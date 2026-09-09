@@ -415,6 +415,50 @@ internal fun StudioNavChip(
 }
 
 @Composable
+internal fun StudioSwitchRow(
+    label: String,
+    checked: Boolean,
+    enabled: Boolean,
+    hint: String? = null,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .then(
+                    if (enabled) {
+                        Modifier.toggleable(
+                            value = checked,
+                            role = Role.Switch,
+                            onValueChange = onCheckedChange,
+                        )
+                    } else {
+                        Modifier
+                    },
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                label,
+                color = if (enabled) Paper else PaperDim,
+                modifier = Modifier.weight(1f),
+            )
+            Switch(
+                checked = checked,
+                onCheckedChange = null,
+                enabled = enabled,
+                colors = SwitchDefaults.colors(checkedTrackColor = Amber),
+            )
+        }
+        if (hint != null) {
+            StudioNote(hint, tone = Amber, topPadding = 0)
+        }
+    }
+}
+
+@Composable
 internal fun StudioWatermarkRow(
     checked: Boolean,
     enabled: Boolean,

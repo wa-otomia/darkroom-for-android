@@ -9,7 +9,10 @@ import app.darkroom.android.core.PrintRecord
 import app.darkroom.android.core.PrintRestoreAction
 import app.darkroom.android.core.ViewportPlacement
 import app.darkroom.android.core.combineGeneratePrompt
+import app.darkroom.android.core.exactQuarterTurns
+import app.darkroom.android.core.framingFor
 import app.darkroom.android.core.PrintJobCancelFlags
+import app.darkroom.android.core.resolveQueuedPose
 import app.darkroom.android.core.mapPrintWorkerFailure
 import app.darkroom.android.core.printImageSize
 import app.darkroom.android.core.resolvePrintLandscape
@@ -230,7 +233,14 @@ class PrintQueue @Inject constructor(
     ) {
         appScope.launch {
             val copiesN = (copies ?: settings.readSettings().defaultCopies).coerceIn(1, 9)
-            val resolvedLandscape = resolveEnqueueLandscape(photoId, source, landscape)
+            val photo = catalog.get(photoId)
+            val pose = resolveQueuedPose(
+                saved = photo?.framingFor(source),
+                explicitLandscape = landscape,
+                explicitRotationDegrees = rotationDegrees,
+                explicitPlacement = placement,
+            )
+            val resolvedLandscape = pose.landscape ?: resolveEnqueueLandscape(photoId, source, null)
             persist(
                 PrintJobEntity(
                     id = UUID.randomUUID().toString(),
@@ -242,10 +252,10 @@ class PrintQueue @Inject constructor(
                     prompt = prompt,
                     cropImageWidth = cropImageWidth,
                     cropImageHeight = cropImageHeight,
-                    rotateQuarters = rotateQuarters,
+                    rotateQuarters = exactQuarterTurns(pose.rotationDegrees) ?: rotateQuarters,
                     landscape = resolvedLandscape,
-                    rotationDegrees = rotationDegrees,
-                    placementJson = placement?.let { encodePlacement(json, it) },
+                    rotationDegrees = pose.rotationDegrees,
+                    placementJson = pose.placement?.let { encodePlacement(json, it) },
                     origin = origin,
                     watermark = watermark,
                     state = STATE_QUEUED,

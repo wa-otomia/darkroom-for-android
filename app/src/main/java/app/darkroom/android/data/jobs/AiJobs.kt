@@ -1,12 +1,14 @@
 package app.darkroom.android.data.jobs
 
 import app.darkroom.android.core.AiJobSnapshot
+import app.darkroom.android.core.AppliedFraming
 import app.darkroom.android.core.GENERATED_PHOTO_TAG
 import app.darkroom.android.core.combineGeneratePrompt
 import app.darkroom.android.core.generatedPhotoFilename
 import app.darkroom.android.core.resolvePhotoSource
 import app.darkroom.android.data.catalog.CatalogRepository
 import app.darkroom.android.data.ai.AiImageClient
+import app.darkroom.android.data.imaging.ImagePipeline
 import app.darkroom.android.data.printer.StudioJobEvent
 import app.darkroom.android.data.progress.JobKind
 import app.darkroom.android.data.progress.JobProgress
@@ -81,12 +83,24 @@ class AiJobs @Inject constructor(
 
     private val handles = ConcurrentHashMap<String, Job>()
 
-    fun enqueueGenerate(photoId: String, source: String, presetId: String, prompt: String) {
-        start(AiKind.Generate, photoId, source, presetId, prompt)
+    fun enqueueGenerate(
+        photoId: String,
+        source: String,
+        presetId: String,
+        prompt: String,
+        appliedFraming: AppliedFraming? = null,
+    ) {
+        start(AiKind.Generate, photoId, source, presetId, prompt, appliedFraming)
     }
 
-    fun enqueueEdit(photoId: String, source: String, presetId: String, prompt: String) {
-        start(AiKind.Edit, photoId, source, presetId, prompt)
+    fun enqueueEdit(
+        photoId: String,
+        source: String,
+        presetId: String,
+        prompt: String,
+        appliedFraming: AppliedFraming? = null,
+    ) {
+        start(AiKind.Edit, photoId, source, presetId, prompt, appliedFraming)
     }
 
     fun cancel(id: String): Pair<Boolean, String> {
@@ -99,7 +113,14 @@ class AiJobs @Inject constructor(
         update(id) { it.copy(hidden = true) }
     }
 
-    private fun start(kind: AiKind, photoId: String, source: String, presetId: String, prompt: String) {
+    private fun start(
+        kind: AiKind,
+        photoId: String,
+        source: String,
+        presetId: String,
+        prompt: String,
+        appliedFraming: AppliedFraming? = null,
+    ) {
         val id = UUID.randomUUID().toString()
         val targetPhotoId = if (kind == AiKind.Generate) UUID.randomUUID().toString() else photoId
         val startedAt = System.currentTimeMillis()
@@ -129,7 +150,22 @@ class AiJobs @Inject constructor(
                 val combined = combineGeneratePrompt(presetPrompt, prompt)
                 if (!settings.aiConfigured()) error("未配置 AI 钥匙。去设置页填入 API key 后再${if (kind == AiKind.Generate) "生成" else "修图"}。")
                 val file = catalog.sourceFile(photoId, resolvePhotoSource(source))
-                val jpeg = grok.edit(file.readBytes(), combined, photoId, purpose = kind.purpose) { progress ->
+                val raw = file.readBytes()
+                val upload = if (appliedFraming != null) {
+                    ImagePipeline.cropToJpeg(
+                        raw,
+                        appliedFraming.crop,
+                        appliedFraming.cropImageWidth,
+                        appliedFraming.cropImageHeight,
+                        rotateQuarters = appliedFraming.rotateQuarters,
+                        landscape = appliedFraming.landscape,
+                        rotationDegrees = appliedFraming.rotationDegrees,
+                        placement = appliedFraming.placement,
+                    )
+                } else {
+                    raw
+                }
+                val jpeg = grok.edit(upload, combined, photoId, purpose = kind.purpose) { progress ->
                     applyAiProgress(tracker, progress)
                     publish(id, tracker)
                 }

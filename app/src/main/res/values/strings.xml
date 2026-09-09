@@ -103,6 +103,7 @@
     <string name="studio_watermark">Watermark</string>
     <string name="studio_watermark_unconfigured">Turn on a watermark in Settings first</string>
     <string name="studio_reset">Reset</string>
+    <string name="studio_ai_use_framing">Generate with current framing</string>
     <string name="studio_ai_generate_version">Generate new version</string>
     <string name="studio_ai_generate_to_gallery">Generate to gallery</string>
     <string name="studio_ai_generate_hint">Generate new version adds an edit to this photo. Generate to gallery saves a new standalone photo in the library.</string>

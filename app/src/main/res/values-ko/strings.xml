@@ -109,6 +109,7 @@
     <string name="studio_watermark">워터마크</string>
     <string name="studio_watermark_unconfigured">먼저 설정에서 워터마크를 켜세요</string>
     <string name="studio_reset">재설정</string>
+    <string name="studio_ai_use_framing">현재 구도로 생성</string>
     <string name="studio_ai_generate_version">수정 버전 생성</string>
     <string name="studio_ai_generate_to_gallery">갤러리로 생성</string>
     <string name="studio_ai_generate_hint">「수정 버전 생성」은 이 사진에 편집 버전을 추가합니다. 「갤러리로 생성」은 라이브러리에 새 사진으로 저장합니다.</string>

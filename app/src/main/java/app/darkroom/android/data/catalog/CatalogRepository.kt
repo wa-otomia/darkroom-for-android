@@ -2,10 +2,15 @@ package app.darkroom.android.data.catalog
 
 import android.content.Context
 import app.darkroom.android.core.EditRecord
+import app.darkroom.android.core.Framing
 import app.darkroom.android.core.GENERATED_PHOTO_TAG
 import app.darkroom.android.core.PhotoMeta
+import app.darkroom.android.core.PrintFit
 import app.darkroom.android.core.PrintRecord
+import app.darkroom.android.core.framingFor
 import app.darkroom.android.core.galleryThumbSource
+import app.darkroom.android.core.toPlacement
+import app.darkroom.android.core.withFraming
 import app.darkroom.android.core.generatedPhotoFilename
 import app.darkroom.android.core.hasJpegEoi
 import app.darkroom.android.core.isJpegBytes
@@ -98,8 +103,12 @@ class CatalogRepository @Inject constructor(
         return if (resolved == "original") originalFile(id) else editFile(id, resolved)
     }
 
+    fun framedThumbFile(id: String) = File(library, "$id/framed-thumb.jpg")
+
     fun galleryThumbFile(photo: PhotoMeta): File {
         val source = galleryThumbSource(photo) { thumbFile(photo.id, it).exists() }
+        val framed = framedThumbFile(photo.id)
+        if (photo.framingFor(source) != null && framed.exists()) return framed
         return thumbFile(photo.id, source)
     }
 
@@ -196,6 +205,7 @@ class CatalogRepository @Inject constructor(
             presetTitle = presetTitle,
         )
         val next = current.copy(edits = current.edits + record)
+        refreshGalleryFramedThumb(next)
         db.photoDao().upsert(next.toEntity())
         record
     }
@@ -205,11 +215,59 @@ class CatalogRepository @Inject constructor(
         if (resolved == "original") return@withContext
         val current = get(photoId) ?: return@withContext
         if (current.edits.none { it.id == resolved }) return@withContext
-        val next = current.copy(edits = current.edits.filter { it.id != resolved })
+        val next = current.copy(
+            edits = current.edits.filter { it.id != resolved },
+            framings = current.framings - resolved,
+        )
+        refreshGalleryFramedThumb(next)
         db.photoDao().upsert(next.toEntity())
         editFile(photoId, resolved).delete()
         thumbFile(photoId, resolved).delete()
         activityLog.record("catalog", "delete edit $resolved of $photoId")
+    }
+
+    fun persistFraming(photoId: String, source: String, framing: Framing?) {
+        scope.launch { saveFraming(photoId, source, framing) }
+    }
+
+    suspend fun saveFraming(photoId: String, source: String, framing: Framing?) = withContext(Dispatchers.IO) {
+        val current = get(photoId) ?: return@withContext
+        val next = current.withFraming(source, framing)
+        val display = galleryThumbSource(next) { thumbFile(next.id, it).exists() }
+        val framedMissing = next.framingFor(display) != null && !framedThumbFile(next.id).exists()
+        if (next.framings == current.framings && !framedMissing) return@withContext
+        refreshGalleryFramedThumb(next)
+        if (next.framings != current.framings) {
+            db.photoDao().upsert(next.toEntity())
+        }
+    }
+
+    private fun refreshGalleryFramedThumb(photo: PhotoMeta) {
+        val source = galleryThumbSource(photo) { thumbFile(photo.id, it).exists() }
+        val dest = framedThumbFile(photo.id)
+        val framing = photo.framingFor(source)
+        if (framing == null) {
+            dest.delete()
+            return
+        }
+        val file = sourceFile(photo.id, source)
+        if (!file.exists()) {
+            dest.delete()
+            return
+        }
+        runCatching {
+            val jpeg = ImagePipeline.renderPrintJpeg(
+                file.readBytes(),
+                crop = null,
+                fit = PrintFit.COVER,
+                landscape = framing.landscape,
+                rotationDegrees = framing.rotationDegrees,
+                placement = framing.toPlacement(),
+                watermark = null,
+                sheetForPrinter = false,
+            )
+            ImagePipeline.writeFile(dest, ImagePipeline.thumbnailJpeg(jpeg))
+        }
     }
 
     suspend fun saveGenerated(

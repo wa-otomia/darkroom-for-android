@@ -5,6 +5,7 @@ import androidx.room.Room
 import app.darkroom.android.data.catalog.MIGRATION_1_2
 import app.darkroom.android.data.catalog.MIGRATION_2_3
 import app.darkroom.android.data.catalog.MIGRATION_3_4
+import app.darkroom.android.data.catalog.MIGRATION_4_5
 import app.darkroom.android.data.catalog.PhotoDatabase
 import app.darkroom.android.data.progress.PrefsProgressStats
 import app.darkroom.android.data.progress.ProgressStats
@@ -30,7 +31,7 @@ object AppModule {
     @Singleton
     fun database(@ApplicationContext context: Context): PhotoDatabase =
         Room.databaseBuilder(context, PhotoDatabase::class.java, "darkroom.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
 
     @Provides

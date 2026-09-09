@@ -109,6 +109,7 @@
     <string name="studio_watermark">透かし</string>
     <string name="studio_watermark_unconfigured">先に設定で透かしを有効にしてください</string>
     <string name="studio_reset">リセット</string>
+    <string name="studio_ai_use_framing">現在の構図で生成</string>
     <string name="studio_ai_generate_version">新しいバージョンを生成</string>
     <string name="studio_ai_generate_to_gallery">ギャラリーへ生成</string>
     <string name="studio_ai_generate_hint">「新しいバージョンを生成」はこの写真に編集バージョンを追加します。「ギャラリーへ生成」はライブラリに新しい写真として保存します。</string>

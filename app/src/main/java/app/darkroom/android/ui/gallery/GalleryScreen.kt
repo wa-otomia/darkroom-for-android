@@ -714,8 +714,14 @@ private fun PhotoCard(
     onCancelOverlay: () -> Unit,
 ) {
     val context = LocalContext.current
-    val request = remember(thumb) {
-        ImageRequest.Builder(context).data(thumb).crossfade(220).build()
+    val thumbStamp = thumb.lastModified()
+    val request = remember(thumb.path, thumbStamp) {
+        ImageRequest.Builder(context)
+            .data(thumb)
+            .memoryCacheKey("${thumb.path}:$thumbStamp")
+            .diskCacheKey("${thumb.path}:$thumbStamp")
+            .crossfade(220)
+            .build()
     }
     var thumbState by remember(thumb) { mutableStateOf(ThumbState.LOADING) }
     val timeLabel = remember(photo?.ingestedAt, context) {

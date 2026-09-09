@@ -11,6 +11,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import app.darkroom.android.core.EditRecord
+import app.darkroom.android.core.Framing
 import app.darkroom.android.core.PhotoMeta
 import app.darkroom.android.core.PrintRecord
 import kotlinx.coroutines.flow.Flow
@@ -30,6 +31,7 @@ data class PhotoEntity(
     val editsJson: String,
     val printsJson: String,
     val tagsJson: String = "[]",
+    val framingsJson: String = "{}",
 )
 
 private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -47,6 +49,7 @@ fun PhotoEntity.toMeta(): PhotoMeta = PhotoMeta(
     parentId = parentId,
     generatePrompt = generatePrompt,
     tags = runCatching { json.decodeFromString<List<String>>(tagsJson) }.getOrDefault(emptyList()),
+    framings = runCatching { json.decodeFromString<Map<String, Framing>>(framingsJson) }.getOrDefault(emptyMap()),
 )
 
 fun PhotoMeta.toEntity(): PhotoEntity = PhotoEntity(
@@ -62,6 +65,7 @@ fun PhotoMeta.toEntity(): PhotoEntity = PhotoEntity(
     editsJson = json.encodeToString(edits),
     printsJson = json.encodeToString(prints),
     tagsJson = json.encodeToString(tags),
+    framingsJson = json.encodeToString(framings),
 )
 
 @Dao
@@ -133,6 +137,12 @@ interface PrintJobDao {
     suspend fun listRunning(): List<PrintJobEntity>
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE photos ADD COLUMN framingsJson TEXT NOT NULL DEFAULT '{}'")
+    }
+}
+
 val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE photos ADD COLUMN tagsJson TEXT NOT NULL DEFAULT '[]'")
@@ -179,7 +189,7 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
-@Database(entities = [PhotoEntity::class, PrintJobEntity::class], version = 4, exportSchema = false)
+@Database(entities = [PhotoEntity::class, PrintJobEntity::class], version = 5, exportSchema = false)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
     abstract fun printJobDao(): PrintJobDao

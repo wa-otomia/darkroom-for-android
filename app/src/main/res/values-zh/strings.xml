@@ -109,6 +109,7 @@
     <string name="studio_watermark">水印</string>
     <string name="studio_watermark_unconfigured">请先在设置中启用水印</string>
     <string name="studio_reset">重置</string>
+    <string name="studio_ai_use_framing">使用当前构图生成</string>
     <string name="studio_ai_generate_version">生成修改版本</string>
     <string name="studio_ai_generate_to_gallery">生成到相册</string>
     <string name="studio_ai_generate_hint">「生成修改版本」会为当前照片新增一个版本。「生成到相册」会另存为相册中的一张新照片。</string>

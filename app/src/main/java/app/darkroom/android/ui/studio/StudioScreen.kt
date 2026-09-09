@@ -46,7 +46,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +71,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.darkroom.android.R
+import app.darkroom.android.core.AppliedFraming
+import app.darkroom.android.core.Framing
 import app.darkroom.android.core.GENERATED_PHOTO_TAG
 import app.darkroom.android.core.MAX_PRINT_ZOOM
 import app.darkroom.android.core.MIN_PRINT_ZOOM
@@ -82,12 +86,17 @@ import app.darkroom.android.core.editsInCreationOrder
 import app.darkroom.android.core.isConfigured
 import app.darkroom.android.core.exactQuarterTurns
 import app.darkroom.android.core.formatCropSpec
+import app.darkroom.android.core.framingFor
 import app.darkroom.android.core.isCancelledPrintMessage
 import app.darkroom.android.core.isGenerated
 import app.darkroom.android.core.listRelatedPhotos
+import app.darkroom.android.core.liveFraming
 import app.darkroom.android.core.newestVersionSource
+import app.darkroom.android.core.panInFrame
 import app.darkroom.android.core.normalizeRotationDegrees
 import app.darkroom.android.core.parseCropSpec
+import app.darkroom.android.core.persistableFraming
+import app.darkroom.android.core.printImageSize
 import app.darkroom.android.core.resolveEditPresetName
 import app.darkroom.android.core.resolveRootId
 import app.darkroom.android.core.rotatePan
@@ -129,6 +138,7 @@ import app.darkroom.android.ui.theme.PaperDim
 import app.darkroom.android.ui.theme.Room
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -166,20 +176,17 @@ fun StudioScreen(
         if (raw != "original" && edits.none { it.id == raw }) newestVersionSource(edits) else raw
     }
     val haptics = LocalHapticFeedback.current
-    var zoom by rememberSaveable(photoId) { mutableStateOf(1f) }
-    var panX by rememberSaveable(photoId) { mutableStateOf(0f) }
-    var panY by rememberSaveable(photoId) { mutableStateOf(0f) }
-    var rotationDegrees by rememberSaveable(photoId) { mutableStateOf(0f) }
-    var landscapeTouched by rememberSaveable(photoId) { mutableStateOf(false) }
-    var landscape by rememberSaveable(photoId) {
+    var zoom by rememberSaveable(photoId, source) { mutableStateOf(1f) }
+    var panX by rememberSaveable(photoId, source) { mutableStateOf(0f) }
+    var panY by rememberSaveable(photoId, source) { mutableStateOf(0f) }
+    var rotationDegrees by rememberSaveable(photoId, source) { mutableStateOf(0f) }
+    var landscapeTouched by rememberSaveable(photoId, source) { mutableStateOf(false) }
+    var landscape by rememberSaveable(photoId, source) {
         mutableStateOf(defaultLandscape(photo?.width ?: 0, photo?.height ?: 0))
     }
-    LaunchedEffect(photoId, photo?.width, photo?.height) {
-        val meta = photo ?: return@LaunchedEffect
-        if (!landscapeTouched && meta.width > 0 && meta.height > 0) {
-            landscape = defaultLandscape(meta.width, meta.height)
-        }
-    }
+    var framingReady by remember(photoId, source) { mutableStateOf(false) }
+    var restoreFraming by remember(photoId, source) { mutableStateOf<Framing?>(null) }
+    var useCurrentFraming by rememberSaveable { mutableStateOf(true) }
     var cropSpec by rememberSaveable(photoId, source) { mutableStateOf("") }
     var placement by remember(photoId, source) { mutableStateOf<ViewportPlacement?>(null) }
     var prompt by rememberSaveable(photoId) { mutableStateOf("") }
@@ -372,6 +379,100 @@ fun StudioScreen(
         rotatedSize(orientedW, orientedH, quarterTurns)
     }
 
+    LaunchedEffect(photoId, source) {
+        framingReady = false
+        val saved = catalog.get(photoId)?.framingFor(source) ?: photo.framingFor(source)
+        restoreFraming = saved
+        if (saved != null) {
+            zoom = saved.zoom
+            panX = saved.offsetX
+            panY = saved.offsetY
+            rotationDegrees = saved.rotationDegrees
+            landscape = saved.landscape
+            landscapeTouched = true
+        } else {
+            zoom = 1f
+            panX = 0f
+            panY = 0f
+            rotationDegrees = 0f
+            landscapeTouched = false
+            val size = printImageSize(photo, source)
+            landscape = defaultLandscape(size?.width ?: 0, size?.height ?: 0)
+        }
+        framingReady = true
+    }
+    LaunchedEffect(photoId, source, restoreFraming, placement?.frameWidth, placement?.frameHeight) {
+        val saved = restoreFraming ?: return@LaunchedEffect
+        val fw = placement?.frameWidth ?: return@LaunchedEffect
+        val fh = placement?.frameHeight ?: return@LaunchedEffect
+        if (fw <= 0f || fh <= 0f) return@LaunchedEffect
+        val (x, y) = saved.panInFrame(fw, fh)
+        panX = x
+        panY = y
+        restoreFraming = null
+    }
+
+    val currentFraming = liveFraming(
+        landscape = landscape,
+        zoom = zoom,
+        offsetX = placement?.offsetX ?: panX,
+        offsetY = placement?.offsetY ?: panY,
+        rotationDegrees = rotationDegrees,
+        placement = placement,
+        imageWidth = orientedW,
+        imageHeight = orientedH,
+    )
+    val poseRef = remember { mutableStateOf(FramingPoseSnap("", "", false, null)) }
+    val framingToPersist: Framing? =
+        restoreFraming ?: persistableFraming(currentFraming, orientedW, orientedH)
+    SideEffect {
+        poseRef.value = FramingPoseSnap(
+            photoId = photo.id,
+            source = source,
+            ready = framingReady,
+            framing = framingToPersist,
+        )
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            val snap = poseRef.value
+            if (snap.ready) catalog.persistFraming(snap.photoId, snap.source, snap.framing)
+        }
+    }
+    LaunchedEffect(photoId, source, zoom, panX, panY, rotationDegrees, landscape, placement, framingReady, restoreFraming) {
+        if (!framingReady || restoreFraming != null) return@LaunchedEffect
+        delay(300)
+        catalog.saveFraming(
+            photo.id,
+            source,
+            persistableFraming(currentFraming, orientedW, orientedH),
+        )
+    }
+
+    val selectSource: (String) -> Unit = { next ->
+        if (next != source) {
+            if (framingReady) {
+                catalog.persistFraming(photo.id, source, framingToPersist)
+            }
+            sourceOverride = next
+        }
+    }
+
+    val appliedAiFraming: AppliedFraming? =
+        if (useCurrentFraming) {
+            AppliedFraming(
+                crop = crop,
+                cropImageWidth = working.width.takeIf { it > 0 },
+                cropImageHeight = working.height.takeIf { it > 0 },
+                rotateQuarters = quarterTurns,
+                landscape = landscape,
+                rotationDegrees = rotationDegrees,
+                placement = placement,
+            )
+        } else {
+            null
+        }
+
     // The buttons land on a right angle even after a two-finger twist, so one tap
     // straightens a tilted frame instead of carrying the tilt round.
     val onRotate: (Int) -> Unit = { delta ->
@@ -478,6 +579,7 @@ fun StudioScreen(
                     },
                     onRotate = onRotate,
                     onReset = {
+                        restoreFraming = null
                         zoom = 1f
                         panX = 0f
                         panY = 0f
@@ -487,6 +589,7 @@ fun StudioScreen(
                         val autoH = orientedH.takeIf { it > 0 } ?: photo.height
                         landscape = defaultLandscape(autoW, autoH)
                         snapState.begin(0f, 0f, 0f)
+                        catalog.persistFraming(photo.id, source, null)
                     },
                 )
                 if (landscape) {
@@ -540,7 +643,7 @@ fun StudioScreen(
                         selected = source == "original",
                         label = stringResource(R.string.original),
                         model = catalog.versionThumbFile(photo.id, "original"),
-                        onClick = { sourceOverride = "original" },
+                        onClick = { selectSource("original") },
                     )
                     editsInCreationOrder(photo.edits).forEachIndexed { i, edit ->
                         val presetName = resolveEditPresetName(
@@ -552,7 +655,7 @@ fun StudioScreen(
                             selected = source == edit.id,
                             label = versionLabel(i + 1, presetName, versionFallback),
                             model = catalog.versionThumbFile(photo.id, edit.id),
-                            onClick = { sourceOverride = edit.id },
+                            onClick = { selectSource(edit.id) },
                             onLongClick = if (aiActive) {
                                 null
                             } else {
@@ -589,13 +692,18 @@ fun StudioScreen(
                     )
                 }
             }
+            StudioSwitchRow(
+                label = stringResource(R.string.studio_ai_use_framing),
+                checked = useCurrentFraming,
+                enabled = !cropLocked,
+            ) { useCurrentFraming = it }
             PaperButton(stringResource(R.string.studio_ai_generate_version), enabled = canGenerate) {
                 genError = null
-                aiJobs.enqueueEdit(photo.id, source, presetId, prompt)
+                aiJobs.enqueueEdit(photo.id, source, presetId, prompt, appliedAiFraming)
             }
             GhostButton(stringResource(R.string.studio_ai_generate_to_gallery), enabled = canGenerate) {
                 genError = null
-                aiJobs.enqueueGenerate(photo.id, source, presetId, prompt)
+                aiJobs.enqueueGenerate(photo.id, source, presetId, prompt, appliedAiFraming)
             }
             StudioNote(stringResource(R.string.studio_ai_generate_hint), topPadding = 0)
         }
@@ -1065,6 +1173,13 @@ private fun CopiesStepper(copies: Int, enabled: Boolean, onChange: (Int) -> Unit
         }
     }
 }
+
+private data class FramingPoseSnap(
+    val photoId: String,
+    val source: String,
+    val ready: Boolean,
+    val framing: Framing?,
+)
 
 private fun exportDisplayName(photo: PhotoMeta): String {
     val base = photo.filename

@@ -55,6 +55,8 @@ data class PhotoMeta(
     val parentId: String? = null,
     val generatePrompt: String? = null,
     val tags: List<String> = emptyList(),
+    /** Per-version crop pose. Key is [ORIGINAL_VERSION_ID] or an edit id. Missing = auto defaults. */
+    val framings: Map<String, Framing> = emptyMap(),
 )
 
 /** Catalog tag written when a Studio result is saved as its own gallery photo. */
