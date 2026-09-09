@@ -11,6 +11,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.LocaleList
+import android.os.PowerManager
 import android.provider.Settings
 import android.text.format.DateFormat
 import android.text.format.DateUtils
@@ -47,6 +48,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.BatteryChargingFull
 import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.BrandingWatermark
@@ -143,6 +145,7 @@ import app.darkroom.android.data.ai.AiImageClient
 import app.darkroom.android.data.ai.AiProbe
 import app.darkroom.android.data.catalog.CatalogRepository
 import app.darkroom.android.data.ftp.FtpForegroundService
+import app.darkroom.android.data.jobs.KeepAliveService
 import app.darkroom.android.data.imaging.WatermarkRenderer
 import app.darkroom.android.data.printer.NearbyDevice
 import app.darkroom.android.data.printer.PrinterBluetooth
@@ -272,6 +275,7 @@ fun SettingsScreen(
     var openWatermark by rememberSaveable { mutableStateOf(false) }
     var openActivity by rememberSaveable { mutableStateOf(false) }
     var openLanguage by rememberSaveable { mutableStateOf(false) }
+    var openKeepAlive by rememberSaveable { mutableStateOf(false) }
 
     var showClearKey by rememberSaveable { mutableStateOf(false) }
     var showClearLog by rememberSaveable { mutableStateOf(false) }
@@ -352,6 +356,7 @@ fun SettingsScreen(
             "watermark" -> openWatermark = value
             "activity" -> openActivity = value
             "language" -> openLanguage = value
+            "keepalive", "keep_alive" -> openKeepAlive = value
         }
     }
 
@@ -387,6 +392,21 @@ fun SettingsScreen(
                 context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
         }
+    }
+
+    fun requestIgnoreBatteryOptimizations() {
+        val pm = context.getSystemService(PowerManager::class.java) ?: return
+        if (pm.isIgnoringBatteryOptimizations(context.packageName)) return
+        openIntent(
+            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                .setData(Uri.parse("package:${context.packageName}")),
+        )
+    }
+
+    fun setKeepAlive(on: Boolean) {
+        settings.updateSettings { copy(keepAlive = on) }
+        KeepAliveService.apply(context, on)
+        if (on) requestIgnoreBatteryOptimizations()
     }
 
     fun startScan() {
@@ -1205,6 +1225,29 @@ fun SettingsScreen(
                         onBlur = { pasvMaxBlurred = true },
                         onValueChange = { pasvMax = it },
                     )
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .toggleable(
+                                value = cfg.ftpAutoStart,
+                                role = Role.Switch,
+                                onValueChange = { on -> settings.updateSettings { copy(ftpAutoStart = on) } },
+                            )
+                            .semantics(mergeDescendants = true) {},
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.settings_ftp_auto_start),
+                            color = Paper,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = cfg.ftpAutoStart,
+                            onCheckedChange = null,
+                            colors = SwitchDefaults.colors(checkedTrackColor = Amber),
+                        )
+                    }
                     PaperButton(text = stringResource(R.string.common_save), fillMaxWidth = false) {
                         ftpSubmitted = true
                         if (!ftpInvalid) {
@@ -1753,6 +1796,51 @@ fun SettingsScreen(
                     }
                 }
 
+                Fold(
+                    title = stringResource(R.string.settings_keep_alive),
+                    summary = if (cfg.keepAlive) {
+                        stringResource(R.string.settings_on)
+                    } else {
+                        stringResource(R.string.settings_off)
+                    },
+                    icon = Icons.Outlined.BatteryChargingFull,
+                    open = openKeepAlive,
+                    highlighted = highlighted == "keepalive" || highlighted == "keep_alive",
+                    onToggle = { openKeepAlive = !openKeepAlive },
+                    onTop = { sectionTops["keepalive"] = it },
+                ) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .toggleable(
+                                value = cfg.keepAlive,
+                                role = Role.Switch,
+                                onValueChange = { setKeepAlive(it) },
+                            )
+                            .semantics(mergeDescendants = true) {},
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.settings_keep_alive),
+                            color = Paper,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = cfg.keepAlive,
+                            onCheckedChange = null,
+                            colors = SwitchDefaults.colors(checkedTrackColor = Amber),
+                        )
+                    }
+                    Text(
+                        stringResource(R.string.settings_keep_alive_hint),
+                        color = PaperDim,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -1862,6 +1950,7 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     settings.resetAll()
+                    KeepAliveService.stop(context)
                     val nextCfg = settings.readSettings()
                     val nextAi = settings.readAi()
                     ftpUser = nextCfg.ftpUser

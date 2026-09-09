@@ -15,11 +15,17 @@ import android.text.format.DateUtils
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -36,6 +42,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -61,8 +68,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
@@ -94,7 +105,6 @@ import app.darkroom.android.ui.theme.Amber
 import app.darkroom.android.ui.theme.MonoFont
 import app.darkroom.android.ui.theme.Paper
 import app.darkroom.android.ui.theme.PaperDim
-import app.darkroom.android.ui.theme.PaperFaint
 import app.darkroom.android.ui.theme.PaperHairline
 import app.darkroom.android.ui.theme.SurfaceLow
 import kotlinx.coroutines.Dispatchers
@@ -131,6 +141,7 @@ fun IoScreen(
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var ftpInfoOpen by rememberSaveable { mutableStateOf(false) }
     var starting by rememberSaveable { mutableStateOf(false) }
     var startFailed by rememberSaveable { mutableStateOf(false) }
     var notifBlocked by rememberSaveable { mutableStateOf(false) }
@@ -138,6 +149,7 @@ fun IoScreen(
     var localNetworkAskBlocked by rememberSaveable { mutableStateOf(false) }
     val notifDenied = stringResource(R.string.ftp_notif_denied)
     val passwordLabel = stringResource(R.string.ftp_password)
+    val copiedMessage = stringResource(R.string.copied_to_clipboard)
 
     // Copy feedback belongs beside the field that was copied, not in a snackbar at the bottom of
     // the screen. One state plus the label of the last copied field drives every row.
@@ -259,7 +271,7 @@ fun IoScreen(
         }
     }
 
-    fun copy(label: String, value: String, sensitive: Boolean = false) {
+    fun copy(label: String, value: String, sensitive: Boolean = false, inlineConfirm: Boolean = true) {
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText(label, value)
         if (sensitive) {
@@ -269,7 +281,7 @@ fun IoScreen(
         }
         cm.setPrimaryClip(clip)
         // Android 13+ raises its own "copied" bubble; a second confirmation would double up.
-        if (Build.VERSION.SDK_INT < 33) {
+        if (inlineConfirm && Build.VERSION.SDK_INT < 33) {
             confirmTarget = label
             scope.launch { confirm.show() }
         }
@@ -291,6 +303,9 @@ fun IoScreen(
             Text(stringResource(R.string.io_eyebrow), style = MaterialTheme.typography.labelSmall, color = Amber)
             Text(stringResource(R.string.io_title), style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(top = 4.dp))
             Text(stringResource(R.string.io_desc), style = MaterialTheme.typography.bodyMedium, color = PaperDim, modifier = Modifier.padding(top = 8.dp, bottom = 20.dp))
+
+            PrintQueueRow(jobs = printJobs, onOpen = onOpenPrintQueue)
+            Spacer(Modifier.height(24.dp))
 
             Column(
                 Modifier
@@ -333,65 +348,60 @@ fun IoScreen(
                         else -> PaperButton(stringResource(R.string.ftp_start), fillMaxWidth = false) { onStartClicked() }
                     }
                 }
-                HostRows(
-                    hosts = hosts,
-                    refreshing = refreshing,
-                    confirmedLabel = confirmedLabel,
-                    onRefresh = { refreshHosts() },
-                ) { label, ip -> copy(label, ip) }
-                Credential(
-                    label = stringResource(R.string.ftp_port),
-                    value = showPort.toString(),
-                    confirmedLabel = confirmedLabel,
-                ) { copy(it, showPort.toString()) }
-                Credential(
-                    label = stringResource(R.string.ftp_user),
-                    value = showUser,
-                    confirmedLabel = confirmedLabel,
-                ) { copy(it, showUser) }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        LabelWithConfirm(passwordLabel, confirmedLabel == passwordLabel)
-                        Text(
-                            if (passwordVisible) showPassword else "••••••••",
-                            color = Paper,
-                            fontFamily = MonoFont,
-                            fontSize = 20.sp,
-                        )
+                ConnectionFold(open = ftpInfoOpen, onToggle = { ftpInfoOpen = !ftpInfoOpen }) {
+                    HostRows(
+                        hosts = hosts,
+                        refreshing = refreshing,
+                        confirmedLabel = confirmedLabel,
+                        onRefresh = { refreshHosts() },
+                    ) { label, ip -> copy(label, ip) }
+                    Credential(
+                        label = stringResource(R.string.ftp_port),
+                        value = showPort.toString(),
+                        confirmedLabel = confirmedLabel,
+                    ) { copy(it, showPort.toString()) }
+                    Credential(
+                        label = stringResource(R.string.ftp_user),
+                        value = showUser,
+                        confirmedLabel = confirmedLabel,
+                    ) { copy(it, showUser) }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            LabelWithConfirm(passwordLabel, confirmedLabel == passwordLabel)
+                            Text(
+                                if (passwordVisible) showPassword else "••••••••",
+                                color = Paper,
+                                fontFamily = MonoFont,
+                                fontSize = 20.sp,
+                            )
+                        }
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                contentDescription = stringResource(if (passwordVisible) R.string.hide_password else R.string.show_password),
+                                tint = PaperDim,
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                copy(passwordLabel, showPassword, sensitive = true, inlineConfirm = false)
+                                scope.launch { snackbar.showSnackbar(copiedMessage) }
+                            },
+                        ) {
+                            Icon(
+                                Icons.Outlined.ContentCopy,
+                                contentDescription = stringResource(R.string.lib_io_copy_field, passwordLabel),
+                                tint = PaperDim,
+                            )
+                        }
                     }
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(
-                            if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                            contentDescription = stringResource(if (passwordVisible) R.string.hide_password else R.string.show_password),
-                            tint = PaperDim,
-                        )
-                    }
-                    // Copying a hidden password was a one-tap leak; require the reveal first.
-                    IconButton(
-                        onClick = { copy(passwordLabel, showPassword, sensitive = true) },
-                        enabled = passwordVisible,
-                    ) {
-                        Icon(
-                            Icons.Outlined.ContentCopy,
-                            contentDescription = stringResource(R.string.lib_io_copy_field, passwordLabel),
-                            tint = if (passwordVisible) PaperDim else PaperFaint,
-                        )
-                    }
+                    Spacer(Modifier.height(14.dp))
+                    Credential(
+                        label = stringResource(R.string.ftp_pasv),
+                        value = "$showPasvMin–$showPasvMax",
+                        confirmedLabel = confirmedLabel,
+                    ) { copy(it, "$showPasvMin-$showPasvMax") }
                 }
-                if (!passwordVisible) {
-                    Text(
-                        stringResource(R.string.lib_io_password_copy_hint),
-                        color = PaperDim,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
-                }
-                Spacer(Modifier.height(14.dp))
-                Credential(
-                    label = stringResource(R.string.ftp_pasv),
-                    value = "$showPasvMin–$showPasvMax",
-                    confirmedLabel = confirmedLabel,
-                ) { copy(it, "$showPasvMin-$showPasvMax") }
             }
             val showLocalNetworkNotice = !localNetworkGranted() &&
                 (localNetworkDenied || localNetworkAskBlocked || serviceLocalNetworkBlocked)
@@ -412,8 +422,6 @@ fun IoScreen(
             SessionsBlock(sessions = sessions, transfers = transfers)
             Spacer(Modifier.height(24.dp))
             TransfersBlock(transfers = transfers, onDismiss = onDismissTransfer)
-            Spacer(Modifier.height(24.dp))
-            PrintQueueRow(jobs = printJobs, onOpen = onOpenPrintQueue)
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -523,6 +531,54 @@ private fun TransferRow(transfer: IncomingTransfer, onDismiss: (String) -> Unit)
             }
         },
     )
+}
+
+@Composable
+private fun ConnectionFold(
+    open: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val expandLabel = stringResource(R.string.expand_section)
+    val collapseLabel = stringResource(R.string.collapse_section)
+    val expandedState = stringResource(R.string.settings_expanded)
+    val collapsedState = stringResource(R.string.settings_collapsed)
+    val arrow by animateFloatAsState(targetValue = if (open) 180f else 0f, label = "ftpInfoArrow")
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(
+                    onClickLabel = if (open) collapseLabel else expandLabel,
+                    role = Role.Button,
+                    onClick = onToggle,
+                )
+                .semantics(mergeDescendants = true) {
+                    stateDescription = if (open) expandedState else collapsedState
+                }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.io_ftp_connection),
+                color = Amber,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                Icons.Outlined.ExpandMore,
+                contentDescription = null,
+                tint = PaperDim,
+                modifier = Modifier.rotate(arrow),
+            )
+        }
+        AnimatedVisibility(
+            visible = open,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            Column(content = content)
+        }
+    }
 }
 
 @Composable

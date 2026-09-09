@@ -63,10 +63,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -82,16 +84,22 @@ import app.darkroom.android.core.PhotoMeta
 import app.darkroom.android.core.SNAP_POSITION_DP
 import app.darkroom.android.core.ViewportPlacement
 import app.darkroom.android.core.defaultLandscape
+import app.darkroom.android.core.editsInCreationOrder
 import app.darkroom.android.core.isConfigured
 import app.darkroom.android.core.exactQuarterTurns
 import app.darkroom.android.core.formatCropSpec
 import app.darkroom.android.core.isCancelledPrintMessage
 import app.darkroom.android.core.listRelatedPhotos
+import app.darkroom.android.core.newestVersionSource
 import app.darkroom.android.core.normalizeRotationDegrees
 import app.darkroom.android.core.parseCropSpec
+import app.darkroom.android.core.resolveEditPresetName
 import app.darkroom.android.core.resolveRootId
 import app.darkroom.android.core.rotatePan
 import app.darkroom.android.core.rotatedSize
+import app.darkroom.android.core.sourceAfterVersionRemoved
+import app.darkroom.android.core.studioVersionIngestName
+import app.darkroom.android.core.versionLabel
 import app.darkroom.android.data.catalog.CatalogRepository
 import app.darkroom.android.data.imaging.ImagePipeline
 import app.darkroom.android.data.jobs.AiJobs
@@ -166,7 +174,13 @@ fun StudioScreen(
     val printJobs by printQueue.printJobs.collectAsState(initial = emptyList())
     val runningProgress by printQueue.runningProgress.collectAsState(initial = null)
     val aiJobList by aiJobs.jobs.collectAsState()
-    var source by rememberSaveable(photoId) { mutableStateOf("original") }
+    var sourceOverride by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
+    val source = run {
+        val edits = photo?.edits.orEmpty()
+        val raw = sourceOverride ?: newestVersionSource(edits)
+        if (raw != "original" && edits.none { it.id == raw }) newestVersionSource(edits) else raw
+    }
+    val haptics = LocalHapticFeedback.current
     var zoom by rememberSaveable(photoId) { mutableStateOf(1f) }
     var panX by rememberSaveable(photoId) { mutableStateOf(0f) }
     var panY by rememberSaveable(photoId) { mutableStateOf(0f) }
@@ -189,6 +203,8 @@ fun StudioScreen(
     var printError by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
     var genError by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
     var pendingDelete by rememberSaveable(photoId) { mutableStateOf(false) }
+    var versionMenuId by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
+    var versionDeleteId by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
     var sourceWidth by rememberSaveable(photoId, source) { mutableStateOf(0) }
     var sourceHeight by rememberSaveable(photoId, source) { mutableStateOf(0) }
     val snackbar = remember { SnackbarHostState() }
@@ -225,6 +241,8 @@ fun StudioScreen(
     val generatedText = stringResource(R.string.ai_generated)
     val viewGenerated = stringResource(R.string.ai_generated_view)
     val editDoneText = stringResource(R.string.edit_done)
+    val addedToGalleryText = stringResource(R.string.studio_added_to_gallery)
+    val versionFallback = stringResource(R.string.studio_version_fallback)
     val printDoneText = stringResource(R.string.print_done)
     val printQueuedText = stringResource(R.string.print_queued)
     var printStripCollapsed by rememberSaveable(photoId) { mutableStateOf(false) }
@@ -284,7 +302,7 @@ fun StudioScreen(
                     }
                 }
                 is StudioJobEvent.Edited -> {
-                    source = e.editId
+                    sourceOverride = e.editId
                     genError = null
                     launch { snackbar.showSnackbar(editDoneText) }
                 }
@@ -430,6 +448,7 @@ fun StudioScreen(
                             photo = photo,
                             outputScale = 2,
                             context = context.applicationContext,
+                            sheetForPrinter = false,
                         )
                         tracker.startPhase("saving")
                         writeExportJpeg(context.applicationContext, jpeg, exportDisplayName(photo))
@@ -461,7 +480,7 @@ fun StudioScreen(
     val controls: @Composable (onPromptFocus: () -> Unit) -> Unit = { onPromptFocus ->
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             CopiesStepper(copies = copies, enabled = !cropLocked) { copies = it.coerceIn(1, 9) }
-            PaperButton(stringResource(R.string.studio_print_direct), enabled = canPrintDirect) {
+            PaperButton(stringResource(R.string.studio_add_to_print_queue), enabled = canPrintDirect) {
                 startPrint(false)
             }
             GhostButton(stringResource(R.string.print_with_preset), enabled = canPrintWithPreset) {
@@ -552,13 +571,26 @@ fun StudioScreen(
                     StudioVersionChip(
                         selected = source == "original",
                         label = stringResource(R.string.original),
-                        onClick = { source = "original" },
+                        onClick = { sourceOverride = "original" },
                     )
-                    photo.edits.forEachIndexed { i, edit ->
+                    editsInCreationOrder(photo.edits).forEachIndexed { i, edit ->
+                        val presetName = resolveEditPresetName(
+                            edit.presetTitle,
+                            edit.presetId,
+                            versionFallback,
+                        ) { id -> presets.presets.find { it.id == id }?.title }
                         StudioVersionChip(
                             selected = source == edit.id,
-                            label = stringResource(R.string.edit_n, i + 1),
-                            onClick = { source = edit.id },
+                            label = versionLabel(i + 1, presetName, versionFallback),
+                            onClick = { sourceOverride = edit.id },
+                            onLongClick = if (aiActive) {
+                                null
+                            } else {
+                                {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    versionMenuId = edit.id
+                                }
+                            },
                         )
                     }
                 }
@@ -607,15 +639,15 @@ fun StudioScreen(
                     },
                 )
             }
-            PaperButton(stringResource(R.string.generate_to_gallery), enabled = canGenerate) {
-                genError = null
-                aiJobs.enqueueGenerate(photo.id, source, presetId, prompt)
-            }
-            GhostButton(stringResource(R.string.edit_only), enabled = canGenerate) {
+            PaperButton(stringResource(R.string.studio_ai_generate_version), enabled = canGenerate) {
                 genError = null
                 aiJobs.enqueueEdit(photo.id, source, presetId, prompt)
             }
-            StudioNote(stringResource(R.string.studio_generate_vs_edit), topPadding = 0)
+            GhostButton(stringResource(R.string.studio_ai_generate_to_gallery), enabled = canGenerate) {
+                genError = null
+                aiJobs.enqueueGenerate(photo.id, source, presetId, prompt)
+            }
+            StudioNote(stringResource(R.string.studio_ai_generate_hint), topPadding = 0)
         }
     }
 
@@ -839,6 +871,106 @@ fun StudioScreen(
             },
             dismissButton = {
                 TextButton(onClick = { pendingDelete = false }) { Text(stringResource(R.string.common_cancel)) }
+            },
+        )
+    }
+
+    LaunchedEffect(versionMenuId, photo.edits) {
+        val id = versionMenuId ?: return@LaunchedEffect
+        if (photo.edits.none { it.id == id }) versionMenuId = null
+    }
+    val menuEdit = versionMenuId?.let { id -> photo.edits.find { it.id == id } }
+    menuEdit?.let { edit ->
+        val menuIndex = editsInCreationOrder(photo.edits).indexOfFirst { it.id == edit.id }
+        val menuName = resolveEditPresetName(
+            edit.presetTitle,
+            edit.presetId,
+            versionFallback,
+        ) { id -> presets.presets.find { it.id == id }?.title }
+        val menuLabel = if (menuIndex >= 0) {
+            versionLabel(menuIndex + 1, menuName, versionFallback)
+        } else {
+            menuName
+        }
+        AlertDialog(
+            onDismissRequest = { versionMenuId = null },
+            title = { Text(menuLabel) },
+            text = {
+                Column {
+                    TextButton(
+                        onClick = {
+                            versionMenuId = null
+                            versionDeleteId = edit.id
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.studio_delete_version), modifier = Modifier.fillMaxWidth())
+                    }
+                    TextButton(
+                        onClick = {
+                            val editId = edit.id
+                            versionMenuId = null
+                            scope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        val file = catalog.sourceFile(photo.id, editId)
+                                        val index = editsInCreationOrder(photo.edits)
+                                            .indexOfFirst { it.id == editId } + 1
+                                        catalog.ingestBytes(
+                                            file.readBytes(),
+                                            studioVersionIngestName(photo.filename, index.coerceAtLeast(1)),
+                                            kind = "studio",
+                                        )
+                                    }
+                                    snackbar.showSnackbar(addedToGalleryText)
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    genError = e.message ?: e.toString()
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.studio_add_version_to_gallery), modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { versionMenuId = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+
+    versionDeleteId?.let { editId ->
+        AlertDialog(
+            onDismissRequest = { versionDeleteId = null },
+            title = { Text(stringResource(R.string.studio_delete_version_title)) },
+            confirmButton = {
+                TextButton(
+                    enabled = !aiActive,
+                    onClick = {
+                        val id = editId
+                        versionDeleteId = null
+                        sourceOverride = sourceAfterVersionRemoved(photo.edits, id, source)
+                        scope.launch {
+                            try {
+                                catalog.deleteEdit(photo.id, id)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                genError = e.message ?: e.toString()
+                            }
+                        }
+                    },
+                ) { Text(stringResource(R.string.common_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { versionDeleteId = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
             },
         )
     }

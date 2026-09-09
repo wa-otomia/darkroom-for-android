@@ -108,6 +108,15 @@
     <string name="studio_watermark">水印</string>
     <string name="studio_watermark_unconfigured">请先在设置中启用水印</string>
     <string name="studio_reset">重置</string>
+    <string name="studio_ai_generate_version">生成修改版本</string>
+    <string name="studio_ai_generate_to_gallery">生成到相册</string>
+    <string name="studio_ai_generate_hint">「生成修改版本」会为当前照片新增一个版本。「生成到相册」会另存为相册中的一张新照片。</string>
+    <string name="studio_version_fallback">修图</string>
+    <string name="studio_delete_version">删除该版本</string>
+    <string name="studio_delete_version_title">删除该版本？</string>
+    <string name="studio_add_version_to_gallery">添加到相册</string>
+    <string name="studio_added_to_gallery">已添加到相册</string>
+    <string name="studio_add_to_print_queue">加入打印队列</string>
     <string name="studio_export">导出</string>
     <string name="studio_exported">已导出到相册</string>
     <string name="studio_share">分享</string>
@@ -267,4 +276,11 @@
     <string name="ds_error_network">网络连接不可用。请检查 Wi-Fi 或移动数据后重试。</string>
     <string name="ds_error_storage">文件读写失败。请检查本机可用存储空间。</string>
     <string name="ds_error_ftp_bind">无法启用该 FTP 端口，可能已被占用，请更换端口。</string>
+    <string name="copied_to_clipboard">已复制</string>
+    <string name="io_ftp_connection">连接信息</string>
+    <string name="settings_ftp_auto_start">APP 启动时自动开启 FTP</string>
+    <string name="settings_keep_alive">App 保活</string>
+    <string name="settings_keep_alive_hint">保持应用在后台运行，以便 FTP 与自动打印持续工作。</string>
+    <string name="keep_alive_channel">保活</string>
+    <string name="keep_alive_notification">保持 Darkroom 运行中</string>
 </resources>

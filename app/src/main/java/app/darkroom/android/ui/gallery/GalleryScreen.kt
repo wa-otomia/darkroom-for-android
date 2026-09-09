@@ -507,7 +507,10 @@ fun GalleryScreen(
                                 photo = null,
                                 thumb = catalog.thumbFile(item.photoId),
                                 pending = item,
-                                sourceThumb = item.sourcePhotoId?.let { catalog.thumbFile(it) },
+                                sourceThumb = item.sourcePhotoId?.let { sid ->
+                                    photos.find { it.id == sid }?.let(catalog::galleryThumbFile)
+                                        ?: catalog.thumbFile(sid)
+                                },
                                 overlay = null,
                                 selectionMode = selectionMode,
                                 selected = false,
@@ -523,7 +526,7 @@ fun GalleryScreen(
                                 val selected = item.photoId in selection
                                 PhotoCard(
                                     photo = item.meta,
-                                    thumb = catalog.thumbFile(item.photoId),
+                                    thumb = catalog.galleryThumbFile(item.meta),
                                     pending = null,
                                     sourceThumb = null,
                                     overlay = item.overlay,

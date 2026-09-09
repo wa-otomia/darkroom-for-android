@@ -170,6 +170,43 @@ class SnapAxisTest {
     }
 
     @Test
+    fun rotationSnapsToFortyFiveThenExitsContinuously() {
+        val axis = SnapAxis(threshold = SNAP_ROTATION_DEG, wrap = 360f)
+        val guides = rotationSnapGuides()
+        axis.begin(43.5f)
+        assertTrue(axis.drag(1f, guides))
+        assertEquals(45f, axis.value, 0.01f)
+        assertEquals(GUIDE_ROT_45, axis.snapped?.id)
+        assertEquals(rotationGuideId(45), axis.snapped?.id)
+
+        // raw is 44.5°; keep going until we leave the 1.5° dead zone.
+        assertFalse(axis.drag(1f, guides))
+        assertEquals(45f, axis.value, 0.01f)
+        assertEquals(GUIDE_ROT_45, axis.snapped?.id)
+        assertFalse(axis.drag(1f, guides))
+        assertEquals(45f, axis.value, 0.01f)
+        assertFalse(axis.drag(1f, guides))
+        assertEquals(46f, axis.value, 0.01f)
+        assertNull(axis.snapped)
+        assertEquals(GUIDE_ROT_45, axis.released?.id)
+
+        assertFalse(axis.drag(1f, guides))
+        assertEquals(47f, axis.value, 0.01f)
+        assertNull(axis.snapped)
+        assertEquals(GUIDE_ROT_45, axis.released?.id)
+    }
+
+    @Test
+    fun rotationWrapsNear360OntoZero() {
+        val axis = SnapAxis(threshold = SNAP_ROTATION_DEG, wrap = 360f)
+        val guides = rotationSnapGuides()
+        axis.begin(358.7f)
+        assertTrue(axis.drag(1.5f, guides))
+        assertEquals(0f, axis.value, 0.01f)
+        assertEquals(GUIDE_ROT_0, axis.snapped?.id)
+    }
+
+    @Test
     fun multipleGuidesChooseNearest() {
         val axis = SnapAxis(threshold = 10f)
         val guides = listOf(SnapGuide("near", 5f), SnapGuide("far", 8f))

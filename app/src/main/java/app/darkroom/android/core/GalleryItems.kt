@@ -226,3 +226,10 @@ private fun printOverlaysByPhoto(jobs: List<PrintJobSnapshot>): Map<String, Over
 
 private fun jobStateKey(value: String): String =
     value.lowercase().substringAfterLast('.')
+
+/** Gallery tiles show the newest edit thumb, or the original when that file is missing. */
+fun galleryThumbSource(photo: PhotoMeta, hasEditThumb: (String) -> Boolean = { true }): String {
+    val id = newestVersionSource(photo.edits)
+    if (id == "original") return "original"
+    return if (hasEditThumb(id)) id else "original"
+}

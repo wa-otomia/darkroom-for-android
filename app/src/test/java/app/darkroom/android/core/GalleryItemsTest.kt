@@ -237,6 +237,17 @@ class GalleryItemsTest {
     }
 
     @Test
+    fun galleryThumbSourcePrefersNewestEditThenFallsBack() {
+        val older = EditRecord("e1", "", "2026-01-01T00:00:00Z", "e1.jpg")
+        val newer = EditRecord("e2", "", "2026-03-01T00:00:00Z", "e2.jpg")
+        val photo = PhotoMeta("p1", "a.jpg", "", "", 1, 1, 1, edits = listOf(older, newer))
+        assertEquals("original", galleryThumbSource(existing))
+        assertEquals("e2", galleryThumbSource(photo))
+        assertEquals("original", galleryThumbSource(photo) { false })
+        assertEquals("e2", galleryThumbSource(photo) { it == "e2" })
+    }
+
+    @Test
     fun finishedPrintDoesNotHideEditOverlay() {
         val edit = AiJobSnapshot(
             id = "e1",

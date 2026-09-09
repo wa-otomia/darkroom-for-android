@@ -3,6 +3,7 @@ package app.darkroom.android.data.ftp
 import app.darkroom.android.core.FtpBindTarget
 import app.darkroom.android.core.formatFtpHosts
 import app.darkroom.android.core.formatFtpHostsOneLine
+import app.darkroom.android.core.isAllowedFtpInterface
 import app.darkroom.android.core.isIngestibleUploadName
 import app.darkroom.android.core.resolvePasvAdvertisedHost
 import app.darkroom.android.core.selectFtpBindTargets
@@ -117,6 +118,7 @@ class CameraFtpServer(
             while (running.get()) {
                 try {
                     val client = sock.accept()
+                    if (!admitSocket(client)) continue
                     pool.execute { Session(client).run() }
                 } catch (_: Exception) {
                     if (!running.get()) break
@@ -137,6 +139,22 @@ class CameraFtpServer(
         pool.shutdownNow()
         status = status.copy(listening = false)
         log("stop $port")
+    }
+
+    private fun admitSocket(socket: Socket): Boolean {
+        val iface = try {
+            NetworkInterface.getByInetAddress(socket.localAddress)?.name
+        } catch (_: Exception) {
+            null
+        }
+        if (isAllowedFtpInterface(iface)) return true
+        val remote = socket.inetAddress?.hostAddress ?: "unknown"
+        log("rejected $remote via ${iface ?: "unknown"}")
+        try {
+            socket.close()
+        } catch (_: Exception) {
+        }
+        return false
     }
 
     private inner class Session(private val socket: Socket) {
@@ -352,6 +370,7 @@ class CameraFtpServer(
             ss.soTimeout = 20_000
             return try {
                 val s = ss.accept()
+                if (!admitSocket(s)) return null
                 dataSocket = s
                 s
             } catch (_: SocketTimeoutException) {

@@ -1,5 +1,6 @@
 package app.darkroom.android.data.ftp
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,11 +8,14 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
 import app.darkroom.android.MainActivity
 import app.darkroom.android.R
 import app.darkroom.android.core.hasLocalNetworkPermission
@@ -246,6 +250,28 @@ class FtpForegroundService : Service() {
 
         fun start(context: Context) {
             context.startForegroundService(Intent(context, FtpForegroundService::class.java))
+        }
+
+        /** Same permission gates as the Transfer-screen start action, without UI prompts. */
+        fun startIfPermitted(context: Context, activityLog: ActivityLog): Boolean {
+            if (!hasLocalNetworkPermission(context)) {
+                activityLog.record("ftp", "auto-start skipped: local network permission missing")
+                return false
+            }
+            if (Build.VERSION.SDK_INT >= 33 &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                activityLog.record("ftp", "auto-start skipped: notifications permission missing")
+                return false
+            }
+            return try {
+                start(context)
+                true
+            } catch (e: Exception) {
+                activityLog.record("ftp", "auto-start failed", "error", e.message)
+                false
+            }
         }
 
         fun stop(context: Context) {

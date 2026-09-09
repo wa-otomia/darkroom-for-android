@@ -108,6 +108,15 @@
     <string name="studio_watermark">워터마크</string>
     <string name="studio_watermark_unconfigured">먼저 설정에서 워터마크를 켜세요</string>
     <string name="studio_reset">재설정</string>
+    <string name="studio_ai_generate_version">수정 버전 생성</string>
+    <string name="studio_ai_generate_to_gallery">갤러리로 생성</string>
+    <string name="studio_ai_generate_hint">「수정 버전 생성」은 이 사진에 편집 버전을 추가합니다. 「갤러리로 생성」은 라이브러리에 새 사진으로 저장합니다.</string>
+    <string name="studio_version_fallback">보정</string>
+    <string name="studio_delete_version">이 버전 삭제</string>
+    <string name="studio_delete_version_title">이 버전을 삭제할까요?</string>
+    <string name="studio_add_version_to_gallery">앨범에 추가</string>
+    <string name="studio_added_to_gallery">앨범에 추가했습니다</string>
+    <string name="studio_add_to_print_queue">인쇄 대기열에 추가</string>
     <string name="studio_export">내보내기</string>
     <string name="studio_exported">갤러리에 내보냈습니다</string>
     <string name="studio_share">공유</string>
@@ -267,4 +276,11 @@
     <string name="ds_error_network">네트워크에 연결할 수 없습니다. Wi-Fi 또는 모바일 데이터를 확인하세요.</string>
     <string name="ds_error_storage">파일을 읽거나 쓰지 못했습니다. 기기의 남은 저장 공간을 확인하세요.</string>
     <string name="ds_error_ftp_bind">이 FTP 포트를 열 수 없습니다. 이미 사용 중일 수 있으므로 다른 포트를 사용하세요.</string>
+    <string name="copied_to_clipboard">복사됨</string>
+    <string name="io_ftp_connection">연결 정보</string>
+    <string name="settings_ftp_auto_start">앱 시작 시 FTP 자동 실행</string>
+    <string name="settings_keep_alive">앱 유지</string>
+    <string name="settings_keep_alive_hint">FTP와 자동 인쇄가 계속되도록 앱을 백그라운드에서 유지합니다.</string>
+    <string name="keep_alive_channel">유지</string>
+    <string name="keep_alive_notification">Darkroom을 실행 중으로 유지</string>
 </resources>

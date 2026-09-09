@@ -1,8 +1,10 @@
 package app.darkroom.android.ui.studio
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +31,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,11 +58,13 @@ private fun chipMaxWidth() = 160.dp * LocalDensity.current.fontScale.coerceIn(1f
  * the cropper shows. Carries selection semantics, so TalkBack reports which one
  * is loaded.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun StudioVersionChip(
     selected: Boolean,
     label: String,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     enabled: Boolean = true,
 ) {
     Box(
@@ -68,11 +74,14 @@ internal fun StudioVersionChip(
             .clip(RoundedCornerShape(999.dp))
             .background(if (selected) Paper else Color.Transparent)
             .then(if (selected) Modifier else Modifier.border(1.dp, PaperFaint, RoundedCornerShape(999.dp)))
-            .selectable(
-                selected = selected,
+            .semantics {
+                this.role = Role.RadioButton
+                this.selected = selected
+            }
+            .combinedClickable(
                 enabled = enabled,
-                role = Role.RadioButton,
                 onClick = onClick,
+                onLongClick = onLongClick,
             )
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,

@@ -108,6 +108,15 @@
     <string name="studio_watermark">透かし</string>
     <string name="studio_watermark_unconfigured">先に設定で透かしを有効にしてください</string>
     <string name="studio_reset">リセット</string>
+    <string name="studio_ai_generate_version">新しいバージョンを生成</string>
+    <string name="studio_ai_generate_to_gallery">ギャラリーへ生成</string>
+    <string name="studio_ai_generate_hint">「新しいバージョンを生成」はこの写真に編集バージョンを追加します。「ギャラリーへ生成」はライブラリに新しい写真として保存します。</string>
+    <string name="studio_version_fallback">レタッチ</string>
+    <string name="studio_delete_version">このバージョンを削除</string>
+    <string name="studio_delete_version_title">このバージョンを削除しますか？</string>
+    <string name="studio_add_version_to_gallery">アルバムに追加</string>
+    <string name="studio_added_to_gallery">アルバムに追加しました</string>
+    <string name="studio_add_to_print_queue">印刷キューに追加</string>
     <string name="studio_export">書き出す</string>
     <string name="studio_exported">アルバムに書き出しました</string>
     <string name="studio_share">共有</string>
@@ -267,4 +276,11 @@
     <string name="ds_error_network">ネットワークに接続できません。Wi-Fi またはモバイルデータをご確認ください。</string>
     <string name="ds_error_storage">ファイルの読み書きに失敗しました。端末の空き容量をご確認ください。</string>
     <string name="ds_error_ftp_bind">この FTP ポートを開けませんでした。使用中の可能性があるため、別のポートをお試しください。</string>
+    <string name="copied_to_clipboard">コピーしました</string>
+    <string name="io_ftp_connection">接続情報</string>
+    <string name="settings_ftp_auto_start">起動時に FTP を自動開始</string>
+    <string name="settings_keep_alive">アプリを常駐</string>
+    <string name="settings_keep_alive_hint">FTP と自動印刷が継続できるよう、アプリをバックグラウンドで維持します。</string>
+    <string name="keep_alive_channel">常駐</string>
+    <string name="keep_alive_notification">Darkroom を実行中に保ちます</string>
 </resources>

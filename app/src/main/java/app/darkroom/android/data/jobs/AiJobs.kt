@@ -2,6 +2,8 @@ package app.darkroom.android.data.jobs
 
 import app.darkroom.android.core.AiJobSnapshot
 import app.darkroom.android.core.combineGeneratePrompt
+import app.darkroom.android.core.generatedPhotoFilename
+import app.darkroom.android.core.resolvePhotoSource
 import app.darkroom.android.data.catalog.CatalogRepository
 import app.darkroom.android.data.ai.AiImageClient
 import app.darkroom.android.data.printer.StudioJobEvent
@@ -121,10 +123,11 @@ class AiJobs @Inject constructor(
             try {
                 if (presetId.isNotEmpty()) settings.setLastPreset(presetId)
                 val store = settings.readPresets()
-                val presetPrompt = store.presets.find { it.id == presetId }?.prompt.orEmpty()
+                val preset = store.presets.find { it.id == presetId }
+                val presetPrompt = preset?.prompt.orEmpty()
                 val combined = combineGeneratePrompt(presetPrompt, prompt)
                 if (!settings.aiConfigured()) error("未配置 AI 钥匙。去设置页填入 API key 后再${if (kind == AiKind.Generate) "生成" else "修图"}。")
-                val file = catalog.sourceFile(photoId, source)
+                val file = catalog.sourceFile(photoId, resolvePhotoSource(source))
                 val jpeg = grok.edit(file.readBytes(), combined, photoId, purpose = kind.purpose) { progress ->
                     applyAiProgress(tracker, progress)
                     publish(id, tracker)
@@ -133,13 +136,25 @@ class AiJobs @Inject constructor(
                 publish(id, tracker)
                 when (kind) {
                     AiKind.Generate -> {
-                        val created = catalog.saveGenerated(photoId, jpeg, combined, id = targetPhotoId)
+                        val from = catalog.get(photoId) ?: error("照片不存在")
+                        val created = catalog.ingestBytes(
+                            jpeg,
+                            generatedPhotoFilename(from.filename),
+                            kind = "studio",
+                            id = targetPhotoId,
+                        )
                         tracker.succeed()
                         publish(id, tracker)
                         _events.tryEmit(StudioJobEvent.Generated(photoId, created))
                     }
                     AiKind.Edit -> {
-                        val editId = catalog.saveEdit(photoId, combined, jpeg).id
+                        val editId = catalog.saveEdit(
+                            photoId,
+                            combined,
+                            jpeg,
+                            presetId = presetId,
+                            presetTitle = preset?.title.orEmpty(),
+                        ).id
                         tracker.succeed()
                         publish(id, tracker)
                         _events.tryEmit(StudioJobEvent.Edited(photoId, editId))

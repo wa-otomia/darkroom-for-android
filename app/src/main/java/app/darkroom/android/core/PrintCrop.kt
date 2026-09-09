@@ -257,13 +257,9 @@ fun panSnapGuides(
         axisPanGuides(aabbH, frameH, inset, xAxis = false)
 }
 
-/** Right-angle rotation targets: 0 / 90 / 180 / 270. */
-fun rotationSnapGuides(): List<SnapGuide> = listOf(
-    SnapGuide(GUIDE_ROT_0, 0f),
-    SnapGuide(GUIDE_ROT_90, 90f),
-    SnapGuide(GUIDE_ROT_180, 180f),
-    SnapGuide(GUIDE_ROT_270, 270f),
-)
+/** Rotation snap targets every 45°: 0, 45, 90, 135, 180, 225, 270, 315. */
+fun rotationSnapGuides(): List<SnapGuide> =
+    (0 until 360 step 45).map { deg -> SnapGuide(rotationGuideId(deg), deg.toFloat()) }
 
 private fun axisPanGuides(disp: Float, frame: Float, inset: Float, xAxis: Boolean): List<SnapGuide> {
     val center = SnapGuide(if (xAxis) GUIDE_CENTER_X else GUIDE_CENTER_Y, 0f)

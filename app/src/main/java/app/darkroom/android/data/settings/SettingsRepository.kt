@@ -49,6 +49,8 @@ data class AppSettings(
     val ftpPort: Int = 2121,
     val ftpPasvMin: Int = 50000,
     val ftpPasvMax: Int = 50010,
+    val ftpAutoStart: Boolean = false,
+    val keepAlive: Boolean = false,
 )
 
 @Singleton
@@ -110,6 +112,8 @@ class SettingsRepository @Inject constructor(
         ftpPort = prefs.getInt(KEY_FTP_PORT, 2121),
         ftpPasvMin = prefs.getInt(KEY_PASV_MIN, 50000),
         ftpPasvMax = prefs.getInt(KEY_PASV_MAX, 50010),
+        ftpAutoStart = prefs.getBoolean(KEY_FTP_AUTO_START, false),
+        keepAlive = prefs.getBoolean(KEY_KEEP_ALIVE, false),
     )
 
     fun updateSettings(patch: AppSettings.() -> AppSettings) {
@@ -127,6 +131,8 @@ class SettingsRepository @Inject constructor(
             .putInt(KEY_FTP_PORT, next.ftpPort)
             .putInt(KEY_PASV_MIN, next.ftpPasvMin)
             .putInt(KEY_PASV_MAX, next.ftpPasvMax)
+            .putBoolean(KEY_FTP_AUTO_START, next.ftpAutoStart)
+            .putBoolean(KEY_KEEP_ALIVE, next.keepAlive)
             .apply()
         _settings.value = readSettings()
     }
@@ -256,6 +262,8 @@ class SettingsRepository @Inject constructor(
             .putInt(KEY_FTP_PORT, 2121)
             .putInt(KEY_PASV_MIN, 50000)
             .putInt(KEY_PASV_MAX, 50010)
+            .putBoolean(KEY_FTP_AUTO_START, false)
+            .putBoolean(KEY_KEEP_ALIVE, false)
             .putString(KEY_GROK_KEY, "")
             .putString(KEY_GROK_URL, DEFAULT_XAI_BASE_URL)
             .putString(KEY_GROK_MODEL, AiProvider.GROK.defaultModel)
@@ -340,6 +348,8 @@ class SettingsRepository @Inject constructor(
         private const val KEY_FTP_PORT = "ftp_port"
         private const val KEY_PASV_MIN = "pasv_min"
         private const val KEY_PASV_MAX = "pasv_max"
+        private const val KEY_FTP_AUTO_START = "ftp_auto_start"
+        private const val KEY_KEEP_ALIVE = "keep_alive"
         // No language key: the UI locale lives in AppCompatDelegate /
         // LocaleManager only. Keeping a copy here would be a second source of
         // truth that the Android 13+ system language picker never writes to,

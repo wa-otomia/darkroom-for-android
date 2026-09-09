@@ -26,6 +26,8 @@ data class EditRecord(
     val filename: String,
     val width: Int = 0,
     val height: Int = 0,
+    val presetId: String = "",
+    val presetTitle: String = "",
 )
 
 @Serializable

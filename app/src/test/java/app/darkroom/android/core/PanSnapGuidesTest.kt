@@ -89,8 +89,26 @@ class PanSnapGuidesTest {
     @Test
     fun rotationSnapGuidesAreRightAngles() {
         val guides = rotationSnapGuides()
-        assertEquals(listOf(0f, 90f, 180f, 270f), guides.map { it.value })
-        assertEquals(GUIDE_ROT_0, guides[0].id)
+        assertEquals(
+            listOf(0f, 45f, 90f, 135f, 180f, 225f, 270f, 315f),
+            guides.map { it.value },
+        )
+        assertEquals(
+            listOf(
+                GUIDE_ROT_0,
+                GUIDE_ROT_45,
+                GUIDE_ROT_90,
+                GUIDE_ROT_135,
+                GUIDE_ROT_180,
+                GUIDE_ROT_225,
+                GUIDE_ROT_270,
+                GUIDE_ROT_315,
+            ),
+            guides.map { it.id },
+        )
+        guides.forEach { guide ->
+            assertEquals(SnapGuideKind.ROTATION, snapGuideKind(guide.id))
+        }
     }
 
     @Test

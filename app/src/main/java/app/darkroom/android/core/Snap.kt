@@ -30,9 +30,16 @@ const val GUIDE_SAFE_X_NEG = "safe-x-neg"
 const val GUIDE_SAFE_Y_POS = "safe-y-pos"
 const val GUIDE_SAFE_Y_NEG = "safe-y-neg"
 const val GUIDE_ROT_0 = "rot-0"
+const val GUIDE_ROT_45 = "rot-45"
 const val GUIDE_ROT_90 = "rot-90"
+const val GUIDE_ROT_135 = "rot-135"
 const val GUIDE_ROT_180 = "rot-180"
+const val GUIDE_ROT_225 = "rot-225"
 const val GUIDE_ROT_270 = "rot-270"
+const val GUIDE_ROT_315 = "rot-315"
+
+/** Snap-guide id for a rotation target in degrees (`rot-0`, `rot-45`, …). */
+fun rotationGuideId(deg: Int): String = "rot-${((deg % 360) + 360) % 360}"
 
 /** How a [SnapGuide.id] should be drawn (full center line vs short edge tick). */
 enum class SnapGuideKind { CENTER, SAFE, FRAME, ROTATION }
@@ -41,6 +48,7 @@ fun snapGuideKind(id: String): SnapGuideKind = when {
     id.startsWith("center") -> SnapGuideKind.CENTER
     id.startsWith("safe") -> SnapGuideKind.SAFE
     id.startsWith("frame") -> SnapGuideKind.FRAME
+    id.startsWith("rot") -> SnapGuideKind.ROTATION
     else -> SnapGuideKind.ROTATION
 }
 
@@ -132,6 +140,7 @@ class SnapAxis(
      * return `false`. [delta] `== 0` never snaps in (e.g. a zoom-only frame).
      */
     fun drag(delta: Float, guides: List<SnapGuide>): Boolean {
+        val prev = raw
         raw = norm(raw + delta)
         val g = snapped
         if (g != null) {
@@ -158,12 +167,20 @@ class SnapAxis(
                 val d = dist(value, c.value)
                 // Landing exactly on the guide (d == 0) still counts as moving toward it,
                 // so a wrap jump such as 357° + 3° pins and later exits to 1°.
-                abs(d) <= threshold && (d == 0f || sign(d) == sign(delta))
+                // A frame that overshoots (358.7° + 1.5° → 0.2°) still pins if we were
+                // approaching from [prev] and ended inside the dead zone.
+                if (abs(d) > threshold) return@filter false
+                towardGuide(value, c.value, delta) || towardGuide(prev, c.value, delta)
             }
             .minByOrNull { c -> abs(dist(value, c.value)) }
             ?: return false
         snapped = hit
         value = hit.value
         return true
+    }
+
+    private fun towardGuide(from: Float, guide: Float, delta: Float): Boolean {
+        val d = dist(from, guide)
+        return d == 0f || sign(d) == sign(delta)
     }
 }

@@ -102,6 +102,15 @@
     <string name="studio_watermark">Watermark</string>
     <string name="studio_watermark_unconfigured">Turn on a watermark in Settings first</string>
     <string name="studio_reset">Reset</string>
+    <string name="studio_ai_generate_version">Generate new version</string>
+    <string name="studio_ai_generate_to_gallery">Generate to gallery</string>
+    <string name="studio_ai_generate_hint">Generate new version adds an edit to this photo. Generate to gallery saves a new standalone photo in the library.</string>
+    <string name="studio_version_fallback">Edit</string>
+    <string name="studio_delete_version">Delete this version</string>
+    <string name="studio_delete_version_title">Delete this version?</string>
+    <string name="studio_add_version_to_gallery">Add to gallery</string>
+    <string name="studio_added_to_gallery">Added to gallery</string>
+    <string name="studio_add_to_print_queue">Add to print queue</string>
     <string name="studio_export">Export</string>
     <string name="studio_exported">Saved to the gallery</string>
     <string name="studio_share">Share</string>
@@ -261,4 +270,11 @@
     <string name="ds_error_network">No connection to the network. Check Wi-Fi or mobile data and try again.</string>
     <string name="ds_error_storage">Could not read or write the file. Check the free space on this phone.</string>
     <string name="ds_error_ftp_bind">Could not open the FTP port. It may already be in use; try another port.</string>
+    <string name="copied_to_clipboard">Copied</string>
+    <string name="io_ftp_connection">Connection</string>
+    <string name="settings_ftp_auto_start">Start FTP when the app launches</string>
+    <string name="settings_keep_alive">Keep app alive</string>
+    <string name="settings_keep_alive_hint">Keeps the app running in the background so FTP and auto-print keep working.</string>
+    <string name="keep_alive_channel">Keep-alive</string>
+    <string name="keep_alive_notification">Keeping Darkroom running</string>
 </resources>

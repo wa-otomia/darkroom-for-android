@@ -325,7 +325,13 @@ class PrintQueue @Inject constructor(
         if (!settings.aiConfigured()) error("未配置 AI 钥匙。去设置页填入 API key 后再修图。")
         val file = catalog.sourceFile(photoId, source)
         val jpeg = grok.edit(file.readBytes(), preset.prompt, photoId, "edit")
-        return catalog.saveEdit(photoId, preset.prompt, jpeg).id
+        return catalog.saveEdit(
+            photoId,
+            preset.prompt,
+            jpeg,
+            presetId = presetId,
+            presetTitle = preset.title,
+        ).id
     }
 
     suspend fun generate(photoId: String, source: String, presetId: String, prompt: String): PhotoMeta {
@@ -341,12 +347,19 @@ class PrintQueue @Inject constructor(
 
     suspend fun editInPlace(photoId: String, source: String, presetId: String, prompt: String): String {
         val store = settings.readPresets()
-        val presetPrompt = store.presets.find { it.id == presetId }?.prompt.orEmpty()
+        val preset = store.presets.find { it.id == presetId }
+        val presetPrompt = preset?.prompt.orEmpty()
         val combined = combineGeneratePrompt(presetPrompt, prompt)
         if (!settings.aiConfigured()) error("未配置 AI 钥匙。去设置页填入 API key 后再修图。")
         val file = catalog.sourceFile(photoId, source)
         val jpeg = grok.edit(file.readBytes(), combined, photoId, "edit")
-        return catalog.saveEdit(photoId, combined, jpeg).id
+        return catalog.saveEdit(
+            photoId,
+            combined,
+            jpeg,
+            presetId = presetId,
+            presetTitle = preset?.title.orEmpty(),
+        ).id
     }
 
     suspend fun printPhoto(
@@ -385,7 +398,8 @@ class PrintQueue @Inject constructor(
                 emit(photoId, "editing")
                 if (!settings.aiConfigured()) error("未配置 AI 钥匙。去设置页填入 API key 后再修图。")
                 val store = settings.readPresets()
-                val presetPrompt = store.presets.find { it.id == presetId }?.prompt.orEmpty()
+                val preset = store.presets.find { it.id == presetId }
+                val presetPrompt = preset?.prompt.orEmpty()
                 val combined = combineGeneratePrompt(presetPrompt, prompt)
                 val srcBytes = catalog.sourceFile(photoId, source).readBytes()
                 val cropped = ImagePipeline.cropToJpeg(
@@ -413,7 +427,13 @@ class PrintQueue @Inject constructor(
                 } finally {
                     nestTicks.cancel()
                 }
-                usedSource = catalog.saveEdit(photoId, combined, jpeg).id
+                usedSource = catalog.saveEdit(
+                    photoId,
+                    combined,
+                    jpeg,
+                    presetId = presetId.orEmpty(),
+                    presetTitle = preset?.title.orEmpty(),
+                ).id
                 tracker.completePhase()
             }
             throwIfCancelled()

@@ -4,11 +4,13 @@ import android.content.Context
 import app.darkroom.android.core.EditRecord
 import app.darkroom.android.core.PhotoMeta
 import app.darkroom.android.core.PrintRecord
+import app.darkroom.android.core.galleryThumbSource
 import app.darkroom.android.core.generatedPhotoFilename
 import app.darkroom.android.core.hasJpegEoi
 import app.darkroom.android.core.isJpegBytes
 import app.darkroom.android.core.looksLikeJpeg
 import app.darkroom.android.core.listRelatedPhotos
+import app.darkroom.android.core.resolvePhotoSource
 import app.darkroom.android.data.imaging.ImagePipeline
 import app.darkroom.android.data.settings.ActivityLog
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -80,11 +82,24 @@ class CatalogRepository @Inject constructor(
     fun inboxDir(): File = inbox.apply { mkdirs() }
 
     fun originalFile(id: String) = File(library, "$id/original.jpg")
-    fun thumbFile(id: String) = File(library, "$id/thumb.jpg")
+    fun thumbFile(id: String, source: String = "original"): File {
+        val resolved = resolvePhotoSource(source)
+        return if (resolved == "original") {
+            File(library, "$id/thumb.jpg")
+        } else {
+            File(library, "$id/edits/$resolved-thumb.jpg")
+        }
+    }
     fun editFile(id: String, editId: String) = File(library, "$id/edits/$editId.jpg")
 
     fun sourceFile(id: String, source: String): File {
-        return if (source.isBlank() || source == "original") originalFile(id) else editFile(id, source)
+        val resolved = resolvePhotoSource(source)
+        return if (resolved == "original") originalFile(id) else editFile(id, resolved)
+    }
+
+    fun galleryThumbFile(photo: PhotoMeta): File {
+        val source = galleryThumbSource(photo) { thumbFile(photo.id, it).exists() }
+        return thumbFile(photo.id, source)
     }
 
     suspend fun get(id: String): PhotoMeta? = db.photoDao().get(id)?.toMeta()
@@ -148,16 +163,44 @@ class CatalogRepository @Inject constructor(
         }
     }
 
-    suspend fun saveEdit(photoId: String, prompt: String, jpeg: ByteArray): EditRecord = withContext(Dispatchers.IO) {
+    suspend fun saveEdit(
+        photoId: String,
+        prompt: String,
+        jpeg: ByteArray,
+        presetId: String = "",
+        presetTitle: String = "",
+    ): EditRecord = withContext(Dispatchers.IO) {
         val current = get(photoId) ?: error("照片不存在")
         val stored = storedAiJpeg(jpeg, "修图结果不是 JPEG")
         val id = UUID.randomUUID().toString()
         ImagePipeline.writeFile(editFile(photoId, id), stored)
+        ImagePipeline.writeFile(thumbFile(photoId, id), ImagePipeline.thumbnailJpeg(stored))
         val info = ImagePipeline.probe(stored)
-        val record = EditRecord(id, prompt, Instant.now().toString(), "$id.jpg", info.width, info.height)
+        val record = EditRecord(
+            id = id,
+            prompt = prompt,
+            createdAt = Instant.now().toString(),
+            filename = "$id.jpg",
+            width = info.width,
+            height = info.height,
+            presetId = presetId,
+            presetTitle = presetTitle,
+        )
         val next = current.copy(edits = current.edits + record)
         db.photoDao().upsert(next.toEntity())
         record
+    }
+
+    suspend fun deleteEdit(photoId: String, editId: String) = withContext(Dispatchers.IO) {
+        val resolved = resolvePhotoSource(editId)
+        if (resolved == "original") return@withContext
+        val current = get(photoId) ?: return@withContext
+        if (current.edits.none { it.id == resolved }) return@withContext
+        val next = current.copy(edits = current.edits.filter { it.id != resolved })
+        db.photoDao().upsert(next.toEntity())
+        editFile(photoId, resolved).delete()
+        thumbFile(photoId, resolved).delete()
+        activityLog.record("catalog", "delete edit $resolved of $photoId")
     }
 
     suspend fun saveGenerated(

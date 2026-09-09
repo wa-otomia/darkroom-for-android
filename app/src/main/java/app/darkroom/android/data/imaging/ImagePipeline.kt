@@ -13,7 +13,6 @@ import androidx.exifinterface.media.ExifInterface
 import app.darkroom.android.core.DEFAULT_PRINT_QUALITY
 import app.darkroom.android.core.OrientedSize
 import app.darkroom.android.core.PRINT_HEIGHT
-import app.darkroom.android.core.PRINT_SHEET_QUARTER_TURNS
 import app.darkroom.android.core.PRINT_WIDTH
 import app.darkroom.android.core.PhotoMeta
 import app.darkroom.android.core.PixelCrop
@@ -27,6 +26,8 @@ import app.darkroom.android.core.clampZoom
 import app.darkroom.android.core.coverScale
 import app.darkroom.android.core.cropAspect
 import app.darkroom.android.core.cropInSourceSpace
+import app.darkroom.android.core.exportSheetSize
+import app.darkroom.android.core.sheetQuarterTurns
 import app.darkroom.android.core.ensureJpegBytes
 import app.darkroom.android.core.exactQuarterTurns
 import app.darkroom.android.core.normalizeQuarterTurns
@@ -195,6 +196,9 @@ object ImagePipeline {
      * [cropToJpeg] and [grokUploadJpeg] never accept a watermark. [outputScale] multiplies
      * the 1040×1560 sheet (use `2` for a 2080×3120 album export). [context] is required
      * to tint SNS [android.graphics.drawable.VectorDrawable]s; date-only marks still draw without it.
+     *
+     * [sheetForPrinter] (default true) quarter-turns a landscape frame onto the portrait
+     * printer sheet. Export passes false so 横幅 stays 3120×2080 and 竖幅 stays 2080×3120.
      */
     fun renderPrintJpeg(
         bytes: ByteArray,
@@ -211,6 +215,7 @@ object ImagePipeline {
         photo: PhotoMeta? = null,
         outputScale: Int = 1,
         context: Context? = null,
+        sheetForPrinter: Boolean = true,
     ): ByteArray {
         val bmp = decodeRotated(bytes)
         if (placement != null || exactQuarterTurns(rotationDegrees) == null) {
@@ -219,7 +224,7 @@ object ImagePipeline {
                 bmp,
                 placed,
                 landscape,
-                ontoPortraitSheet = true,
+                ontoPortraitSheet = sheetForPrinter,
                 outputScale = outputScale,
                 watermark = watermark,
                 photo = photo,
@@ -246,8 +251,13 @@ object ImagePipeline {
         } else {
             bmp
         }
-        val sheet = rotateBitmap(cut, rotateQuarters + if (landscape) PRINT_SHEET_QUARTER_TURNS else 0)
-        val out = preparePrintBitmap(sheet, if (framedCrop != null) PrintFit.COVER else fit, outputScale)
+        val sheet = rotateBitmap(cut, rotateQuarters + sheetQuarterTurns(landscape, sheetForPrinter))
+        val out = preparePrintBitmap(
+            sheet,
+            if (framedCrop != null) PrintFit.COVER else fit,
+            outputScale,
+            landscape = landscape && !sheetForPrinter,
+        )
         applyWatermark(out, watermark, photo, out.width, out.height, context)
         return encodeJpeg(out, quality).also {
             if (out !== sheet) out.recycle()
@@ -340,16 +350,16 @@ object ImagePipeline {
         photo: PhotoMeta? = null,
         context: Context? = null,
     ): Bitmap {
-        val scale = outputScale.coerceAtLeast(1)
-        val destW = (if (landscape) PRINT_HEIGHT else PRINT_WIDTH) * scale
-        val destH = (if (landscape) PRINT_WIDTH else PRINT_HEIGHT) * scale
+        val dest = exportSheetSize(landscape, outputScale)
+        val destW = dest.width
+        val destH = dest.height
         val framed = Bitmap.createBitmap(destW, destH, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(framed)
         canvas.drawColor(Color.WHITE)
         drawPlacement(canvas, source, placement, destW, destH)
         applyWatermark(framed, watermark, photo, destW, destH, context)
-        if (!ontoPortraitSheet || !landscape) return framed
-        val sheet = rotateBitmap(framed, PRINT_SHEET_QUARTER_TURNS)
+        if (sheetQuarterTurns(landscape, ontoPortraitSheet) == 0) return framed
+        val sheet = rotateBitmap(framed, sheetQuarterTurns(landscape, ontoPortraitSheet))
         if (sheet !== framed) framed.recycle()
         return sheet
     }
@@ -390,10 +400,15 @@ object ImagePipeline {
         return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
     }
 
-    fun preparePrintBitmap(source: Bitmap, fit: PrintFit, outputScale: Int = 1): Bitmap {
-        val scale = outputScale.coerceAtLeast(1)
-        val destW = PRINT_WIDTH * scale
-        val destH = PRINT_HEIGHT * scale
+    fun preparePrintBitmap(
+        source: Bitmap,
+        fit: PrintFit,
+        outputScale: Int = 1,
+        landscape: Boolean = false,
+    ): Bitmap {
+        val dest = exportSheetSize(landscape, outputScale)
+        val destW = dest.width
+        val destH = dest.height
         val out = Bitmap.createBitmap(destW, destH, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
         canvas.drawColor(Color.WHITE)
