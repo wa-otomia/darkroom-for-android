@@ -162,6 +162,8 @@
     <string name="settings_watermark_logo_x">X</string>
     <string name="settings_watermark_logo_facebook">Facebook</string>
     <string name="settings_watermark_logo_weibo">Weibo</string>
+    <string name="settings_watermark_logo_none">없음</string>
+    <string name="settings_watermark_orientation_hint">세로와 가로 용지의 워터마크 위치를 각각 설정합니다.</string>
     <string name="settings_automation_blocked_watermark">워터마크는 건너뜁니다:</string>
     <string name="settings_automation_need_watermark">먼저 워터마크를 하나 이상 켜세요.</string>
     <string name="settings_goto_watermark">「워터마크」로 이동</string>

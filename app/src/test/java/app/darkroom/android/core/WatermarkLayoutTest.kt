@@ -106,6 +106,100 @@ class WatermarkLayoutTest {
     }
 
     @Test
+    fun landscapeFrameUsesLandscapeAnchorsAndLongEdgeScale() {
+        val frameW = 1560f
+        val frameH = 1040f
+        val settings = WatermarkSettings(
+            sns = SnsWatermark(
+                enabled = true,
+                handle = "x",
+                anchor = WatermarkAnchor(0.5f, 0.5f),
+                landscapeAnchor = WatermarkAnchor(0.3f, 0.4f),
+            ),
+            date = DateWatermark(
+                enabled = true,
+                anchor = WatermarkAnchor(0.5f, 0.5f),
+                landscapeAnchor = WatermarkAnchor(0.7f, 0.6f),
+            ),
+        )
+        assertTrue(isLandscapeFrame(frameW, frameH))
+        val boxes = watermarkLayout(settings, frameW, frameH, measure, dateText = "2024.01.15")
+        val sns = boxes.first { it.id == "sns" }
+        val date = boxes.first { it.id == "date" }
+        assertEquals(0.3f * frameW, sns.cx, 0.5f)
+        assertEquals(0.4f * frameH, sns.cy, 0.5f)
+        assertEquals(0.7f * frameW, date.cx, 0.5f)
+        assertEquals(0.6f * frameH, date.cy, 0.5f)
+        // Same physical size as on the portrait sheet: scale × long edge, not × frame height.
+        assertEquals(0.035f * frameW, sns.logoSize, 0.01f)
+        assertEquals(0.03f * frameW, date.textSize, 0.01f)
+        val portrait = watermarkLayout(settings, frameH, frameW, measure, dateText = "2024.01.15")
+        assertEquals(sns.logoSize, portrait.first { it.id == "sns" }.logoSize, 0.01f)
+        assertEquals(0.5f * frameH, portrait.first { it.id == "sns" }.cx, 0.5f)
+    }
+
+    @Test
+    fun landscapeDefaultsStayInsideSafeArea() {
+        val settings = WatermarkSettings(
+            sns = SnsWatermark(enabled = true, handle = "thirteenchars"),
+            date = DateWatermark(enabled = true, includeTime = true),
+        )
+        val boxes = watermarkLayout(settings, 1560f, 1040f, measure, dateText = "2026.09.09 14:53")
+        boxes.forEach { assertInsideSafeArea(it, 1560f, 1040f) }
+        assertTrue(boxes.first { it.id == "sns" }.cx < boxes.first { it.id == "date" }.cx)
+    }
+
+    @Test
+    fun noneLogoDrawsHandleOnly() {
+        val settings = WatermarkSettings(sns = SnsWatermark(enabled = true, logo = SnsLogo.NONE, handle = "abc"))
+        val box = watermarkLayout(settings, 1040f, 1560f, measure).single()
+        assertEquals(null, box.logo)
+        assertEquals(0f, box.logoSize, 0f)
+        assertEquals(box.left, box.textLeft, 0.01f)
+        assertEquals(box.textSize, box.height, 0.01f)
+        assertEquals(measure("abc", box.textSize), box.width, 0.01f)
+    }
+
+    @Test
+    fun textBaselineCentresMixedCaseOnLogo() {
+        val settings = WatermarkSettings(sns = SnsWatermark(enabled = true, handle = "abc"))
+        val box = watermarkLayout(settings, 1040f, 1560f, measure).single()
+        assertEquals(box.top + box.height * WATERMARK_TEXT_BASELINE, box.textBaseline, 0.01f)
+        assertEquals(0.83f, WATERMARK_TEXT_BASELINE, 0f)
+    }
+
+    @Test
+    fun withDefaultAnchorsResetsBothOrientationsOnly() {
+        val custom = WatermarkSettings(
+            sns = SnsWatermark(
+                enabled = true,
+                logo = SnsLogo.X,
+                handle = "h",
+                scale = 0.07f,
+                anchor = WatermarkAnchor(0.5f, 0.5f),
+                landscapeAnchor = WatermarkAnchor(0.4f, 0.4f),
+            ),
+            date = DateWatermark(
+                enabled = true,
+                includeTime = true,
+                scale = 0.06f,
+                anchor = WatermarkAnchor(0.5f, 0.5f),
+                landscapeAnchor = WatermarkAnchor(0.6f, 0.6f),
+            ),
+        )
+        val reset = custom.withDefaultAnchors()
+        assertEquals(SnsWatermark().anchor, reset.sns.anchor)
+        assertEquals(SnsWatermark().landscapeAnchor, reset.sns.landscapeAnchor)
+        assertEquals(DateWatermark().anchor, reset.date.anchor)
+        assertEquals(DateWatermark().landscapeAnchor, reset.date.landscapeAnchor)
+        assertEquals(0.07f, reset.sns.scale, 0f)
+        assertEquals(0.06f, reset.date.scale, 0f)
+        assertEquals(SnsLogo.X, reset.sns.logo)
+        assertEquals("h", reset.sns.handle)
+        assertTrue(reset.sns.enabled && reset.date.enabled && reset.date.includeTime)
+    }
+
+    @Test
     fun bothMarksLayoutWhenEnabled() {
         val settings = WatermarkSettings(
             sns = SnsWatermark(enabled = true, handle = "x"),

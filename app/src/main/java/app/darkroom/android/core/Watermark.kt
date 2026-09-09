@@ -9,9 +9,9 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-/** SNS mark drawn to the left of the handle. */
+/** SNS mark drawn to the left of the handle. [NONE] prints the handle alone. */
 @Serializable
-enum class SnsLogo { INSTAGRAM, X, FACEBOOK, WEIBO }
+enum class SnsLogo { INSTAGRAM, X, FACEBOOK, WEIBO, NONE }
 
 /**
  * Centre of a watermark box, normalized to the paper frame (`0..1`).
@@ -20,7 +20,11 @@ enum class SnsLogo { INSTAGRAM, X, FACEBOOK, WEIBO }
 @Serializable
 data class WatermarkAnchor(val cx: Float, val cy: Float)
 
-/** Handle + logo. [scale] is text/logo height as a fraction of frame height (clamped 0.02–0.08). */
+/**
+ * Handle + logo. [scale] is text/logo height as a fraction of the frame's **long edge**
+ * (clamped 0.02–0.08) so a mark is the same physical size on a portrait and a landscape sheet.
+ * [anchor] positions the 2:3 portrait frame, [landscapeAnchor] the 3:2 landscape frame.
+ */
 @Serializable
 data class SnsWatermark(
     val enabled: Boolean = false,
@@ -28,6 +32,7 @@ data class SnsWatermark(
     val handle: String = "",
     val scale: Float = 0.035f,
     val anchor: WatermarkAnchor = WatermarkAnchor(0.15f, 0.95f),
+    val landscapeAnchor: WatermarkAnchor = WatermarkAnchor(0.12f, 0.93f),
 )
 
 /** Capture-date mark. [includeTime] switches `yyyy.MM.dd` ↔ `yyyy.MM.dd HH:mm`. */
@@ -37,7 +42,37 @@ data class DateWatermark(
     val includeTime: Boolean = false,
     val scale: Float = 0.03f,
     val anchor: WatermarkAnchor = WatermarkAnchor(0.85f, 0.95f),
+    val landscapeAnchor: WatermarkAnchor = WatermarkAnchor(0.88f, 0.93f),
 )
+
+/** A frame wider than tall is the landscape sheet (before the print quarter-turn). */
+fun isLandscapeFrame(frameW: Float, frameH: Float): Boolean = frameW > frameH
+
+fun SnsWatermark.anchorFor(landscape: Boolean): WatermarkAnchor = if (landscape) landscapeAnchor else anchor
+fun DateWatermark.anchorFor(landscape: Boolean): WatermarkAnchor = if (landscape) landscapeAnchor else anchor
+
+fun SnsWatermark.withAnchor(landscape: Boolean, value: WatermarkAnchor): SnsWatermark =
+    if (landscape) copy(landscapeAnchor = value) else copy(anchor = value)
+
+fun DateWatermark.withAnchor(landscape: Boolean, value: WatermarkAnchor): DateWatermark =
+    if (landscape) copy(landscapeAnchor = value) else copy(anchor = value)
+
+/** Both orientations back to their default positions; size, logo, handle and switches untouched. */
+fun WatermarkSettings.withDefaultAnchors(): WatermarkSettings {
+    val sns0 = SnsWatermark()
+    val date0 = DateWatermark()
+    return copy(
+        sns = sns.copy(anchor = sns0.anchor, landscapeAnchor = sns0.landscapeAnchor),
+        date = date.copy(anchor = date0.anchor, landscapeAnchor = date0.landscapeAnchor),
+    )
+}
+
+/**
+ * Baseline of the mark text as a fraction of the box height. Sans-serif caps rise ~0.71 em and
+ * x-height ~0.53 em above the baseline, so 0.83 puts the visual centre of a mixed-case handle on
+ * the logo's centre line instead of the line box centre (which sits the text too low).
+ */
+const val WATERMARK_TEXT_BASELINE = 0.83f
 
 /** Persisted watermark configuration. Overlay happens only at print/export time. */
 @Serializable
@@ -89,14 +124,15 @@ fun watermarkLayout(
     dateText: String = "",
 ): List<WatermarkBox> {
     if (frameW <= 0f || frameH <= 0f) return emptyList()
+    val landscape = isLandscapeFrame(frameW, frameH)
     val boxes = ArrayList<WatermarkBox>(2)
     if (settings.sns.enabled) {
         boxes += layoutWatermark(
             id = "sns",
-            logo = settings.sns.logo,
+            logo = settings.sns.logo.takeIf { it != SnsLogo.NONE },
             text = settings.sns.handle,
             scale = settings.sns.scale,
-            anchor = settings.sns.anchor,
+            anchor = settings.sns.anchorFor(landscape),
             frameW = frameW,
             frameH = frameH,
             measureText = measureText,
@@ -108,7 +144,7 @@ fun watermarkLayout(
             logo = null,
             text = dateText,
             scale = settings.date.scale,
-            anchor = settings.date.anchor,
+            anchor = settings.date.anchorFor(landscape),
             frameW = frameW,
             frameH = frameH,
             measureText = measureText,
@@ -194,7 +230,7 @@ private fun layoutWatermark(
     frameH: Float,
     measureText: (String, Float) -> Float,
 ): WatermarkBox {
-    val textSize = clampWatermarkScale(scale) * frameH
+    val textSize = clampWatermarkScale(scale) * maxOf(frameW, frameH)
     val logoSize = if (logo != null) textSize else 0f
     val textWidth = if (text.isEmpty()) 0f else measureText(text, textSize).coerceAtLeast(0f)
     val gap = if (logoSize > 0f && textWidth > 0f) textSize * 0.28f else 0f
@@ -209,7 +245,7 @@ private fun layoutWatermark(
     val left = cx - width / 2f
     val top = cy - height / 2f
     val textLeft = left + logoSize + gap
-    val textBaseline = top + height * 0.78f
+    val textBaseline = top + height * WATERMARK_TEXT_BASELINE
     return clampWatermarkBox(
         WatermarkBox(
             id = id,

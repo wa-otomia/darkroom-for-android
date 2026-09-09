@@ -56,6 +56,21 @@ class WatermarkSettingsCodecTest {
         assertEquals(DateWatermark().scale, decoded.date.scale, 0f)
     }
 
+    @Test
+    fun legacyJsonWithoutLandscapeAnchorsGetsDefaultsAndNoneLogoRoundTrips() {
+        val legacy = """{"sns":{"enabled":true,"logo":"X","handle":"h","scale":0.04,"anchor":{"cx":0.2,"cy":0.9}},""" +
+            """"date":{"enabled":true,"includeTime":false,"scale":0.03,"anchor":{"cx":0.8,"cy":0.9}}}"""
+        val decoded = json.decodeFromString(WatermarkSettings.serializer(), legacy)
+        assertEquals(WatermarkAnchor(0.2f, 0.9f), decoded.sns.anchor)
+        assertEquals(SnsWatermark().landscapeAnchor, decoded.sns.landscapeAnchor)
+        assertEquals(DateWatermark().landscapeAnchor, decoded.date.landscapeAnchor)
+
+        val none = WatermarkSettings(sns = SnsWatermark(enabled = true, logo = SnsLogo.NONE, handle = "h"))
+        val encoded = json.encodeToString(WatermarkSettings.serializer(), none)
+        assertTrue(encoded.contains("\"logo\":\"NONE\""))
+        assertEquals(none, json.decodeFromString(WatermarkSettings.serializer(), encoded))
+    }
+
     private fun decodeOrDefault(raw: String?): WatermarkSettings {
         if (raw.isNullOrBlank()) return WatermarkSettings()
         return runCatching { json.decodeFromString(WatermarkSettings.serializer(), raw) }

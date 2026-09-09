@@ -127,11 +127,11 @@ import app.darkroom.android.R
 import app.darkroom.android.core.AI_PRESET_NONE
 import app.darkroom.android.core.ActivityEntry
 import app.darkroom.android.core.AiProvider
-import app.darkroom.android.core.DateWatermark
 import app.darkroom.android.core.GROK_MODELS
 import app.darkroom.android.core.PrintFit
 import app.darkroom.android.core.SnsLogo
-import app.darkroom.android.core.SnsWatermark
+import app.darkroom.android.core.withAnchor
+import app.darkroom.android.core.withDefaultAnchors
 import app.darkroom.android.core.WATERMARK_SCALE_MAX
 import app.darkroom.android.core.WATERMARK_SCALE_MIN
 import app.darkroom.android.core.clampWatermarkScale
@@ -563,6 +563,7 @@ fun SettingsScreen(
     } else {
         watermarkParts.joinToString(" · ")
     }
+    var watermarkPreviewLandscape by rememberSaveable { mutableStateOf(false) }
     val newestPhoto = photos.firstOrNull()
     val watermarkPhotoFile = newestPhoto?.let { catalog.sourceFile(it.id, "original") }?.takeIf { it.exists() }
     val watermarkDateText = formatWatermarkDate(
@@ -1456,11 +1457,20 @@ fun SettingsScreen(
                                 colors = darkroomSegmentedColors(),
                                 icon = {},
                             ) {
-                                Icon(
-                                    painter = painterResource(WatermarkRenderer.snsLogoRes(logo)),
-                                    contentDescription = stringResource(snsLogoLabel(logo)),
-                                    modifier = Modifier.size(18.dp),
-                                )
+                                val res = WatermarkRenderer.snsLogoRes(logo)
+                                if (res != null) {
+                                    Icon(
+                                        painter = painterResource(res),
+                                        contentDescription = stringResource(snsLogoLabel(logo)),
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                } else {
+                                    Text(
+                                        stringResource(snsLogoLabel(logo)),
+                                        maxLines = 1,
+                                        style = MaterialTheme.typography.labelMedium,
+                                    )
+                                }
                             }
                         }
                     }
@@ -1541,15 +1551,40 @@ fun SettingsScreen(
                         valueRange = WATERMARK_SCALE_MIN..WATERMARK_SCALE_MAX,
                         colors = SliderDefaults.colors(thumbColor = Amber, activeTrackColor = Amber),
                     )
+                    Text(
+                        stringResource(R.string.settings_watermark_orientation_hint),
+                        color = PaperDim,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
+                    )
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        listOf(false, true).forEachIndexed { index, landscape ->
+                            SegmentedButton(
+                                selected = watermarkPreviewLandscape == landscape,
+                                onClick = { watermarkPreviewLandscape = landscape },
+                                shape = SegmentedButtonDefaults.itemShape(index, 2),
+                                colors = darkroomSegmentedColors(),
+                                icon = {},
+                            ) {
+                                Text(
+                                    stringResource(
+                                        if (landscape) R.string.studio_frame_landscape else R.string.studio_frame_portrait,
+                                    ),
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
                     WatermarkPreviewEditor(
                         settings = watermark,
                         photoFile = watermarkPhotoFile,
                         dateText = watermarkDateText,
-                        onAnchorChange = { id, anchor ->
+                        landscape = watermarkPreviewLandscape,
+                        onAnchorChange = { id, landscape, anchor ->
                             settings.updateWatermark {
                                 when (id) {
-                                    "sns" -> copy(sns = sns.copy(anchor = anchor))
-                                    "date" -> copy(date = date.copy(anchor = anchor))
+                                    "sns" -> copy(sns = sns.withAnchor(landscape, anchor))
+                                    "date" -> copy(date = date.withAnchor(landscape, anchor))
                                     else -> this
                                 }
                             }
@@ -1557,12 +1592,7 @@ fun SettingsScreen(
                         modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
                     )
                     GhostButton(text = stringResource(R.string.settings_watermark_reset)) {
-                        settings.updateWatermark {
-                            copy(
-                                sns = sns.copy(anchor = SnsWatermark().anchor),
-                                date = date.copy(anchor = DateWatermark().anchor),
-                            )
-                        }
+                        settings.updateWatermark { withDefaultAnchors() }
                     }
                 }
 
@@ -1883,6 +1913,7 @@ private fun snsLogoLabel(logo: SnsLogo): Int = when (logo) {
     SnsLogo.X -> R.string.settings_watermark_logo_x
     SnsLogo.FACEBOOK -> R.string.settings_watermark_logo_facebook
     SnsLogo.WEIBO -> R.string.settings_watermark_logo_weibo
+    SnsLogo.NONE -> R.string.settings_watermark_logo_none
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

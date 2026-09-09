@@ -156,6 +156,8 @@
     <string name="settings_watermark_logo_x">X</string>
     <string name="settings_watermark_logo_facebook">Facebook</string>
     <string name="settings_watermark_logo_weibo">Weibo</string>
+    <string name="settings_watermark_logo_none">None</string>
+    <string name="settings_watermark_orientation_hint">Positions are set separately for portrait and landscape sheets.</string>
     <string name="settings_automation_blocked_watermark">Watermark will be skipped:</string>
     <string name="settings_automation_need_watermark">Turn on at least one watermark first.</string>
     <string name="settings_goto_watermark">Go to Watermark</string>

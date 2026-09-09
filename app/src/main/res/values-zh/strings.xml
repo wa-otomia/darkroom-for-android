@@ -162,6 +162,8 @@
     <string name="settings_watermark_logo_x">X</string>
     <string name="settings_watermark_logo_facebook">Facebook</string>
     <string name="settings_watermark_logo_weibo">微博</string>
+    <string name="settings_watermark_logo_none">无</string>
+    <string name="settings_watermark_orientation_hint">竖幅与横幅的水印位置分别设置。</string>
     <string name="settings_automation_blocked_watermark">打水印当前会跳过：</string>
     <string name="settings_automation_need_watermark">请先启用至少一种水印。</string>
     <string name="settings_goto_watermark">前往「水印」</string>

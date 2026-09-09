@@ -8,39 +8,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.IntSize
 import app.darkroom.android.core.PRINT_ASPECT
 import app.darkroom.android.core.PRINT_ASPECT_LANDSCAPE
 import app.darkroom.android.core.PhotoMeta
-import app.darkroom.android.core.WatermarkBox
 import app.darkroom.android.core.WatermarkSettings
 import app.darkroom.android.core.formatWatermarkDate
 import app.darkroom.android.core.largestFrameSize
 import app.darkroom.android.core.watermarkLayout
-import app.darkroom.android.data.imaging.WatermarkRenderer
+import app.darkroom.android.ui.components.drawWatermarkMark
+import app.darkroom.android.ui.components.rememberLogoGlow
 
 /**
  * Read-only preview of [WatermarkSettings] over the Studio crop frame.
  *
  * Drawn with [Modifier.drawWithContent] on the same box as [content] so the
- * cropper still receives gestures. Geometry comes from [watermarkLayout].
+ * cropper still receives gestures. Geometry comes from [watermarkLayout], which picks
+ * the portrait or landscape anchors from the frame's orientation.
  */
 @Composable
 fun WatermarkOverlay(
@@ -77,7 +67,8 @@ fun WatermarkOverlay(
             watermarkLayout(settings, frameW, frameH, measureText, dateText)
         }
     }
-    val logoPainter = painterResource(WatermarkRenderer.snsLogoRes(settings.sns.logo))
+    val snsBox = boxes.firstOrNull { it.id == "sns" }
+    val glow = rememberLogoGlow(snsBox?.logo, snsBox?.logoSize ?: 0f)
     Box(
         modifier
             .onSizeChanged { container = it }
@@ -87,60 +78,17 @@ fun WatermarkOverlay(
                 val left = (size.width - frameW) / 2f
                 val top = (size.height - frameH) / 2f
                 for (box in boxes) {
-                    drawWatermarkBox(
+                    drawWatermarkMark(
                         box = box,
                         frameLeft = left,
                         frameTop = top,
-                        logoPainter = logoPainter,
-                        measure = { text, sizePx, color ->
-                            measurer.measure(
-                                text = AnnotatedString(text),
-                                style = TextStyle(
-                                    fontSize = with(density) { sizePx.toSp() },
-                                    fontFamily = FontFamily.SansSerif,
-                                    color = color,
-                                    shadow = Shadow(
-                                        color = Color.Black.copy(alpha = 0.63f),
-                                        offset = Offset(0f, sizePx * 0.04f),
-                                        blurRadius = sizePx * 0.14f,
-                                    ),
-                                ),
-                            )
-                        },
+                        glow = glow,
+                        measurer = measurer,
+                        density = density,
                     )
                 }
             },
     ) {
         content()
     }
-}
-
-private fun DrawScope.drawWatermarkBox(
-    box: WatermarkBox,
-    frameLeft: Float,
-    frameTop: Float,
-    logoPainter: Painter,
-    measure: (String, Float, Color) -> TextLayoutResult,
-) {
-    val logo = box.logo
-    if (logo != null && box.logoSize > 0f) {
-        val logoTop = frameTop + box.top + (box.height - box.logoSize) / 2f
-        translate(frameLeft + box.left, logoTop) {
-            with(logoPainter) {
-                draw(
-                    Size(box.logoSize, box.logoSize),
-                    colorFilter = ColorFilter.tint(Color.White),
-                )
-            }
-        }
-    }
-    if (box.text.isEmpty() || box.textSize <= 0f) return
-    val layout = measure(box.text, box.textSize, Color.White)
-    drawText(
-        textLayoutResult = layout,
-        topLeft = Offset(
-            frameLeft + box.textLeft,
-            frameTop + box.textBaseline - layout.firstBaseline,
-        ),
-    )
 }

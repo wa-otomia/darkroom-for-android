@@ -4,10 +4,17 @@ import kotlin.math.abs
 import kotlin.math.sign
 
 /** Position snap radius in dp; convert with density before constructing [SnapAxis]. */
-const val SNAP_POSITION_DP = 8f
+const val SNAP_POSITION_DP = 4f
 
 /** Rotation snap radius in degrees. */
-const val SNAP_ROTATION_DEG = 3f
+const val SNAP_ROTATION_DEG = 1.5f
+
+/**
+ * After leaving a guide, that guide cannot recapture until the object is at least
+ * `threshold * SNAP_REARM_FACTOR` away from it. Finger jitter right at the dead-zone edge
+ * otherwise flips the object back onto the guide the moment it has escaped.
+ */
+const val SNAP_REARM_FACTOR = 2f
 
 /** Safe-line inset as a fraction of the frame's short edge. */
 const val SAFE_INSET_FRACTION = 0.05f
@@ -55,6 +62,10 @@ data class SnapGuide(val id: String, val value: Float)
  * accumulating the finger. Leaving the dead zone exits continuously from the guide edge
  * (`guide ± threshold`) so the object does not jump to the finger.
  *
+ * The guide just left is *disarmed* ([released]) until the object is
+ * `threshold * SNAP_REARM_FACTOR` away from it, so a 1–2 px finger tremor at the exit edge
+ * cannot pull the object straight back onto the guide. Every other guide stays armed.
+ *
  * @param threshold snap radius (px or degrees)
  * @param wrap period for a cyclic axis; pass `360` for rotation so distances use the shortest arc
  */
@@ -73,6 +84,10 @@ class SnapAxis(
     var snapped: SnapGuide? = null
         private set
 
+    /** Guide exited most recently and still inside its re-arm radius; excluded from snap-in. */
+    var released: SnapGuide? = null
+        private set
+
     /** Reset both positions to [current] and clear any pin. Call on pointer-down and after an external reset. */
     fun begin(current: Float) {
         sync(current)
@@ -86,6 +101,7 @@ class SnapAxis(
         value = if (wrap != null) norm(current) else current
         raw = value
         snapped = null
+        released = null
     }
 
     /**
@@ -128,12 +144,17 @@ class SnapAxis(
             value = norm(g.value + d - threshold * sign(d))
             raw = value
             snapped = null
+            released = g
             return false
         }
         value = raw
+        val armedAgain = released?.let { abs(dist(it.value, value)) >= threshold * SNAP_REARM_FACTOR }
+        if (armedAgain == true) released = null
         if (delta == 0f) return false
+        val disarmed = released
         val hit = guides
             .filter { c ->
+                if (disarmed != null && c.id == disarmed.id) return@filter false
                 val d = dist(value, c.value)
                 // Landing exactly on the guide (d == 0) still counts as moving toward it,
                 // so a wrap jump such as 357° + 3° pins and later exits to 1°.

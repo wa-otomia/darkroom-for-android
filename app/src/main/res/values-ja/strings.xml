@@ -162,6 +162,8 @@
     <string name="settings_watermark_logo_x">X</string>
     <string name="settings_watermark_logo_facebook">Facebook</string>
     <string name="settings_watermark_logo_weibo">Weibo</string>
+    <string name="settings_watermark_logo_none">なし</string>
+    <string name="settings_watermark_orientation_hint">縦向きと横向きで透かしの位置を別々に設定します。</string>
     <string name="settings_automation_blocked_watermark">透かしはスキップされます:</string>
     <string name="settings_automation_need_watermark">先に少なくとも 1 つの透かしをオンにしてください。</string>
     <string name="settings_goto_watermark">「透かし」へ移動</string>

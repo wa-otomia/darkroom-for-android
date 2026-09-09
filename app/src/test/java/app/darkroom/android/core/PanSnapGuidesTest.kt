@@ -95,8 +95,9 @@ class PanSnapGuidesTest {
 
     @Test
     fun constantsMatchThePlan() {
-        assertEquals(8f, SNAP_POSITION_DP, 0f)
-        assertEquals(3f, SNAP_ROTATION_DEG, 0f)
+        assertEquals(4f, SNAP_POSITION_DP, 0f)
+        assertEquals(1.5f, SNAP_ROTATION_DEG, 0f)
+        assertEquals(2f, SNAP_REARM_FACTOR, 0f)
         assertEquals(0.05f, SAFE_INSET_FRACTION, 0f)
     }
 }

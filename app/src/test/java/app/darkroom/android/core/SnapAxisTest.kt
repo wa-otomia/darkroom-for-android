@@ -78,15 +78,70 @@ class SnapAxisTest {
     }
 
     @Test
-    fun reversingTowardGuideResnaps() {
+    fun jitterAtExitEdgeDoesNotResnap() {
+        // Exit to -1, then the finger trembles back toward the guide: the released guide is
+        // disarmed, so the object follows the finger continuously instead of jumping to 0.
         val axis = exitToMinus1()
+        assertEquals("c", axis.released?.id)
         assertFalse(axis.drag(-1f, center))
         assertEquals(-2f, axis.value, 0.01f)
 
-        assertTrue(axis.drag(1f, center))
+        assertFalse(axis.drag(1f, center))
+        assertEquals(-1f, axis.value, 0.01f)
+        assertNull(axis.snapped)
+        assertFalse(axis.drag(0.5f, center))
+        assertEquals(-0.5f, axis.value, 0.01f)
+        assertNull(axis.snapped)
+        // Even crossing the guide keeps moving continuously.
+        assertFalse(axis.drag(1f, center))
+        assertEquals(0.5f, axis.value, 0.01f)
+        assertNull(axis.snapped)
+    }
+
+    @Test
+    fun releasedGuideRearmsAfterTwoThresholds() {
+        val axis = exitToMinus1()
+        assertFalse(axis.drag(-18f, center))
+        assertEquals(-19f, axis.value, 0.01f)
+        assertEquals("c", axis.released?.id)
+        assertFalse(axis.drag(-1f, center))
+        assertEquals(-20f, axis.value, 0.01f)
+        assertNull(axis.released)
+
+        assertFalse(axis.drag(5f, center))
+        assertEquals(-15f, axis.value, 0.01f)
+        assertTrue(axis.drag(6f, center))
         assertEquals(0f, axis.value, 0.01f)
-        assertEquals(-1f, axis.raw, 0.01f)
         assertEquals("c", axis.snapped?.id)
+    }
+
+    @Test
+    fun otherGuidesStayArmedWhileOneIsReleased() {
+        val guides = listOf(SnapGuide("a", 0f), SnapGuide("b", 15f))
+        val axis = SnapAxis(threshold = 10f)
+        axis.begin(-30f)
+        assertTrue(axis.drag(20f, guides))
+        assertEquals("a", axis.snapped?.id)
+        assertFalse(axis.drag(21f, guides))
+        assertEquals(1f, axis.value, 0.01f)
+        assertEquals("a", axis.released?.id)
+        // Guide b at 15 is within 10 of 1 → 5 while a is still disarmed.
+        assertTrue(axis.drag(4f, guides))
+        assertEquals("b", axis.snapped?.id)
+        assertEquals(15f, axis.value, 0.01f)
+    }
+
+    @Test
+    fun beginAndSyncClearReleasedGuide() {
+        val axis = exitToMinus1()
+        assertEquals("c", axis.released?.id)
+        axis.begin(axis.value)
+        assertNull(axis.released)
+        assertTrue(axis.drag(1f, center))
+
+        val other = exitToMinus1()
+        other.sync(-5f)
+        assertNull(other.released)
     }
 
     private fun exitToMinus1(): SnapAxis {
