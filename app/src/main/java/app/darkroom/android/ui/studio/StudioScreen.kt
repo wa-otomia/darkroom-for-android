@@ -113,7 +113,7 @@ import app.darkroom.android.ui.UserErrorDialog
 import app.darkroom.android.ui.components.AspectCropper
 import app.darkroom.android.ui.components.DarkroomSnackbarHost
 import app.darkroom.android.ui.components.GhostButton
-import app.darkroom.android.ui.components.JobOverlayBar
+import app.darkroom.android.ui.components.JobProgressStrip
 import app.darkroom.android.ui.components.PaperButton
 import app.darkroom.android.ui.components.PresetDropdown
 import app.darkroom.android.ui.components.SectionLabel
@@ -233,6 +233,7 @@ fun StudioScreen(
     val printDoneText = stringResource(R.string.print_done)
     val printQueuedText = stringResource(R.string.print_queued)
     var printStripCollapsed by rememberSaveable(photoId) { mutableStateOf(false) }
+    var aiStripCollapsed by rememberSaveable(photoId) { mutableStateOf(false) }
     var exportStripCollapsed by rememberSaveable(photoId) { mutableStateOf(false) }
     val myProgress = runningProgress?.takeIf { it.photoId == photoId }
     val printPhase = myProgress?.phase ?: myPrint?.phase
@@ -335,6 +336,7 @@ fun StudioScreen(
     val queuedIds = printJobs.filter { jobFieldKey(it.state) == "queued" }.map { it.id }
     val queueIndex = myPrint?.let { queuedIds.indexOf(it.id) }?.let { if (it >= 0) it + 1 else 0 } ?: 0
     LaunchedEffect(myPrint?.id) { printStripCollapsed = false }
+    LaunchedEffect(activeAi?.id) { aiStripCollapsed = false }
     LaunchedEffect(exporting) { if (exporting) exportStripCollapsed = false }
     val portraitOverlay = stringResource(R.string.crop_overlay)
     val landscapeOverlay = stringResource(R.string.studio_crop_overlay_landscape)
@@ -680,79 +682,78 @@ fun StudioScreen(
         stringResource(R.string.phase_export_rendering)
     }
     val exportUi = exportProgress?.toUi(exportLabel) ?: indeterminateUi(exportLabel)
-    val showAiOverlay = aiBlocking
-    val showExportOverlay = exporting && !exportStripCollapsed
 
     val topBar: @Composable () -> Unit = {
-        StudioTopBar(
-            filename = photo.filename,
-            generated = photo.isGenerated(),
-            busy = aiActive || alreadyQueued,
-            onBack = onBack,
-            onDelete = { pendingDelete = true },
-        )
-    }
-
-    val jobIdExtra = printerJobId?.let { stringResource(R.string.print_job_id, it) }
-    val printOverlayPhase = if (jobIdExtra.isNullOrBlank()) printLabel else "$printLabel · $jobIdExtra"
-
-    val cropper: @Composable (Modifier) -> Unit = { cropModifier ->
-        Box(cropModifier) {
-            WatermarkOverlay(
-                settings = watermarkSettings,
-                photo = photo,
-                landscape = landscape,
-                visible = watermarkArmed,
-                modifier = Modifier.fillMaxSize().background(Color.Black),
-            ) {
-                AspectCropper(
-                    model = imageFile,
-                    imageWidth = orientedW,
-                    imageHeight = orientedH,
-                    zoom = zoom,
-                    panX = panX,
-                    panY = panY,
-                    onZoomChange = { zoom = it },
-                    onPanChange = { x, y -> panX = x; panY = y },
-                    onCrop = { cropSpec = formatCropSpec(it) },
-                    overlay = if (landscape) landscapeOverlay else portraitOverlay,
-                    aspect = if (landscape) PRINT_ASPECT_LANDSCAPE.toFloat() else PRINT_ASPECT.toFloat(),
-                    rotationDegrees = rotationDegrees,
-                    onRotationChange = { rotationDegrees = it },
-                    onPlacement = { placement = it },
-                    // Lock only while a visible AI job is running. A queued print
-                    // must not freeze framing — the crop was already captured at enqueue.
-                    enabled = !cropLocked,
-                    snapState = snapState,
+        Column {
+            StudioTopBar(
+                filename = photo.filename,
+                generated = photo.isGenerated(),
+                busy = aiActive || alreadyQueued,
+                onBack = onBack,
+                onDelete = { pendingDelete = true },
+            )
+            if (myPrint != null && printUi != null) {
+                JobProgressStrip(
+                    title = stringResource(R.string.progress_print),
+                    ui = printUi,
+                    collapsed = printStripCollapsed,
+                    extra = printerJobId?.let { stringResource(R.string.print_job_id, it) },
+                    onCancel = { printQueue.cancel(myPrint.id) },
+                    onHide = { printStripCollapsed = true },
                 )
             }
-            Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
-                if (showAiOverlay && activeAi != null) {
-                    JobOverlayBar(
-                        phase = aiPhaseLabel,
-                        ui = aiUi,
-                        onHide = { aiJobs.hide(activeAi.id) },
-                        onCancel = { aiJobs.cancel(activeAi.id) },
-                    )
-                }
-                if (showExportOverlay) {
-                    JobOverlayBar(
-                        phase = exportLabel,
-                        ui = exportUi,
-                        onHide = { exportStripCollapsed = true },
-                    )
-                }
-                val printJob = myPrint
-                val printOverlayUi = printUi
-                if (!printStripCollapsed && printJob != null && printOverlayUi != null) {
-                    JobOverlayBar(
-                        phase = printOverlayPhase,
-                        ui = printOverlayUi,
-                        onHide = { printStripCollapsed = true },
-                        onCancel = { printQueue.cancel(printJob.id) },
-                    )
-                }
+            activeAi?.let { job ->
+                JobProgressStrip(
+                    title = stringResource(R.string.progress_generate),
+                    ui = aiUi,
+                    collapsed = aiStripCollapsed,
+                    extra = aiBytes,
+                    onCancel = { aiJobs.cancel(job.id) },
+                    onHide = {
+                        aiJobs.hide(job.id)
+                        aiStripCollapsed = true
+                    },
+                )
             }
+            if (exporting) {
+                JobProgressStrip(
+                    title = stringResource(R.string.progress_export),
+                    ui = exportUi,
+                    collapsed = exportStripCollapsed,
+                    onHide = { exportStripCollapsed = true },
+                )
+            }
+        }
+    }
+
+    val cropper: @Composable (Modifier) -> Unit = { cropModifier ->
+        WatermarkOverlay(
+            settings = watermarkSettings,
+            photo = photo,
+            landscape = landscape,
+            visible = watermarkArmed,
+            modifier = cropModifier.background(Color.Black),
+        ) {
+            AspectCropper(
+                model = imageFile,
+                imageWidth = orientedW,
+                imageHeight = orientedH,
+                zoom = zoom,
+                panX = panX,
+                panY = panY,
+                onZoomChange = { zoom = it },
+                onPanChange = { x, y -> panX = x; panY = y },
+                onCrop = { cropSpec = formatCropSpec(it) },
+                overlay = if (landscape) landscapeOverlay else portraitOverlay,
+                aspect = if (landscape) PRINT_ASPECT_LANDSCAPE.toFloat() else PRINT_ASPECT.toFloat(),
+                rotationDegrees = rotationDegrees,
+                onRotationChange = { rotationDegrees = it },
+                onPlacement = { placement = it },
+                // Lock only while a visible AI job is running. A queued print
+                // must not freeze framing — the crop was already captured at enqueue.
+                enabled = !cropLocked,
+                snapState = snapState,
+            )
         }
     }
 
