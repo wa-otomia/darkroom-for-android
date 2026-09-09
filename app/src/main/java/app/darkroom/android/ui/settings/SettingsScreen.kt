@@ -1557,12 +1557,10 @@ fun SettingsScreen(
                         modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
                     )
                     GhostButton(text = stringResource(R.string.settings_watermark_reset)) {
-                        val snsDefault = SnsWatermark()
-                        val dateDefault = DateWatermark()
                         settings.updateWatermark {
                             copy(
-                                sns = sns.copy(scale = snsDefault.scale, anchor = snsDefault.anchor),
-                                date = date.copy(scale = dateDefault.scale, anchor = dateDefault.anchor),
+                                sns = sns.copy(anchor = SnsWatermark().anchor),
+                                date = date.copy(anchor = DateWatermark().anchor),
                             )
                         }
                     }

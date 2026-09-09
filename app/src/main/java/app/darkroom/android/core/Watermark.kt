@@ -210,17 +210,71 @@ private fun layoutWatermark(
     val top = cy - height / 2f
     val textLeft = left + logoSize + gap
     val textBaseline = top + height * 0.78f
-    return WatermarkBox(
-        id = id,
+    return clampWatermarkBox(
+        WatermarkBox(
+            id = id,
+            left = left,
+            top = top,
+            width = width,
+            height = height,
+            logo = logo,
+            logoSize = logoSize,
+            text = text,
+            textSize = textSize,
+            textLeft = textLeft,
+            textBaseline = textBaseline,
+        ),
+        frameW,
+        frameH,
+    )
+}
+
+/**
+ * Pins [box] so every edge stays inside the safe inset. A box wider/taller than the
+ * remaining span is locked to the left/top inset rather than going negative.
+ */
+fun clampWatermarkBox(box: WatermarkBox, frameW: Float, frameH: Float): WatermarkBox {
+    if (frameW <= 0f || frameH <= 0f) return box
+    val inset = safeInset(frameW, frameH)
+    val minLeft = inset
+    val maxLeft = frameW - inset - box.width
+    val minTop = inset
+    val maxTop = frameH - inset - box.height
+    val left = if (maxLeft < minLeft) minLeft else box.left.coerceIn(minLeft, maxLeft)
+    val top = if (maxTop < minTop) minTop else box.top.coerceIn(minTop, maxTop)
+    val dx = left - box.left
+    val dy = top - box.top
+    if (dx == 0f && dy == 0f) return box
+    return box.copy(
         left = left,
         top = top,
-        width = width,
-        height = height,
-        logo = logo,
-        logoSize = logoSize,
-        text = text,
-        textSize = textSize,
-        textLeft = textLeft,
-        textBaseline = textBaseline,
+        textLeft = box.textLeft + dx,
+        textBaseline = box.textBaseline + dy,
+    )
+}
+
+/** Normalised centre of the box that [watermarkLayout] would produce for this drag. */
+fun clampedWatermarkAnchor(
+    centerX: Float,
+    centerY: Float,
+    width: Float,
+    height: Float,
+    frameW: Float,
+    frameH: Float,
+): WatermarkAnchor {
+    val clamped = clampWatermarkBox(
+        WatermarkBox(
+            id = "",
+            left = centerX - width / 2f,
+            top = centerY - height / 2f,
+            width = width,
+            height = height,
+        ),
+        frameW,
+        frameH,
+    )
+    return WatermarkAnchor(
+        cx = if (frameW > 0f) clamped.cx / frameW else 0f,
+        cy = if (frameH > 0f) clamped.cy / frameH else 0f,
     )
 }

@@ -93,6 +93,7 @@ import app.darkroom.android.core.EditJobOverlay
 import app.darkroom.android.core.GalleryItem
 import app.darkroom.android.core.PendingKind
 import app.darkroom.android.core.PhotoMeta
+import app.darkroom.android.core.fallbackImportName
 import app.darkroom.android.core.isJpegBytes
 import app.darkroom.android.core.isJpegName
 import app.darkroom.android.core.mergeGalleryItems
@@ -1250,13 +1251,24 @@ private fun readUriBytes(
 }
 
 private fun displayName(context: Context, uri: Uri): String {
-    val provided = runCatching {
+    val provided = queryDisplayName(context, uri, OpenableColumns.DISPLAY_NAME)
+        ?: queryDisplayName(context, uri, MediaStore.MediaColumns.DISPLAY_NAME)
+    return fallbackImportName(provided, System.currentTimeMillis())
+}
+
+private fun queryDisplayName(context: Context, uri: Uri, column: String): String? {
+    return runCatching {
         context.contentResolver
-            .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+            .query(uri, arrayOf(column), null, null, null)
+            ?.use { cursor ->
+                val idx = cursor.getColumnIndex(column)
+                if (idx >= 0 && cursor.moveToFirst()) {
+                    cursor.getString(idx)?.trim()?.takeIf { it.isNotBlank() }
+                } else {
+                    null
+                }
+            }
     }.getOrNull()
-    val raw = provided ?: uri.lastPathSegment
-    return raw?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: "import.jpg"
 }
 
 /** The bytes are JPEG by this point, either originally or after transcoding, so only the

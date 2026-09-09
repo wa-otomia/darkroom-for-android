@@ -50,6 +50,7 @@ import app.darkroom.android.core.SNAP_POSITION_DP
 import app.darkroom.android.core.WatermarkAnchor
 import app.darkroom.android.core.WatermarkBox
 import app.darkroom.android.core.WatermarkSettings
+import app.darkroom.android.core.clampedWatermarkAnchor
 import app.darkroom.android.core.largestFrameSize
 import app.darkroom.android.core.safeInset
 import app.darkroom.android.core.watermarkLayout
@@ -229,10 +230,16 @@ private fun WatermarkPreviewMark(
                     onDragEnd = {
                         val current = boxState.value
                         val snapped = snapState.value
-                        val cx = if (frameW > 0f) snapped.x / frameW else current.cx / frameW
-                        val cy = if (frameH > 0f) snapped.y / frameH else current.cy / frameH
+                        val anchor = clampedWatermarkAnchor(
+                            centerX = snapped.x,
+                            centerY = snapped.y,
+                            width = current.width,
+                            height = current.height,
+                            frameW = frameW,
+                            frameH = frameH,
+                        )
                         snapState.value.end()
-                        onCommitState.value(current.id, WatermarkAnchor(cx, cy))
+                        onCommitState.value(current.id, anchor)
                     },
                     onDragCancel = {
                         snapState.value.end()
