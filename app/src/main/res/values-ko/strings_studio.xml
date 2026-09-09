@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="studio_tab_compose">구도</string>
+    <string name="studio_tab_process">처리</string>
+    <string name="studio_tab_output">출력</string>
+    <string name="studio_extra_prompt">추가 프롬프트</string>
+    <string name="studio_extra_prompt_edit">추가 프롬프트 편집</string>
     <string name="studio_framing">구도</string>
     <string name="studio_frame_portrait">세로 2:3</string>
     <string name="studio_frame_landscape">가로 3:2</string>
@@ -10,7 +15,6 @@
     <string name="studio_landscape_note">용지는 항상 세로입니다. 가로 구도는 시계 방향으로 90° 돌려 용지를 채우므로, 인쇄물을 옆으로 돌려서 보세요.</string>
     <string name="studio_crop_locked">작업이 진행 중입니다. 완료될 때까지 구도와 자르기가 잠깁니다.</string>
     <string name="studio_crop_locked_short">자르기 잠금</string>
-    <string name="studio_preset_prompt_label">프리셋 프롬프트</string>
     <string name="studio_preset_stacks">프리셋은 자동으로 전송됩니다. 아래 입력한 내용은 프리셋 뒤에 덧붙으며 덮어쓰지 않습니다.</string>
     <string name="studio_generate_vs_edit">갤러리로 생성은 옆에 새 사진을 만듭니다. 이 사진만 편집은 현재 사진에 버전을 추가하고 자르기를 유지합니다.</string>
     <string name="studio_open_photo">사진 %1$s 열기</string>

@@ -19,9 +19,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,8 +32,6 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,12 +46,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -61,11 +57,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -76,6 +69,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.darkroom.android.R
+import app.darkroom.android.core.GENERATED_PHOTO_TAG
 import app.darkroom.android.core.MAX_PRINT_ZOOM
 import app.darkroom.android.core.MIN_PRINT_ZOOM
 import app.darkroom.android.core.PRINT_ASPECT
@@ -89,6 +83,7 @@ import app.darkroom.android.core.isConfigured
 import app.darkroom.android.core.exactQuarterTurns
 import app.darkroom.android.core.formatCropSpec
 import app.darkroom.android.core.isCancelledPrintMessage
+import app.darkroom.android.core.isGenerated
 import app.darkroom.android.core.listRelatedPhotos
 import app.darkroom.android.core.newestVersionSource
 import app.darkroom.android.core.normalizeRotationDegrees
@@ -117,15 +112,12 @@ import app.darkroom.android.data.settings.SettingsRepository
 import app.darkroom.android.ui.UserErrorDialog
 import app.darkroom.android.ui.components.AspectCropper
 import app.darkroom.android.ui.components.DarkroomSnackbarHost
-import app.darkroom.android.ui.components.DarkroomTextField
 import app.darkroom.android.ui.components.GhostButton
-import app.darkroom.android.ui.components.JobProgressStrip
-import app.darkroom.android.ui.components.JobScrim
+import app.darkroom.android.ui.components.JobOverlayBar
 import app.darkroom.android.ui.components.PaperButton
 import app.darkroom.android.ui.components.PresetDropdown
 import app.darkroom.android.ui.components.SectionLabel
 import app.darkroom.android.ui.components.SnapDragState
-import app.darkroom.android.ui.components.contentBlur
 import app.darkroom.android.ui.jobFieldKey
 import app.darkroom.android.ui.localizedByteProgress
 import app.darkroom.android.ui.localizedGeneratePhase
@@ -139,19 +131,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 
 private val ACTIVE_PRINT_STATES = setOf("queued", "running")
 
-/**
- * Height of [BottomSheetDefaults.DragHandle] (4dp bar plus 22dp padding above and
- * below). The sheet cap applies to handle plus content, and the handle is not ours
- * to measure, so its size is subtracted here.
- */
-private val SheetDragHandleHeight = 48.dp
-
-/** The controls sheet may never take more than this share of the phone layout. */
-private const val SHEET_MAX_FRACTION = 0.5f
+/** The selected-tab panel may never take more than this share of the phone layout. */
+private const val PANEL_MAX_FRACTION = 0.42f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -165,6 +149,7 @@ fun StudioScreen(
     onBack: () -> Unit,
     onOpen: (String) -> Unit,
     onSettings: (String) -> Unit,
+    onOpenGallery: (String) -> Unit = {},
 ) {
     val photo = photos.find { it.id == photoId }
     val presets by settings.presets.collectAsState()
@@ -198,7 +183,10 @@ fun StudioScreen(
     var cropSpec by rememberSaveable(photoId, source) { mutableStateOf("") }
     var placement by remember(photoId, source) { mutableStateOf<ViewportPlacement?>(null) }
     var prompt by rememberSaveable(photoId) { mutableStateOf("") }
+    var extraPromptOpen by rememberSaveable(photoId) { mutableStateOf(false) }
     var presetId by rememberSaveable(photoId) { mutableStateOf(presets.lastSelectedId) }
+    var tabKey by rememberSaveable { mutableStateOf(StudioTab.Compose.key) }
+    val tab = StudioTab.fromKey(tabKey)
     var copies by rememberSaveable(photoId) { mutableStateOf(appSettings.defaultCopies) }
     var printError by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
     var genError by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
@@ -236,17 +224,15 @@ fun StudioScreen(
     val aiHidden = activeAi?.hidden == true
     val aiActive = generating || editing
     val aiBlocking = aiActive && !aiHidden
-    val generateDoneText = stringResource(R.string.generate_done)
     val aiCancelledText = stringResource(R.string.ai_cancelled)
     val generatedText = stringResource(R.string.ai_generated)
     val viewGenerated = stringResource(R.string.ai_generated_view)
     val editDoneText = stringResource(R.string.edit_done)
-    val addedToGalleryText = stringResource(R.string.studio_added_to_gallery)
     val versionFallback = stringResource(R.string.studio_version_fallback)
     val printDoneText = stringResource(R.string.print_done)
     val printQueuedText = stringResource(R.string.print_queued)
     var printStripCollapsed by rememberSaveable(photoId) { mutableStateOf(false) }
-    var aiStripCollapsed by rememberSaveable(photoId) { mutableStateOf(false) }
+    var exportStripCollapsed by rememberSaveable(photoId) { mutableStateOf(false) }
     val myProgress = runningProgress?.takeIf { it.photoId == photoId }
     val printPhase = myProgress?.phase ?: myPrint?.phase
     val printState = myProgress?.jobState ?: myPrint?.jobState
@@ -288,8 +274,7 @@ fun StudioScreen(
                             (it.sourcePhotoId == e.photoId && it.kind == AiKind.Generate)
                     }?.hidden == true
                     if (!hidden && photoId == e.photoId) {
-                        launch { snackbar.showSnackbar(generateDoneText) }
-                        onOpen(e.created.id)
+                        onOpenGallery(e.created.id)
                     } else {
                         launch {
                             val result = snackbar.showSnackbar(
@@ -297,7 +282,7 @@ fun StudioScreen(
                                 actionLabel = viewGenerated,
                                 duration = SnackbarDuration.Long,
                             )
-                            if (result == SnackbarResult.ActionPerformed) onOpen(e.created.id)
+                            if (result == SnackbarResult.ActionPerformed) onOpenGallery(e.created.id)
                         }
                     }
                 }
@@ -349,11 +334,9 @@ fun StudioScreen(
     val queuedIds = printJobs.filter { jobFieldKey(it.state) == "queued" }.map { it.id }
     val queueIndex = myPrint?.let { queuedIds.indexOf(it.id) }?.let { if (it >= 0) it + 1 else 0 } ?: 0
     LaunchedEffect(myPrint?.id) { printStripCollapsed = false }
-    LaunchedEffect(activeAi?.id) { aiStripCollapsed = false }
+    LaunchedEffect(exporting) { if (exporting) exportStripCollapsed = false }
     val portraitOverlay = stringResource(R.string.crop_overlay)
     val landscapeOverlay = stringResource(R.string.studio_crop_overlay_landscape)
-    val fontScale = LocalDensity.current.fontScale
-    val scaffoldState = rememberBottomSheetScaffoldState(snackbarHostState = snackbar)
 
     LaunchedEffect(photoId, source, photo, imageFile) {
         if (source == "original" || source.isBlank()) {
@@ -421,6 +404,7 @@ fun StudioScreen(
     val startExport: () -> Unit = {
         if (!exporting) {
             exporting = true
+            exportStripCollapsed = false
             exportProgress = null
             val tracker = JobProgressTracker(
                 jobId = "export-$photoId",
@@ -477,30 +461,8 @@ fun StudioScreen(
         }
     }
 
-    val controls: @Composable (onPromptFocus: () -> Unit) -> Unit = { onPromptFocus ->
+    val composePanel: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            CopiesStepper(copies = copies, enabled = !cropLocked) { copies = it.coerceIn(1, 9) }
-            PaperButton(stringResource(R.string.studio_add_to_print_queue), enabled = canPrintDirect) {
-                startPrint(false)
-            }
-            GhostButton(stringResource(R.string.print_with_preset), enabled = canPrintWithPreset) {
-                startPrint(true)
-            }
-            StudioWatermarkRow(
-                checked = watermarkArmed,
-                enabled = canWatermark && !cropLocked,
-                hint = if (!canWatermark) stringResource(R.string.studio_watermark_unconfigured) else null,
-            ) { watermarkOn = it }
-            if (alreadyQueued) {
-                StudioNote(stringResource(R.string.print_queue_already_queued), tone = Amber, topPadding = 0)
-            }
-            if (!printerReady) {
-                Column {
-                    Text(stringResource(R.string.print_need_printer), color = Amber)
-                    TextButton(onClick = { onSettings("printer") }) { Text(stringResource(R.string.nav_settings), color = Amber) }
-                }
-            }
-
             Column {
                 SectionLabel(stringResource(R.string.studio_framing))
                 FramingControls(
@@ -541,36 +503,40 @@ fun StudioScreen(
                     StudioNote(stringResource(R.string.studio_crop_locked), tone = Amber)
                 }
             }
-            GhostButton(stringResource(R.string.studio_export), enabled = !exporting && !cropLocked) {
-                startExport()
-            }
-            if (exporting) {
-                val exportPhase = exportProgress?.phase ?: "rendering"
-                val exportLabel = if (exportPhase == "saving") {
-                    stringResource(R.string.phase_export_saving)
-                } else {
-                    stringResource(R.string.phase_export_rendering)
-                }
-                val exportUi = exportProgress?.toUi(exportLabel) ?: indeterminateUi(exportLabel)
-                Text(
-                    exportUi.percent?.let { "$exportLabel · $it%" } ?: exportLabel,
-                    color = PaperDim,
-                    fontSize = 12.sp,
-                )
-            }
+            StudioWatermarkRow(
+                checked = watermarkArmed,
+                enabled = canWatermark && !cropLocked,
+                hint = if (!canWatermark) stringResource(R.string.studio_watermark_unconfigured) else null,
+            ) { watermarkOn = it }
+        }
+    }
 
+    val processPanel: @Composable () -> Unit = {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Column {
                 SectionLabel(stringResource(R.string.version))
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    family.filter { it.id != photo.id }.forEach { p ->
-                        StudioNavChip(
-                            label = if (p.id == rootId) stringResource(R.string.original) else p.filename,
-                            onClick = { onOpen(p.id) },
-                        )
+                val siblings = family.filter { it.id != photo.id }
+                if (siblings.isNotEmpty()) {
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()).padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        siblings.forEach { p ->
+                            StudioNavChip(
+                                label = if (p.id == rootId) stringResource(R.string.original) else p.filename,
+                                onClick = { onOpen(p.id) },
+                            )
+                        }
                     }
-                    StudioVersionChip(
+                }
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    StudioVersionTile(
                         selected = source == "original",
                         label = stringResource(R.string.original),
+                        model = catalog.versionThumbFile(photo.id, "original"),
                         onClick = { sourceOverride = "original" },
                     )
                     editsInCreationOrder(photo.edits).forEachIndexed { i, edit ->
@@ -579,9 +545,10 @@ fun StudioScreen(
                             edit.presetId,
                             versionFallback,
                         ) { id -> presets.presets.find { it.id == id }?.title }
-                        StudioVersionChip(
+                        StudioVersionTile(
                             selected = source == edit.id,
                             label = versionLabel(i + 1, presetName, versionFallback),
+                            model = catalog.versionThumbFile(photo.id, edit.id),
                             onClick = { sourceOverride = edit.id },
                             onLongClick = if (aiActive) {
                                 null
@@ -602,42 +569,22 @@ fun StudioScreen(
                     Text(stringResource(R.string.grok_need_key), color = Amber, modifier = Modifier.padding(bottom = 8.dp))
                     TextButton(onClick = { onSettings("grok") }) { Text(stringResource(R.string.nav_settings), color = Amber) }
                 }
-                PresetDropdown(presetId, presets.presets, enabled = !cropLocked) {
-                    presetId = it
-                    settings.setLastPreset(it)
-                }
-                val selectedPreset = presets.presets.find { it.id == presetId }
-                if (selectedPreset != null) {
-                    Text(
-                        stringResource(R.string.studio_preset_prompt_label),
-                        color = PaperDim,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        fontFamily = MonoFont,
-                        modifier = Modifier.padding(top = 2.dp),
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Box(Modifier.weight(1f)) {
+                        PresetDropdown(presetId, presets.presets, enabled = !cropLocked) {
+                            presetId = it
+                            settings.setLastPreset(it)
+                        }
+                    }
+                    StudioExtraPromptRow(
+                        prompt = prompt,
+                        enabled = !cropLocked,
+                        onEdit = { extraPromptOpen = true },
                     )
-                    Text(
-                        selectedPreset.prompt,
-                        color = Paper,
-                        fontSize = 12.sp,
-                        lineHeight = 17.sp,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 2.dp),
-                    )
-                    StudioNote(stringResource(R.string.studio_preset_stacks))
                 }
-                DarkroomTextField(
-                    label = "",
-                    value = prompt,
-                    onValueChange = { prompt = it },
-                    placeholder = stringResource(R.string.prompt_placeholder),
-                    minLines = 3,
-                    enabled = !cropLocked,
-                    modifier = Modifier.onFocusEvent { state ->
-                        if (state.isFocused || state.hasFocus) onPromptFocus()
-                    },
-                )
             }
             PaperButton(stringResource(R.string.studio_ai_generate_version), enabled = canGenerate) {
                 genError = null
@@ -651,7 +598,38 @@ fun StudioScreen(
         }
     }
 
-    var topBarHeightPx by remember { mutableIntStateOf(0) }
+    val outputPanel: @Composable () -> Unit = {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            CopiesStepper(copies = copies, enabled = !cropLocked) { copies = it.coerceIn(1, 9) }
+            PaperButton(stringResource(R.string.studio_add_to_print_queue), enabled = canPrintDirect) {
+                startPrint(false)
+            }
+            GhostButton(stringResource(R.string.print_with_preset), enabled = canPrintWithPreset) {
+                startPrint(true)
+            }
+            if (alreadyQueued) {
+                StudioNote(stringResource(R.string.print_queue_already_queued), tone = Amber, topPadding = 0)
+            }
+            if (!printerReady) {
+                Column {
+                    Text(stringResource(R.string.print_need_printer), color = Amber)
+                    TextButton(onClick = { onSettings("printer") }) { Text(stringResource(R.string.nav_settings), color = Amber) }
+                }
+            }
+            GhostButton(stringResource(R.string.studio_export), enabled = !exporting && !cropLocked) {
+                startExport()
+            }
+        }
+    }
+
+    val tabPanel: @Composable () -> Unit = {
+        when (tab) {
+            StudioTab.Compose -> composePanel()
+            StudioTab.Process -> processPanel()
+            StudioTab.Output -> outputPanel()
+        }
+    }
+
     val printQueued = myPrint != null && jobFieldKey(myPrint.state) == "queued"
     val printLabel = when {
         myPrint == null -> ""
@@ -673,65 +651,107 @@ fun StudioScreen(
     }
     val aiBytes = localizedByteProgress(genLoaded, genTotal).ifEmpty { null }
     val aiUi = activeAi?.progress?.toUi(aiPhaseLabel, aiBytes) ?: indeterminateUi(aiPhaseLabel, aiBytes)
+    val exportPhase = exportProgress?.phase ?: "rendering"
+    val exportLabel = if (exportPhase == "saving") {
+        stringResource(R.string.phase_export_saving)
+    } else {
+        stringResource(R.string.phase_export_rendering)
+    }
+    val exportUi = exportProgress?.toUi(exportLabel) ?: indeterminateUi(exportLabel)
+    val showAiOverlay = aiBlocking
+    val showExportOverlay = exporting && !exportStripCollapsed
+
     val topBar: @Composable () -> Unit = {
-        Column(Modifier.onSizeChanged { topBarHeightPx = it.height }) {
-            StudioTopBar(
-                filename = photo.filename,
-                busy = aiActive || alreadyQueued,
-                onBack = onBack,
-                onDelete = { pendingDelete = true },
-            )
-            if (myPrint != null && printUi != null) {
-                JobProgressStrip(
-                    title = stringResource(R.string.progress_print),
-                    ui = printUi,
-                    collapsed = printStripCollapsed,
-                    extra = printerJobId?.let { stringResource(R.string.print_job_id, it) },
-                    onCancel = { printQueue.cancel(myPrint.id) },
-                    onHide = { printStripCollapsed = true },
+        StudioTopBar(
+            filename = photo.filename,
+            generated = photo.isGenerated(),
+            busy = aiActive || alreadyQueued,
+            onBack = onBack,
+            onDelete = { pendingDelete = true },
+        )
+    }
+
+    val jobIdExtra = printerJobId?.let { stringResource(R.string.print_job_id, it) }
+    val printOverlayPhase = if (jobIdExtra.isNullOrBlank()) printLabel else "$printLabel · $jobIdExtra"
+
+    val cropper: @Composable (Modifier) -> Unit = { cropModifier ->
+        Box(cropModifier) {
+            WatermarkOverlay(
+                settings = watermarkSettings,
+                photo = photo,
+                landscape = landscape,
+                visible = watermarkArmed,
+                modifier = Modifier.fillMaxSize().background(Color.Black),
+            ) {
+                AspectCropper(
+                    model = imageFile,
+                    imageWidth = orientedW,
+                    imageHeight = orientedH,
+                    zoom = zoom,
+                    panX = panX,
+                    panY = panY,
+                    onZoomChange = { zoom = it },
+                    onPanChange = { x, y -> panX = x; panY = y },
+                    onCrop = { cropSpec = formatCropSpec(it) },
+                    overlay = if (landscape) landscapeOverlay else portraitOverlay,
+                    aspect = if (landscape) PRINT_ASPECT_LANDSCAPE.toFloat() else PRINT_ASPECT.toFloat(),
+                    rotationDegrees = rotationDegrees,
+                    onRotationChange = { rotationDegrees = it },
+                    onPlacement = { placement = it },
+                    // Lock only while a visible AI job is running. A queued print
+                    // must not freeze framing — the crop was already captured at enqueue.
+                    enabled = !cropLocked,
+                    snapState = snapState,
                 )
             }
-            activeAi?.takeIf { it.hidden }?.let { hidden ->
-                JobProgressStrip(
-                    title = stringResource(R.string.progress_generate),
-                    ui = aiUi,
-                    collapsed = aiStripCollapsed,
-                    extra = aiBytes,
-                    onCancel = { aiJobs.cancel(hidden.id) },
-                    onHide = { aiStripCollapsed = true },
-                )
+            Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
+                if (showAiOverlay && activeAi != null) {
+                    JobOverlayBar(
+                        phase = aiPhaseLabel,
+                        ui = aiUi,
+                        onHide = { aiJobs.hide(activeAi.id) },
+                        onCancel = { aiJobs.cancel(activeAi.id) },
+                    )
+                }
+                if (showExportOverlay) {
+                    JobOverlayBar(
+                        phase = exportLabel,
+                        ui = exportUi,
+                        onHide = { exportStripCollapsed = true },
+                    )
+                }
+                val printJob = myPrint
+                val printOverlayUi = printUi
+                if (!printStripCollapsed && printJob != null && printOverlayUi != null) {
+                    JobOverlayBar(
+                        phase = printOverlayPhase,
+                        ui = printOverlayUi,
+                        onHide = { printStripCollapsed = true },
+                        onCancel = { printQueue.cancel(printJob.id) },
+                    )
+                }
             }
         }
     }
 
-    val cropper: @Composable (Modifier) -> Unit = { cropModifier ->
-        WatermarkOverlay(
-            settings = watermarkSettings,
-            photo = photo,
-            landscape = landscape,
-            visible = watermarkArmed,
-            modifier = cropModifier.background(Color.Black),
-        ) {
-            AspectCropper(
-                model = imageFile,
-                imageWidth = orientedW,
-                imageHeight = orientedH,
-                zoom = zoom,
-                panX = panX,
-                panY = panY,
-                onZoomChange = { zoom = it },
-                onPanChange = { x, y -> panX = x; panY = y },
-                onCrop = { cropSpec = formatCropSpec(it) },
-                overlay = if (landscape) landscapeOverlay else portraitOverlay,
-                aspect = if (landscape) PRINT_ASPECT_LANDSCAPE.toFloat() else PRINT_ASPECT.toFloat(),
-                rotationDegrees = rotationDegrees,
-                onRotationChange = { rotationDegrees = it },
-                onPlacement = { placement = it },
-                // Lock only while the AI scrim is up. A queued print must not
-                // freeze framing — the crop was already captured at enqueue.
-                enabled = !cropLocked,
-                snapState = snapState,
+    val panelBody: @Composable (Modifier) -> Unit = { bodyModifier ->
+        Column(bodyModifier.verticalScroll(rememberScrollState())) {
+            Text(
+                "${working.width}×${working.height}",
+                fontFamily = MonoFont,
+                color = PaperDim,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             )
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                tabPanel()
+            }
         }
     }
 
@@ -748,104 +768,54 @@ fun StudioScreen(
                     Modifier
                         .fillMaxSize()
                         .padding(padding)
-                        .contentBlur(aiBlocking),
+                        .navigationBarsPadding()
+                        .imePadding(),
                 ) {
                     cropper(Modifier.weight(1f).fillMaxHeight())
-                    Column(
-                        Modifier
-                            .width(panelWidth)
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState())
-                            .imePadding()
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text("${working.width}×${working.height}", fontFamily = MonoFont, color = PaperDim, fontSize = 12.sp)
-                        controls {}
+                    Column(Modifier.width(panelWidth).fillMaxHeight()) {
+                        panelBody(Modifier.weight(1f).fillMaxWidth())
+                        StudioTabBar(
+                            selected = tab,
+                            onSelect = { tabKey = it.key },
+                        )
                     }
                 }
             }
         } else {
-            // The keyboard shrinks this box, so the half-height cap and the cropper
-            // both give way to it instead of the sheet growing over the cropper.
-            BoxWithConstraints(Modifier.fillMaxSize().imePadding()) {
-                val sheetCap = maxHeight * SHEET_MAX_FRACTION
-                val sheetPeekHeight = (220.dp * fontScale.coerceIn(1f, 1.5f)).coerceAtMost(sheetCap)
-                val peekPx = with(LocalDensity.current) { sheetPeekHeight.roundToPx() }
-                BottomSheetScaffold(
-                    scaffoldState = scaffoldState,
-                    topBar = topBar,
-                    sheetPeekHeight = sheetPeekHeight,
-                    sheetContainerColor = Room,
-                    sheetContentColor = Paper,
-                    sheetDragHandle = { BottomSheetDefaults.DragHandle(color = PaperDim) },
-                    snackbarHost = { DarkroomSnackbarHost(snackbar) },
-                    // Room, not black: this colour is only ever seen in the strip
-                    // the scaffold reserves for insets, where it used to butt up
-                    // against the Room the nav host paints and leave a seam under
-                    // the status bar. The viewport keeps its neutral black — the
-                    // cropper paints that itself, right below.
-                    containerColor = Room,
-                    sheetContent = {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .contentBlur(aiBlocking)
-                                .heightIn(max = (sheetCap - SheetDragHandleHeight).coerceAtLeast(0.dp))
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 20.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Text("${working.width}×${working.height}", fontFamily = MonoFont, color = PaperDim, fontSize = 12.sp)
-                            controls {
-                                scope.launch {
-                                    try {
-                                        scaffoldState.bottomSheetState.expand()
-                                    } catch (_: Exception) {
-                                    }
-                                }
-                            }
-                        }
-                    },
-                ) { _ ->
-                    // The scaffold only reserves the peek height for the body; the
-                    // cropper instead follows the sheet edge, so it shrinks as the
-                    // sheet is dragged up. The sheet offset is relative to the whole
-                    // scaffold, the body starts below the top bar.
-                    cropper(
-                        Modifier
-                            .fillMaxSize()
-                            .contentBlur(aiBlocking)
-                            .layout { measurable, constraints ->
-                                val sheetTop = runCatching { scaffoldState.bottomSheetState.requireOffset() }.getOrNull()
-                                val height = (sheetTop?.let { it.roundToInt() - topBarHeightPx } ?: (constraints.maxHeight - peekPx))
-                                    .coerceIn(0, constraints.maxHeight)
-                                val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
-                                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, 0) }
-                            },
+            val panelCap = maxHeight * PANEL_MAX_FRACTION
+            Scaffold(
+                containerColor = Room,
+                contentWindowInsets = WindowInsets(0),
+                topBar = topBar,
+                snackbarHost = { DarkroomSnackbarHost(snackbar) },
+            ) { padding ->
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .navigationBarsPadding()
+                        .imePadding(),
+                ) {
+                    cropper(Modifier.weight(1f).fillMaxWidth())
+                    panelBody(Modifier.fillMaxWidth().heightIn(max = panelCap))
+                    StudioTabBar(
+                        selected = tab,
+                        onSelect = { tabKey = it.key },
                     )
                 }
             }
         }
+    }
 
-        if (aiBlocking) {
-            JobScrim(
-                title = stringResource(R.string.progress_generate),
-                ui = aiUi,
-                cancel = {
-                    Spacer(Modifier.height(12.dp))
-                    GhostButton(stringResource(R.string.common_cancel)) {
-                        activeAi?.let { aiJobs.cancel(it.id) }
-                    }
-                },
-                secondaryAction = {
-                    Spacer(Modifier.height(8.dp))
-                    GhostButton(stringResource(R.string.job_hide)) {
-                        activeAi?.let { aiJobs.hide(it.id) }
-                    }
-                },
-            )
-        }
+    if (extraPromptOpen) {
+        ExtraPromptDialog(
+            value = prompt,
+            onDismiss = { extraPromptOpen = false },
+            onConfirm = {
+                prompt = it
+                extraPromptOpen = false
+            },
+        )
     }
 
     UserErrorDialog(printError, onDismiss = { printError = null })
@@ -912,7 +882,7 @@ fun StudioScreen(
                             versionMenuId = null
                             scope.launch {
                                 try {
-                                    withContext(Dispatchers.IO) {
+                                    val created = withContext(Dispatchers.IO) {
                                         val file = catalog.sourceFile(photo.id, editId)
                                         val index = editsInCreationOrder(photo.edits)
                                             .indexOfFirst { it.id == editId } + 1
@@ -920,9 +890,10 @@ fun StudioScreen(
                                             file.readBytes(),
                                             studioVersionIngestName(photo.filename, index.coerceAtLeast(1)),
                                             kind = "studio",
+                                            tags = listOf(GENERATED_PHOTO_TAG),
                                         )
                                     }
-                                    snackbar.showSnackbar(addedToGalleryText)
+                                    onOpenGallery(created.id)
                                 } catch (e: CancellationException) {
                                     throw e
                                 } catch (e: Exception) {
@@ -980,6 +951,7 @@ fun StudioScreen(
 @Composable
 private fun StudioTopBar(
     filename: String,
+    generated: Boolean,
     busy: Boolean,
     onBack: () -> Unit,
     onDelete: () -> Unit,
@@ -987,7 +959,19 @@ private fun StudioTopBar(
 ) {
     TopAppBar(
         title = {
-            Text(filename, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Paper)
+            Column {
+                if (generated) {
+                    Text(
+                        stringResource(R.string.photo_tag_generated),
+                        color = Amber,
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp,
+                        fontFamily = MonoFont,
+                        letterSpacing = 1.2.sp,
+                    )
+                }
+                Text(filename, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Paper)
+            }
         },
         navigationIcon = {
             IconButton(onClick = onBack) {

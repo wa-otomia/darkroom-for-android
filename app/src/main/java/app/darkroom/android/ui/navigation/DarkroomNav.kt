@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoFixHigh
@@ -22,7 +24,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -55,6 +59,7 @@ import app.darkroom.android.ui.theme.Paper
 import app.darkroom.android.ui.theme.PaperDim
 import app.darkroom.android.ui.theme.Room
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @Composable
 fun DarkroomNav(
@@ -82,6 +87,16 @@ fun DarkroomNav(
     val showBar = destRoute in tabs
     // Kept across recompositions: GalleryScreen keys its collector on this instance.
     val galleryReselect = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
+    val galleryFocus = remember { MutableStateFlow<String?>(null) }
+    val focusPhotoId by galleryFocus.collectAsState()
+    val layoutDirection = LocalLayoutDirection.current
+
+    fun openGallery(photoId: String) {
+        galleryFocus.value = photoId
+        if (!nav.popBackStack("gallery", false)) {
+            nav.navigateTab("gallery")
+        }
+    }
 
     LaunchedEffect(openPhotoId) {
         if (!openPhotoId.isNullOrBlank()) {
@@ -131,7 +146,12 @@ fun DarkroomNav(
         NavHost(
             nav,
             startDestination = "gallery",
-            modifier = Modifier.padding(padding),
+            modifier = Modifier.padding(
+                start = padding.calculateStartPadding(layoutDirection),
+                top = padding.calculateTopPadding(),
+                end = padding.calculateEndPadding(layoutDirection),
+                bottom = if (showBar) padding.calculateBottomPadding() else 0.dp,
+            ),
             // Tab switches cross-fade; drilling into a detail slides toward the layout end and
             // reverses on the way back. SlideDirection.Start/End already respect RTL.
             enterTransition = {
@@ -181,6 +201,8 @@ fun DarkroomNav(
                     automation = automation,
                     printQueue = printQueue,
                     reselect = galleryReselect,
+                    focusPhotoId = focusPhotoId,
+                    onFocusConsumed = { galleryFocus.value = null },
                     onOpen = { nav.navigate("studio/$it") },
                     onDismissTransfer = { transferRegistry.dismiss(it) },
                     onCancelAi = { aiJobs.cancel(it) },
@@ -242,6 +264,7 @@ fun DarkroomNav(
                     // No launchSingleTop: sibling versions are a different photo, so the back stack
                     // has to keep the one we came from.
                     onOpen = { nav.navigate("studio/$it") },
+                    onOpenGallery = { openGallery(it) },
                     onSettings = { section ->
                         nav.navigate(if (section.isBlank()) "settings" else "settings?section=$section") {
                             launchSingleTop = true

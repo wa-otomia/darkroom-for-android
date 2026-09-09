@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="studio_tab_compose">構図</string>
+    <string name="studio_tab_process">処理</string>
+    <string name="studio_tab_output">出力</string>
+    <string name="studio_extra_prompt">追加プロンプト</string>
+    <string name="studio_extra_prompt_edit">追加プロンプトを編集</string>
     <string name="studio_framing">構図</string>
     <string name="studio_frame_portrait">縦 2:3</string>
     <string name="studio_frame_landscape">横 3:2</string>
@@ -10,7 +15,6 @@
     <string name="studio_landscape_note">用紙は常に縦向きです。横構図は時計回りに 90° 回して用紙いっぱいに配置するため、印刷後は横に持ってご覧ください。</string>
     <string name="studio_crop_locked">処理中です。完了するまで構図とトリミングはロックされます。</string>
     <string name="studio_crop_locked_short">トリミング固定</string>
-    <string name="studio_preset_prompt_label">プリセットのプロンプト</string>
     <string name="studio_preset_stacks">プリセットは自動で送信されます。下に入力した内容はその後ろに追加され、プリセットを上書きしません。</string>
     <string name="studio_generate_vs_edit">「ギャラリーへ生成」は隣に新しい写真を作ります。「この写真だけ編集」は今の写真にバージョンを追加し、トリミングを保持します。</string>
     <string name="studio_open_photo">写真 %1$s を開く</string>

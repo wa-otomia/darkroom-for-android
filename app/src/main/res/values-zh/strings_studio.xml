@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="studio_tab_compose">构图</string>
+    <string name="studio_tab_process">处理</string>
+    <string name="studio_tab_output">输出</string>
+    <string name="studio_extra_prompt">追加提示词</string>
+    <string name="studio_extra_prompt_edit">编辑追加提示词</string>
     <string name="studio_framing">取景</string>
     <string name="studio_frame_portrait">竖幅 2:3</string>
     <string name="studio_frame_landscape">横幅 3:2</string>
@@ -10,7 +15,6 @@
     <string name="studio_landscape_note">相纸方向固定为竖向。横幅取景会顺时针旋转 90° 后铺满相纸，出纸后横持照片即可正常观看。</string>
     <string name="studio_crop_locked">任务进行中，取景与裁切已锁定，完成后可继续调整。</string>
     <string name="studio_crop_locked_short">裁切已锁定</string>
-    <string name="studio_preset_prompt_label">预设提示词</string>
     <string name="studio_preset_stacks">预设提示词会自动发送，下方输入的内容将追加在其后，不会覆盖预设。</string>
     <string name="studio_generate_vs_edit">「生成到相册」会新建一张照片并入库；「只修这一张」只为当前照片新增一个版本，并保留当前裁切。</string>
     <string name="studio_open_photo">打开照片 %1$s</string>

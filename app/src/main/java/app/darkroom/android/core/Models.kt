@@ -54,7 +54,14 @@ data class PhotoMeta(
     val prints: List<PrintRecord> = emptyList(),
     val parentId: String? = null,
     val generatePrompt: String? = null,
+    val tags: List<String> = emptyList(),
 )
+
+/** Catalog tag written when a Studio result is saved as its own gallery photo. */
+const val GENERATED_PHOTO_TAG = "generated"
+
+fun PhotoMeta.isGenerated(): Boolean =
+    GENERATED_PHOTO_TAG in tags || parentId != null
 
 enum class PrintFit {
     COVER,

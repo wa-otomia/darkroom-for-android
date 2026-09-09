@@ -94,6 +94,7 @@ import app.darkroom.android.core.GalleryItem
 import app.darkroom.android.core.OverlayKind
 import app.darkroom.android.core.PendingKind
 import app.darkroom.android.core.PhotoMeta
+import app.darkroom.android.core.isGenerated
 import app.darkroom.android.core.PrintJobSnapshot
 import app.darkroom.android.core.fallbackImportName
 import app.darkroom.android.core.isJpegBytes
@@ -121,6 +122,7 @@ import app.darkroom.android.ui.UserErrorDialog
 import app.darkroom.android.ui.components.AmberTrack
 import app.darkroom.android.ui.components.DarkroomSnackbarHost
 import app.darkroom.android.ui.components.DeleteUndoBar
+import app.darkroom.android.ui.components.JobOverlayBar
 import app.darkroom.android.ui.components.JobProgressStrip
 import app.darkroom.android.ui.components.JobScrim
 import app.darkroom.android.ui.components.StatusBadge
@@ -175,6 +177,8 @@ fun GalleryScreen(
     automation: Automation,
     printQueue: PrintQueue,
     reselect: Flow<Unit> = emptyFlow(),
+    focusPhotoId: String? = null,
+    onFocusConsumed: () -> Unit = {},
     onOpen: (String) -> Unit,
     onDismissTransfer: (String) -> Unit,
     onCancelAi: (String) -> Unit,
@@ -198,6 +202,7 @@ fun GalleryScreen(
     var selection by rememberSaveable(stateSaver = IdSetSaver) { mutableStateOf(emptySet<String>()) }
     var seenTopId by rememberSaveable { mutableStateOf<String?>(null) }
     var newArrivals by rememberSaveable { mutableStateOf(0) }
+    var highlightPhotoId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val printJobs by printQueue.printJobs.collectAsState(initial = emptyList())
     val runningProgress by printQueue.runningProgress.collectAsState(initial = null)
@@ -395,6 +400,18 @@ fun GalleryScreen(
         }
     }
 
+    val latestItems by rememberUpdatedState(items)
+    LaunchedEffect(focusPhotoId, items) {
+        val id = focusPhotoId ?: return@LaunchedEffect
+        val index = latestItems.indexOfFirst { it.photoId == id }
+        if (index < 0) return@LaunchedEffect
+        highlightPhotoId = id
+        seenTopId = latestPhotos.firstOrNull()?.id
+        newArrivals = 0
+        grid.animateScrollToItem(index + 1)
+        onFocusConsumed()
+    }
+
     // The undo prompt follows the repository rather than this screen's own state, because a
     // deletion started from the photo detail screen pops straight back here: the screen that has
     // to offer the undo is never the one that asked for the delete. The 15 s commit lives on
@@ -532,6 +549,7 @@ fun GalleryScreen(
                                     overlay = item.overlay,
                                     selectionMode = selectionMode,
                                     selected = selected,
+                                    highlighted = item.photoId == highlightPhotoId,
                                     modifier = Modifier.animateItem(),
                                     onOpen = { onOpen(item.photoId) },
                                     onToggle = {
@@ -677,7 +695,7 @@ private fun GalleryHeader(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun PhotoCard(
     photo: PhotoMeta?,
@@ -687,6 +705,7 @@ private fun PhotoCard(
     overlay: EditJobOverlay?,
     selectionMode: Boolean,
     selected: Boolean,
+    highlighted: Boolean = false,
     modifier: Modifier,
     onOpen: () -> Unit,
     onToggle: () -> Unit,
@@ -712,7 +731,7 @@ private fun PhotoCard(
             .background(SurfaceLow)
             // The photo is the affordance here, so the unselected outline is a hairline: at
             // PaperFaint it competes with the image it frames.
-            .border(1.dp, if (selected) Amber else PaperHairline, RoundedCornerShape(2.dp))
+            .border(1.dp, if (selected || highlighted) Amber else PaperHairline, RoundedCornerShape(2.dp))
             .combinedClickable(
                 onClick = {
                     when {
@@ -800,15 +819,20 @@ private fun PhotoCard(
                 }
             }
             if (photo != null && pending == null) {
-                StatusBadge(
-                    visible = photo.edits.isNotEmpty() || photo.parentId != null,
-                    text = if (photo.edits.isNotEmpty()) {
-                        stringResource(R.string.badge_edited)
-                    } else {
-                        stringResource(R.string.generated_prefix).trim(' ', '·')
-                    },
+                FlowRow(
                     modifier = Modifier.align(Alignment.TopStart).padding(6.dp),
-                )
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    StatusBadge(
+                        visible = photo.edits.isNotEmpty(),
+                        text = stringResource(R.string.badge_edited),
+                    )
+                    StatusBadge(
+                        visible = photo.isGenerated(),
+                        text = stringResource(R.string.photo_tag_generated),
+                    )
+                }
             }
             if (selectionMode && selectable) {
                 Box(
@@ -1012,27 +1036,7 @@ private fun OverlayBar(overlay: EditJobOverlay, modifier: Modifier) {
     }
     val detail = localizedByteProgress(overlay.loaded, overlay.total).ifEmpty { null }
     val ui = overlay.jobProgress?.toUi(phase, detail) ?: indeterminateUi(phase, detail)
-    val estimated = stringResource(R.string.progress_estimated)
-    Column(
-        modifier
-            .background(SurfacePanel)
-            .border(1.dp, PaperHairline),
-    ) {
-        Text(
-            if (ui.estimated) "$phase · $estimated" else phase,
-            color = Paper,
-            fontSize = 12.sp,
-            fontFamily = MonoFont,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-        )
-        AmberTrack(
-            ui = ui,
-            modifier = Modifier.fillMaxWidth(),
-            height = 3.dp,
-        )
-    }
+    JobOverlayBar(phase = phase, ui = ui, modifier = modifier)
 }
 
 @Composable

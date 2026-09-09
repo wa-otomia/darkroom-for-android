@@ -1,6 +1,7 @@
 package app.darkroom.android.data.jobs
 
 import app.darkroom.android.core.AiJobSnapshot
+import app.darkroom.android.core.GENERATED_PHOTO_TAG
 import app.darkroom.android.core.combineGeneratePrompt
 import app.darkroom.android.core.generatedPhotoFilename
 import app.darkroom.android.core.resolvePhotoSource
@@ -142,6 +143,7 @@ class AiJobs @Inject constructor(
                             generatedPhotoFilename(from.filename),
                             kind = "studio",
                             id = targetPhotoId,
+                            tags = listOf(GENERATED_PHOTO_TAG),
                         )
                         tracker.succeed()
                         publish(id, tracker)

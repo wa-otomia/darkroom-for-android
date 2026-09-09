@@ -2,6 +2,7 @@ package app.darkroom.android.data.catalog
 
 import android.content.Context
 import app.darkroom.android.core.EditRecord
+import app.darkroom.android.core.GENERATED_PHOTO_TAG
 import app.darkroom.android.core.PhotoMeta
 import app.darkroom.android.core.PrintRecord
 import app.darkroom.android.core.galleryThumbSource
@@ -102,6 +103,12 @@ class CatalogRepository @Inject constructor(
         return thumbFile(photo.id, source)
     }
 
+    /** Edit/original thumb, or the full file when the thumb has not been written yet. */
+    fun versionThumbFile(id: String, source: String): File {
+        val thumb = thumbFile(id, source)
+        return if (thumb.exists()) thumb else sourceFile(id, source)
+    }
+
     suspend fun get(id: String): PhotoMeta? = db.photoDao().get(id)?.toMeta()
 
     suspend fun list(): List<PhotoMeta> = db.photoDao().list().map { it.toMeta() }
@@ -114,6 +121,7 @@ class CatalogRepository @Inject constructor(
         kind: String = "import",
         id: String = UUID.randomUUID().toString(),
         onPhase: ((String) -> Unit)? = null,
+        tags: List<String> = emptyList(),
     ): PhotoMeta = withContext(Dispatchers.IO) {
         val stored = if (isJpegBytes(bytes) || looksLikeJpeg(bytes)) {
             if (!hasJpegEoi(bytes)) error("文件不完整")
@@ -144,6 +152,7 @@ class CatalogRepository @Inject constructor(
             width = info.width,
             height = info.height,
             bytes = stored.size.toLong(),
+            tags = tags,
         )
         db.photoDao().upsert(meta.toEntity())
         activityLog.record(kind, "ingest ${meta.filename} → $id")
@@ -229,6 +238,7 @@ class CatalogRepository @Inject constructor(
                 bytes = stored.size.toLong(),
                 parentId = rootId,
                 generatePrompt = prompt,
+                tags = listOf(GENERATED_PHOTO_TAG),
             )
             db.photoDao().upsert(meta.toEntity())
             activityLog.record("ai", "generate $id from $fromPhotoId")

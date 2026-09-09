@@ -749,6 +749,66 @@ fun JobProgressStrip(
     }
 }
 
+/**
+ * Compact phase + fraction bar used on gallery tiles and over the Studio photo.
+ * [onHide] only dismisses the chrome for this job; [onCancel] stops the job.
+ */
+@Composable
+fun JobOverlayBar(
+    phase: String,
+    ui: ProgressUi,
+    modifier: Modifier = Modifier,
+    onHide: (() -> Unit)? = null,
+    onCancel: (() -> Unit)? = null,
+) {
+    val estimated = stringResource(R.string.progress_estimated)
+    Column(
+        modifier
+            .background(SurfacePanel)
+            .border(1.dp, PaperHairline),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                if (ui.estimated) "$phase · $estimated" else phase,
+                color = Paper,
+                fontSize = 12.sp,
+                fontFamily = MonoFont,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+            )
+            if (onHide != null) {
+                IconButton(onClick = onHide) {
+                    Icon(
+                        Icons.Outlined.VisibilityOff,
+                        contentDescription = stringResource(R.string.job_hide),
+                        tint = Paper,
+                    )
+                }
+            }
+            if (onCancel != null) {
+                IconButton(onClick = onCancel) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.common_cancel),
+                        tint = Paper,
+                    )
+                }
+            }
+        }
+        AmberTrack(
+            ui = ui,
+            modifier = Modifier.fillMaxWidth(),
+            height = ThinBarHeight,
+        )
+    }
+}
+
 @Composable
 fun JobProgressStrip(
     title: String,

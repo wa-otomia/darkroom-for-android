@@ -38,6 +38,8 @@
     <string name="delete_photo_title">この写真を削除しますか？</string>
     <string name="common_delete">削除</string>
     <string name="common_cancel">キャンセル</string>
+    <string name="common_ok">OK</string>
+    <string name="photo_tag_generated">生成</string>
     <string name="common_save">保存</string>
     <string name="common_edit">編集</string>
     <string name="io_eyebrow">カメラ FTP</string>
@@ -91,7 +93,6 @@
     <string name="generate_to_gallery">ギャラリーへ生成</string>
     <string name="editing">編集中…</string>
     <string name="edit_only">この写真のみ編集</string>
-    <string name="generate_done">保存しました。新しい写真を開いています…</string>
     <string name="edit_done">編集が完了しました。続けてトリミングし、印刷待ちに追加できます。</string>
     <string name="progress_generate">生成の進捗</string>
     <string name="progress_print">印刷の進捗</string>
@@ -114,8 +115,7 @@
     <string name="studio_version_fallback">レタッチ</string>
     <string name="studio_delete_version">このバージョンを削除</string>
     <string name="studio_delete_version_title">このバージョンを削除しますか？</string>
-    <string name="studio_add_version_to_gallery">アルバムに追加</string>
-    <string name="studio_added_to_gallery">アルバムに追加しました</string>
+    <string name="studio_add_version_to_gallery">メインアルバムに追加</string>
     <string name="studio_add_to_print_queue">印刷キューに追加</string>
     <string name="studio_export">書き出す</string>
     <string name="studio_exported">アルバムに書き出しました</string>

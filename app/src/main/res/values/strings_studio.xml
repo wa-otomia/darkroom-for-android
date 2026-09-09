@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="studio_tab_compose">Compose</string>
+    <string name="studio_tab_process">Process</string>
+    <string name="studio_tab_output">Output</string>
+    <string name="studio_extra_prompt">Extra prompt</string>
+    <string name="studio_extra_prompt_edit">Edit extra prompt</string>
     <string name="studio_framing">Framing</string>
     <string name="studio_frame_portrait">Portrait 2:3</string>
     <string name="studio_frame_landscape">Landscape 3:2</string>
@@ -10,7 +15,6 @@
     <string name="studio_landscape_note">The sheet is always portrait. A landscape frame is turned a quarter clockwise onto the paper, so hold the print sideways to view it.</string>
     <string name="studio_crop_locked">A job is running. Framing and crop stay locked until it finishes.</string>
     <string name="studio_crop_locked_short">CROP LOCKED</string>
-    <string name="studio_preset_prompt_label">PRESET PROMPT</string>
     <string name="studio_preset_stacks">The preset is sent automatically. What you type below is appended after it and never replaces it.</string>
     <string name="studio_generate_vs_edit">Generate to gallery saves a new photo next to this one. Edit this photo only adds a version to the current photo and keeps your crop.</string>
     <string name="studio_open_photo">Open photo %1$s</string>

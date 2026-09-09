@@ -31,8 +31,10 @@
     <string name="delete_photo_title">Delete this photo?</string>
     <string name="common_delete">Delete</string>
     <string name="common_cancel">Cancel</string>
+    <string name="common_ok">OK</string>
     <string name="common_save">Save</string>
     <string name="common_edit">Edit</string>
+    <string name="photo_tag_generated">Generated</string>
     <string name="io_eyebrow">CAMERA FTP</string>
     <string name="io_title">Transfer</string>
     <string name="io_desc">Start the server, then set the camera host to a Wi-Fi IP on this phone (wlan0 or wlan1). Use passive mode and leave the remote directory empty. Sessions, transfers and the print queue appear below.</string>
@@ -84,7 +86,6 @@
     <string name="generate_to_gallery">Generate to gallery</string>
     <string name="editing">Editing…</string>
     <string name="edit_only">Edit this photo only</string>
-    <string name="generate_done">Saved. Opening the new photo…</string>
     <string name="edit_done">Edit saved. You can still crop and add it to the print queue.</string>
     <string name="progress_generate">Generate</string>
     <string name="progress_print">Print</string>
@@ -108,8 +109,7 @@
     <string name="studio_version_fallback">Edit</string>
     <string name="studio_delete_version">Delete this version</string>
     <string name="studio_delete_version_title">Delete this version?</string>
-    <string name="studio_add_version_to_gallery">Add to gallery</string>
-    <string name="studio_added_to_gallery">Added to gallery</string>
+    <string name="studio_add_version_to_gallery">Add to main gallery</string>
     <string name="studio_add_to_print_queue">Add to print queue</string>
     <string name="studio_export">Export</string>
     <string name="studio_exported">Saved to the gallery</string>

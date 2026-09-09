@@ -29,6 +29,7 @@ data class PhotoEntity(
     val generatePrompt: String?,
     val editsJson: String,
     val printsJson: String,
+    val tagsJson: String = "[]",
 )
 
 private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -45,6 +46,7 @@ fun PhotoEntity.toMeta(): PhotoMeta = PhotoMeta(
     prints = runCatching { json.decodeFromString<List<PrintRecord>>(printsJson) }.getOrDefault(emptyList()),
     parentId = parentId,
     generatePrompt = generatePrompt,
+    tags = runCatching { json.decodeFromString<List<String>>(tagsJson) }.getOrDefault(emptyList()),
 )
 
 fun PhotoMeta.toEntity(): PhotoEntity = PhotoEntity(
@@ -59,6 +61,7 @@ fun PhotoMeta.toEntity(): PhotoEntity = PhotoEntity(
     generatePrompt = generatePrompt,
     editsJson = json.encodeToString(edits),
     printsJson = json.encodeToString(prints),
+    tagsJson = json.encodeToString(tags),
 )
 
 @Dao
@@ -130,6 +133,12 @@ interface PrintJobDao {
     suspend fun listRunning(): List<PrintJobEntity>
 }
 
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE photos ADD COLUMN tagsJson TEXT NOT NULL DEFAULT '[]'")
+    }
+}
+
 val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE print_jobs ADD COLUMN watermark INTEGER NOT NULL DEFAULT 0")
@@ -170,7 +179,7 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
-@Database(entities = [PhotoEntity::class, PrintJobEntity::class], version = 3, exportSchema = false)
+@Database(entities = [PhotoEntity::class, PrintJobEntity::class], version = 4, exportSchema = false)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
     abstract fun printJobDao(): PrintJobDao
