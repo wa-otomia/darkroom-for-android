@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -66,6 +65,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.darkroom.android.R
@@ -187,6 +187,7 @@ fun StudioScreen(
     var presetId by rememberSaveable(photoId) { mutableStateOf(presets.lastSelectedId) }
     var tabKey by rememberSaveable { mutableStateOf(StudioTab.Compose.key) }
     val tab = StudioTab.fromKey(tabKey)
+    var drawerExpanded by rememberSaveable { mutableStateOf(true) }
     var copies by rememberSaveable(photoId) { mutableStateOf(appSettings.defaultCopies) }
     var printError by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
     var genError by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
@@ -622,11 +623,32 @@ fun StudioScreen(
         }
     }
 
-    val tabPanel: @Composable () -> Unit = {
-        when (tab) {
-            StudioTab.Compose -> composePanel()
-            StudioTab.Process -> processPanel()
-            StudioTab.Output -> outputPanel()
+    val onTabSelect: (StudioTab) -> Unit = { clicked ->
+        if (clicked == tab && drawerExpanded) {
+            drawerExpanded = false
+        } else {
+            tabKey = clicked.key
+            drawerExpanded = true
+        }
+    }
+
+    val drawerPanel: @Composable (maxHeight: Dp) -> Unit = { panelCap ->
+        Column(Modifier.fillMaxWidth()) {
+            Text(
+                "${working.width}×${working.height}",
+                fontFamily = MonoFont,
+                color = PaperDim,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+            StudioEqualHeightTabs(
+                selected = tab,
+                maxHeight = panelCap,
+                modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 12.dp),
+                compose = composePanel,
+                process = processPanel,
+                output = outputPanel,
+            )
         }
     }
 
@@ -734,27 +756,6 @@ fun StudioScreen(
         }
     }
 
-    val panelBody: @Composable (Modifier) -> Unit = { bodyModifier ->
-        Column(bodyModifier.verticalScroll(rememberScrollState())) {
-            Text(
-                "${working.width}×${working.height}",
-                fontFamily = MonoFont,
-                color = PaperDim,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-            )
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                tabPanel()
-            }
-        }
-    }
-
     BoxWithConstraints(Modifier.fillMaxSize().background(Room)) {
         if (maxWidth >= 600.dp) {
             val panelWidth = (maxWidth * 0.36f).coerceIn(320.dp, 440.dp)
@@ -772,8 +773,33 @@ fun StudioScreen(
                         .imePadding(),
                 ) {
                     cropper(Modifier.weight(1f).fillMaxHeight())
-                    Column(Modifier.width(panelWidth).fillMaxHeight()) {
-                        panelBody(Modifier.weight(1f).fillMaxWidth())
+                    Column(
+                        Modifier
+                            .width(panelWidth)
+                            .fillMaxHeight()
+                            .background(Room)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        Text(
+                            "${working.width}×${working.height}",
+                            fontFamily = MonoFont,
+                            color = PaperDim,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                        )
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp)
+                                .padding(bottom = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            when (tab) {
+                                StudioTab.Compose -> composePanel()
+                                StudioTab.Process -> processPanel()
+                                StudioTab.Output -> outputPanel()
+                            }
+                        }
                         StudioTabBar(
                             selected = tab,
                             onSelect = { tabKey = it.key },
@@ -793,14 +819,20 @@ fun StudioScreen(
                     Modifier
                         .fillMaxSize()
                         .padding(padding)
-                        .navigationBarsPadding()
                         .imePadding(),
                 ) {
                     cropper(Modifier.weight(1f).fillMaxWidth())
-                    panelBody(Modifier.fillMaxWidth().heightIn(max = panelCap))
-                    StudioTabBar(
-                        selected = tab,
-                        onSelect = { tabKey = it.key },
+                    StudioControlsDrawer(
+                        expanded = drawerExpanded,
+                        onExpandedChange = { drawerExpanded = it },
+                        panel = { drawerPanel(panelCap) },
+                        tabBar = {
+                            StudioTabBar(
+                                selected = tab,
+                                onSelect = onTabSelect,
+                                includeNavigationBars = true,
+                            )
+                        },
                     )
                 }
             }

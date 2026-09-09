@@ -1,10 +1,15 @@
 package app.darkroom.android.ui.studio
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,17 +20,23 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
@@ -35,16 +46,25 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
+import app.darkroom.android.ui.theme.Room
+import kotlinx.coroutines.launch
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -78,16 +98,26 @@ internal enum class StudioTab(val key: String, val labelRes: Int) {
     }
 }
 
+/** Shared by the three tab panels so switching tabs does not resize the drawer. */
+internal fun studioEqualPanelHeight(measuredHeights: IntArray, capPx: Int): Int {
+    if (measuredHeights.isEmpty() || capPx <= 0) return 0
+    var tallest = 0
+    for (h in measuredHeights) if (h > tallest) tallest = h
+    return tallest.coerceAtMost(capPx)
+}
+
 @Composable
 internal fun StudioTabBar(
     selected: StudioTab,
     onSelect: (StudioTab) -> Unit,
     modifier: Modifier = Modifier,
+    includeNavigationBars: Boolean = false,
 ) {
     Row(
         modifier
             .fillMaxWidth()
-            .background(SurfaceLow),
+            .background(Room)
+            .then(if (includeNavigationBars) Modifier.navigationBarsPadding() else Modifier),
     ) {
         StudioTab.entries.forEach { tab ->
             val active = tab == selected
@@ -121,6 +151,164 @@ internal fun StudioTabBar(
                         .background(if (active) Amber else Color.Transparent),
                 )
             }
+        }
+    }
+}
+
+@Composable
+internal fun StudioEqualHeightTabs(
+    selected: StudioTab,
+    maxHeight: Dp,
+    modifier: Modifier = Modifier,
+    compose: @Composable () -> Unit,
+    process: @Composable () -> Unit,
+    output: @Composable () -> Unit,
+) {
+    val maxPx = with(LocalDensity.current) { maxHeight.roundToPx() }
+    SubcomposeLayout(modifier.fillMaxWidth()) { constraints ->
+        val width = constraints.maxWidth
+        val measureConstraints = Constraints(
+            minWidth = width,
+            maxWidth = width,
+            minHeight = 0,
+            maxHeight = Constraints.Infinity,
+        )
+        val heights = IntArray(StudioTab.entries.size)
+        StudioTab.entries.forEachIndexed { i, tab ->
+            val placeables = subcompose("measure-$tab") {
+                Box(Modifier.fillMaxWidth()) {
+                    when (tab) {
+                        StudioTab.Compose -> compose()
+                        StudioTab.Process -> process()
+                        StudioTab.Output -> output()
+                    }
+                }
+            }.map { it.measure(measureConstraints) }
+            heights[i] = placeables.maxOfOrNull { it.height } ?: 0
+        }
+        val height = studioEqualPanelHeight(heights, maxPx).coerceAtMost(constraints.maxHeight)
+        val selectedIndex = StudioTab.entries.indexOf(selected)
+        val needsScroll = heights.getOrElse(selectedIndex) { 0 } > height
+        val shown = subcompose("show-$selected-$height-$needsScroll") {
+            val scroll = rememberScrollState()
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .then(if (needsScroll) Modifier.verticalScroll(scroll) else Modifier),
+            ) {
+                when (selected) {
+                    StudioTab.Compose -> compose()
+                    StudioTab.Process -> process()
+                    StudioTab.Output -> output()
+                }
+            }
+        }.map {
+            it.measure(
+                Constraints(
+                    minWidth = width,
+                    maxWidth = width,
+                    minHeight = height,
+                    maxHeight = height,
+                ),
+            )
+        }
+        layout(width, height) {
+            shown.forEach { it.place(0, 0) }
+        }
+    }
+}
+
+/**
+ * Tab bar stays on screen as the peek; the selected panel slides in above it.
+ * BottomSheetScaffold peeks from the top of the sheet, so a bottom-anchored tab
+ * bar has to be its own drawer rather than sheet content.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun StudioControlsDrawer(
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    panel: @Composable () -> Unit,
+    tabBar: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    var contentPx by remember { mutableIntStateOf(0) }
+    val revealed = remember { Animatable(0f) }
+    var settled by remember { mutableStateOf(false) }
+
+    LaunchedEffect(expanded, contentPx) {
+        if (contentPx <= 0) return@LaunchedEffect
+        val target = if (expanded) contentPx.toFloat() else 0f
+        if (!settled) {
+            revealed.snapTo(target)
+            settled = true
+        } else {
+            revealed.animateTo(target, tween(durationMillis = 280))
+        }
+    }
+
+    fun settleFromDrag() {
+        if (contentPx <= 0) return
+        val open = revealed.value > contentPx * 0.5f
+        if (open != expanded) {
+            onExpandedChange(open)
+        } else {
+            scope.launch {
+                revealed.animateTo(if (open) contentPx.toFloat() else 0f, tween(durationMillis = 280))
+            }
+        }
+    }
+    val handleDrag = rememberDraggableState { delta ->
+        if (contentPx <= 0) return@rememberDraggableState
+        val next = (revealed.value - delta).coerceIn(0f, contentPx.toFloat())
+        scope.launch { revealed.snapTo(next) }
+    }
+    val barDrag = rememberDraggableState { delta ->
+        if (contentPx <= 0) return@rememberDraggableState
+        val next = (revealed.value - delta).coerceIn(0f, contentPx.toFloat())
+        scope.launch { revealed.snapTo(next) }
+    }
+
+    Column(modifier.fillMaxWidth().background(Room)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .draggable(
+                    state = handleDrag,
+                    orientation = Orientation.Vertical,
+                    enabled = contentPx > 0,
+                    onDragStopped = { settleFromDrag() },
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            BottomSheetDefaults.DragHandle(color = PaperDim)
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(with(density) { revealed.value.coerceAtLeast(0f).toDp() })
+                .clipToBounds(),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(unbounded = true, align = Alignment.Top)
+                    .onSizeChanged { contentPx = it.height },
+            ) {
+                panel()
+            }
+        }
+        Box(
+            Modifier.draggable(
+                state = barDrag,
+                orientation = Orientation.Vertical,
+                enabled = contentPx > 0,
+                onDragStopped = { settleFromDrag() },
+            ),
+        ) {
+            tabBar()
         }
     }
 }
