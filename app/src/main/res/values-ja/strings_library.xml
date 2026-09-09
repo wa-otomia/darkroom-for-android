@@ -2,6 +2,7 @@
 <resources>
     <!-- 共通操作 -->
     <string name="lib_action_undo">元に戻す</string>
+    <string name="lib_action_delete_now">今すぐ削除</string>
 
     <!-- ギャラリー: インポート -->
     <string name="lib_gallery_import_formats">JPEG・HEIC・PNG・WebP をインポートできます。JPEG 以外は取り込み時に JPEG へ変換されます。</string>

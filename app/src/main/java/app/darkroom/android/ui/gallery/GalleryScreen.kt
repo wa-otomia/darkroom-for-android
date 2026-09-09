@@ -215,8 +215,6 @@ fun GalleryScreen(
     }
     val photoItems = remember(items) { items.filterIsInstance<GalleryItem.Photo>() }
     val selectionMode = selection.isNotEmpty()
-    val deletedTemplate = stringResource(R.string.lib_gallery_deleted)
-    val undoLabel = stringResource(R.string.lib_action_undo)
     val noCameraText = stringResource(R.string.gallery_no_camera_app)
     val snackbar = remember { SnackbarHostState() }
     var pendingCapture by remember { mutableStateOf<File?>(null) }
@@ -416,7 +414,7 @@ fun GalleryScreen(
     // The undo prompt follows the repository rather than this screen's own state, because a
     // deletion started from the photo detail screen pops straight back here: the screen that has
     // to offer the undo is never the one that asked for the delete. The 15 s commit lives on
-    // the repository timer — this bar only offers undo.
+    // the repository timer — this strip offers undo, delete-now, and a countdown.
     val pendingDeletion by catalog.pendingDeletion.collectAsState()
     val deleteProgress by catalog.deleteProgress.collectAsState()
 
@@ -439,40 +437,37 @@ fun GalleryScreen(
             // containerColor/contentColor default to background/onBackground, i.e. Room/Paper.
             contentWindowInsets = WindowInsets(0),
             topBar = {
-                if (selectionMode) {
-                    SelectionBar(
-                        count = selection.size,
-                        allSelected = photoItems.isNotEmpty() && selection.size == photoItems.size,
-                        onExit = { selection = emptySet() },
-                        onSelectAll = { selection = photoItems.mapTo(LinkedHashSet<String>()) { it.photoId } },
-                        onDelete = { deleteSelected() },
-                    )
-                }
-            },
-            snackbarHost = {
-                deleteProgress?.let { deleting ->
-                    val fraction = if (deleting.total > 0) deleting.done.toFloat() / deleting.total else 0f
-                    JobProgressStrip(
-                        title = stringResource(R.string.progress_delete),
-                        ui = ProgressUi(
-                            percent = (fraction * 100).toInt().coerceIn(0, 100),
-                            fill = fraction,
-                            phaseLabel = stringResource(R.string.progress_delete_fmt, deleting.done, deleting.total),
-                            indeterminate = false,
-                        ),
-                        collapsed = false,
-                    )
-                }
-                pendingDeletion?.let { pending ->
+                Column(Modifier.fillMaxWidth()) {
+                    if (selectionMode) {
+                        SelectionBar(
+                            count = selection.size,
+                            allSelected = photoItems.isNotEmpty() && selection.size == photoItems.size,
+                            onExit = { selection = emptySet() },
+                            onSelectAll = { selection = photoItems.mapTo(LinkedHashSet<String>()) { it.photoId } },
+                            onDelete = { deleteSelected() },
+                        )
+                    }
                     DeleteUndoBar(
-                        message = deletedTemplate.format(pending.ids.size),
-                        undoLabel = undoLabel,
-                        onUndo = { catalog.undoDelete(pending.token) },
-                        modifier = Modifier.fillMaxWidth(),
+                        pending = pendingDeletion,
+                        onUndo = { catalog.undoDelete(it) },
+                        onDeleteNow = { catalog.commitDeleteNow(it) },
                     )
+                    deleteProgress?.let { deleting ->
+                        val fraction = if (deleting.total > 0) deleting.done.toFloat() / deleting.total else 0f
+                        JobProgressStrip(
+                            title = stringResource(R.string.progress_delete),
+                            ui = ProgressUi(
+                                percent = (fraction * 100).toInt().coerceIn(0, 100),
+                                fill = fraction,
+                                phaseLabel = stringResource(R.string.progress_delete_fmt, deleting.done, deleting.total),
+                                indeterminate = false,
+                            ),
+                            collapsed = false,
+                        )
+                    }
                 }
-                DarkroomSnackbarHost(snackbar)
             },
+            snackbarHost = { DarkroomSnackbarHost(snackbar) },
             floatingActionButton = {
                 if (!selectionMode) {
                     Column(horizontalAlignment = Alignment.End) {

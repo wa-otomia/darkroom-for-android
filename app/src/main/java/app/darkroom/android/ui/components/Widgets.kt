@@ -4,15 +4,20 @@ import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -52,6 +57,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -79,6 +85,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.darkroom.android.R
+import app.darkroom.android.core.undoRemainingFraction
+import app.darkroom.android.data.catalog.CatalogRepository
+import app.darkroom.android.data.catalog.PendingDeletion
 import app.darkroom.android.data.progress.ProgressUi
 import app.darkroom.android.ui.theme.Amber
 import app.darkroom.android.ui.theme.Danger
@@ -859,41 +868,103 @@ private fun stripLabel(ui: ProgressUi): String {
 }
 
 /**
- * Full-width undo affordance, pinned to the bottom of its parent. Hairline
- * on top, message left, amber undo on the right.
+ * Undo window chrome in the [JobProgressStrip] slot: same panel, type,
+ * and amber track, with a countdown that empties over the grace period.
  */
 @Composable
 fun DeleteUndoBar(
-    message: String,
-    undoLabel: String,
-    onUndo: () -> Unit,
+    pending: PendingDeletion?,
+    onUndo: (String) -> Unit,
+    onDeleteNow: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxWidth()
-            .background(Room)
-            .semantics { liveRegion = LiveRegionMode.Polite },
+    val last = remember { mutableStateOf<PendingDeletion?>(null) }
+    SideEffect {
+        if (pending != null) last.value = pending
+    }
+    val shown = pending ?: last.value
+    val message = if (shown != null) {
+        stringResource(R.string.lib_gallery_deleted, shown.ids.size)
+    } else {
+        ""
+    }
+    val undoLabel = stringResource(R.string.lib_action_undo)
+    val deleteNowLabel = stringResource(R.string.lib_action_delete_now)
+    AnimatedVisibility(
+        visible = pending != null,
+        modifier = modifier.fillMaxWidth(),
+        enter = slideInVertically(animationSpec = DarkroomMotion.enter()) { -it } +
+            expandVertically(animationSpec = DarkroomMotion.enter()) +
+            fadeIn(animationSpec = DarkroomMotion.enter()),
+        exit = slideOutVertically(animationSpec = DarkroomMotion.stateChange()) { -it } +
+            shrinkVertically(animationSpec = DarkroomMotion.stateChange()) +
+            fadeOut(animationSpec = DarkroomMotion.stateChange()),
     ) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(PaperHairline))
-        Row(
+        val current = shown ?: return@AnimatedVisibility
+        val fill = rememberUndoFill(current.startedAtMs, current.graceMillis)
+        Column(
             Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .background(SurfacePanel)
+                .semantics { liveRegion = LiveRegionMode.Polite },
         ) {
-            Text(
-                message,
-                color = Paper,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
-            )
-            TextButton(onClick = onUndo) {
-                Text(undoLabel, color = Amber, fontSize = 14.sp, lineHeight = 20.sp)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    message,
+                    color = Paper,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                )
+                TextButton(onClick = { onDeleteNow(current.token) }) {
+                    Text(deleteNowLabel, color = Paper, fontSize = 14.sp, lineHeight = 20.sp)
+                }
+                TextButton(onClick = { onUndo(current.token) }) {
+                    Text(undoLabel, color = Amber, fontSize = 14.sp, lineHeight = 20.sp)
+                }
             }
+            AmberTrack(
+                ui = ProgressUi(
+                    percent = (fill * 100f).toInt().coerceIn(0, 100),
+                    fill = fill,
+                    phaseLabel = message,
+                    indeterminate = false,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                height = ThinBarHeight,
+            )
         }
     }
+}
+
+@Composable
+private fun rememberUndoFill(startedAtMs: Long, totalMs: Long): Float {
+    val window = if (totalMs > 0L) totalMs else CatalogRepository.UNDO_GRACE_MS
+    val fill = remember(startedAtMs, window) {
+        Animatable(undoRemainingFraction(System.currentTimeMillis() - startedAtMs, window))
+    }
+    LaunchedEffect(startedAtMs, window) {
+        val elapsed = (System.currentTimeMillis() - startedAtMs).coerceAtLeast(0L)
+        fill.snapTo(undoRemainingFraction(elapsed, window))
+        val leftover = (window - elapsed).coerceAtLeast(0L)
+        if (leftover > 0L) {
+            fill.animateTo(
+                0f,
+                tween(
+                    durationMillis = leftover.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                    easing = LinearEasing,
+                ),
+            )
+        }
+    }
+    return fill.value
 }
 
 /**

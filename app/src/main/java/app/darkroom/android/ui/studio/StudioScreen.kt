@@ -121,6 +121,7 @@ import app.darkroom.android.data.settings.SettingsRepository
 import app.darkroom.android.ui.UserErrorDialog
 import app.darkroom.android.ui.components.AspectCropper
 import app.darkroom.android.ui.components.DarkroomSnackbarHost
+import app.darkroom.android.ui.components.DeleteUndoBar
 import app.darkroom.android.ui.components.GhostButton
 import app.darkroom.android.ui.components.JobProgressStrip
 import app.darkroom.android.ui.components.PaperButton
@@ -206,6 +207,7 @@ fun StudioScreen(
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     val density = LocalDensity.current
+    val pendingDeletion by catalog.pendingDeletion.collectAsState()
     val watermarkSettings by settings.watermark.collectAsState()
     var watermarkOn by rememberSaveable(photoId) { mutableStateOf(watermarkSettings.isConfigured()) }
     val canWatermark = watermarkSettings.isConfigured()
@@ -800,6 +802,11 @@ fun StudioScreen(
                 onBack = onBack,
                 onDelete = { pendingDelete = true },
             )
+            DeleteUndoBar(
+                pending = pendingDeletion,
+                onUndo = { catalog.undoDelete(it) },
+                onDeleteNow = { catalog.commitDeleteNow(it) },
+            )
             if (myPrint != null && printUi != null) {
                 JobProgressStrip(
                     title = stringResource(R.string.progress_print),
@@ -974,8 +981,8 @@ fun StudioScreen(
                         val id = photo.id
                         pendingDelete = false
                         onBack()
-                        // Deferred so the gallery can offer the same undo window it gives its own
-                        // deletions; it renders the prompt off catalog.pendingDeletion.
+                        // Deferred so the gallery (or this top bar, if we stay here) can offer
+                        // the same undo window; the prompt reads catalog.pendingDeletion.
                         catalog.scheduleDelete(listOf(id))
                     },
                 ) { Text(stringResource(R.string.common_delete)) }

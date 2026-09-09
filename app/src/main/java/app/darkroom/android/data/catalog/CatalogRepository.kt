@@ -42,7 +42,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /** A deletion waiting out its undo window; [ids] carries enough to render the prompt. */
-data class PendingDeletion(val token: String, val ids: List<String>)
+data class PendingDeletion(
+    val token: String,
+    val ids: List<String>,
+    val startedAtMs: Long,
+    val graceMillis: Long,
+)
 
 data class DeleteProgress(val done: Int, val total: Int)
 
@@ -352,7 +357,7 @@ class CatalogRepository @Inject constructor(
             delay(graceMillis)
             withContext(NonCancellable) { runDelete(token, cancelTimer = false) }
         }
-        register(token, target, job)
+        register(token, target, job, graceMillis)
         job.start()
         return token
     }
@@ -431,11 +436,16 @@ class CatalogRepository @Inject constructor(
     }
 
     @Synchronized
-    private fun register(token: String, ids: List<String>, job: Job) {
+    private fun register(token: String, ids: List<String>, job: Job, graceMillis: Long) {
         pendingIds[token] = ids
         pendingJobs[token] = job
         hiddenIds.value = hiddenIds.value + ids
-        _pendingDeletion.value = PendingDeletion(token, ids)
+        _pendingDeletion.value = PendingDeletion(
+            token = token,
+            ids = ids,
+            startedAtMs = System.currentTimeMillis(),
+            graceMillis = graceMillis,
+        )
     }
 
     @Synchronized

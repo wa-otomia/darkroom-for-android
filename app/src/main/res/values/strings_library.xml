@@ -2,6 +2,7 @@
 <resources>
     <!-- Shared actions -->
     <string name="lib_action_undo">Undo</string>
+    <string name="lib_action_delete_now">Delete now</string>
 
     <!-- Gallery: import -->
     <string name="lib_gallery_import_formats">Imports JPEG, HEIC, PNG and WebP. Anything other than JPEG is converted on import.</string>

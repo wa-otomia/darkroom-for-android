@@ -2,6 +2,7 @@
 <resources>
     <!-- 通用操作 -->
     <string name="lib_action_undo">撤销</string>
+    <string name="lib_action_delete_now">立刻删除</string>
 
     <!-- 相册：导入 -->
     <string name="lib_gallery_import_formats">支持导入 JPEG、HEIC、PNG、WebP。非 JPEG 文件将在导入时转换为 JPEG。</string>
