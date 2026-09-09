@@ -160,6 +160,7 @@ import app.darkroom.android.ui.components.GhostButton
 import app.darkroom.android.ui.components.InlineConfirm
 import app.darkroom.android.ui.components.PaperButton
 import app.darkroom.android.ui.components.PresetDropdown
+import app.darkroom.android.ui.components.ScreenHeader
 import app.darkroom.android.ui.components.SectionLabel
 import app.darkroom.android.ui.components.darkroomTextFieldColors
 import app.darkroom.android.ui.components.rememberInlineConfirmState
@@ -641,7 +642,10 @@ fun SettingsScreen(
                     .verticalScroll(scrollState)
                     .padding(20.dp),
             ) {
-                Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineLarge)
+                ScreenHeader(
+                    eyebrow = stringResource(R.string.settings_eyebrow),
+                    title = stringResource(R.string.settings_title),
+                )
                 Text(
                     stringResource(R.string.settings_desc),
                     style = MaterialTheme.typography.bodyMedium,

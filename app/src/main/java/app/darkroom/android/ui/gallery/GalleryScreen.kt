@@ -125,6 +125,7 @@ import app.darkroom.android.ui.components.DeleteUndoBar
 import app.darkroom.android.ui.components.JobOverlayBar
 import app.darkroom.android.ui.components.JobProgressStrip
 import app.darkroom.android.ui.components.JobScrim
+import app.darkroom.android.ui.components.ScreenHeader
 import app.darkroom.android.ui.components.StatusBadge
 import app.darkroom.android.ui.components.StatusChip
 import app.darkroom.android.ui.components.contentBlur
@@ -627,11 +628,9 @@ private fun GalleryHeader(
     onSettings: (String) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-        Text(stringResource(R.string.gallery_inbox_live), style = MaterialTheme.typography.labelSmall, color = Amber)
-        Text(
-            if (empty) stringResource(R.string.gallery_waiting) else stringResource(R.string.gallery_count, count),
-            style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.padding(top = 4.dp),
+        ScreenHeader(
+            eyebrow = stringResource(R.string.gallery_inbox_live),
+            title = if (empty) stringResource(R.string.gallery_waiting) else stringResource(R.string.gallery_count, count),
         )
         Text(
             stringResource(R.string.gallery_desc),

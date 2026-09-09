@@ -122,6 +122,7 @@
     <string name="cancel_print">Cancel print</string>
     <string name="crop_overlay">2×3 in · 1040×1560</string>
     <string name="preset_none">No processing</string>
+    <string name="presets_eyebrow">PRESETS</string>
     <string name="presets_title">AI presets</string>
     <string name="presets_desc">Portrait and creative looks. Gallery, print and print-on-receive share the preset you selected last.</string>
     <string name="default_preset">Default preset</string>
@@ -129,6 +130,7 @@
     <string name="add_preset">Add preset</string>
     <string name="preset_title">Title</string>
     <string name="preset_prompt">Prompt</string>
+    <string name="settings_eyebrow">SETTINGS</string>
     <string name="settings_title">Settings</string>
     <string name="settings_desc">AI API key, Xiaomi printer over Bluetooth Classic SPP, FTP account, print-on-receive.</string>
     <string name="settings_grok">AI image processing</string>

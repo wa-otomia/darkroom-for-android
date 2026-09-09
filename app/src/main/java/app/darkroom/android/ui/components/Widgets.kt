@@ -42,6 +42,7 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -892,6 +893,26 @@ fun DeleteUndoBar(
                 Text(undoLabel, color = Amber, fontSize = 14.sp, lineHeight = 20.sp)
             }
         }
+    }
+}
+
+/**
+ * Page header used by Gallery, Transfer, Presets and Settings: amber
+ * `labelSmall` eyebrow, then the `headlineLarge` title 4.dp below it.
+ */
+@Composable
+fun ScreenHeader(
+    eyebrow: String,
+    title: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Text(eyebrow, style = MaterialTheme.typography.labelSmall, color = Amber)
+        Text(
+            title,
+            style = MaterialTheme.typography.headlineLarge,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 

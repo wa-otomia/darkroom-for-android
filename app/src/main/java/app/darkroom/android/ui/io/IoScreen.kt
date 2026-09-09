@@ -96,6 +96,7 @@ import app.darkroom.android.ui.components.DarkroomSnackbarHost
 import app.darkroom.android.ui.components.GhostButton
 import app.darkroom.android.ui.components.InlineConfirm
 import app.darkroom.android.ui.components.PaperButton
+import app.darkroom.android.ui.components.ScreenHeader
 import app.darkroom.android.ui.components.SectionLabel
 import app.darkroom.android.ui.components.rememberInlineConfirmState
 import app.darkroom.android.ui.jobFieldKey
@@ -300,8 +301,10 @@ fun IoScreen(
                 .navigationBarsPadding()
                 .padding(20.dp),
         ) {
-            Text(stringResource(R.string.io_eyebrow), style = MaterialTheme.typography.labelSmall, color = Amber)
-            Text(stringResource(R.string.io_title), style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(top = 4.dp))
+            ScreenHeader(
+                eyebrow = stringResource(R.string.io_eyebrow),
+                title = stringResource(R.string.io_title),
+            )
             Text(stringResource(R.string.io_desc), style = MaterialTheme.typography.bodyMedium, color = PaperDim, modifier = Modifier.padding(top = 8.dp, bottom = 20.dp))
 
             PrintQueueRow(jobs = printJobs, onOpen = onOpenPrintQueue)

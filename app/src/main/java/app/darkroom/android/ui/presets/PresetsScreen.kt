@@ -65,6 +65,7 @@ import app.darkroom.android.ui.components.DarkroomSnackbarHost
 import app.darkroom.android.ui.components.DarkroomTextField
 import app.darkroom.android.ui.components.GhostButton
 import app.darkroom.android.ui.components.PaperButton
+import app.darkroom.android.ui.components.ScreenHeader
 import app.darkroom.android.ui.components.SectionLabel
 import app.darkroom.android.ui.components.StatusBadge
 import app.darkroom.android.ui.theme.Amber
@@ -200,7 +201,10 @@ fun PresetsScreen(settings: SettingsRepository) {
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
         ) {
-            Text(stringResource(R.string.presets_title), style = MaterialTheme.typography.headlineLarge)
+            ScreenHeader(
+                eyebrow = stringResource(R.string.presets_eyebrow),
+                title = stringResource(R.string.presets_title),
+            )
             Text(stringResource(R.string.presets_desc), style = MaterialTheme.typography.bodyMedium, color = PaperDim, modifier = Modifier.padding(top = 8.dp, bottom = 16.dp))
             SectionLabel(stringResource(R.string.default_preset))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
