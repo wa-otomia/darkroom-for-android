@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="studio_framing">構図</string>
+    <string name="studio_frame_portrait">縦 2:3</string>
+    <string name="studio_frame_landscape">横 3:2</string>
+    <string name="studio_rotate_left">左に 90° 回転</string>
+    <string name="studio_rotate_right">右に 90° 回転</string>
+    <string name="studio_rotation_state">%1$d° 回転</string>
+    <string name="studio_crop_overlay_landscape">3×2 in · 1560×1040</string>
+    <string name="studio_landscape_note">用紙は常に縦向きです。横構図は時計回りに 90° 回して用紙いっぱいに配置するため、印刷後は横に持ってご覧ください。</string>
+    <string name="studio_crop_locked">処理中です。完了するまで構図とトリミングはロックされます。</string>
+    <string name="studio_crop_locked_short">トリミング固定</string>
+    <string name="studio_preset_prompt_label">プリセットのプロンプト</string>
+    <string name="studio_preset_stacks">プリセットは自動で送信されます。下に入力した内容はその後ろに追加され、プリセットを上書きしません。</string>
+    <string name="studio_generate_vs_edit">「ギャラリーへ生成」は隣に新しい写真を作ります。「この写真だけ編集」は今の写真にバージョンを追加し、トリミングを保持します。</string>
+    <string name="studio_open_photo">写真 %1$s を開く</string>
+    <string name="studio_print_direct">キューに追加</string>
+
+    <string name="job_error_title">完了できませんでした</string>
+    <string name="job_hide">進捗を隠す</string>
+    <string name="job_scrim_a11y">処理中です</string>
+    <string name="ai_generated">生成しました</string>
+    <string name="ai_generated_view">表示</string>
+    <string name="transfer_phase_receiving">受信中</string>
+    <string name="transfer_phase_transcoding">変換中</string>
+    <string name="transfer_phase_ingesting">保存中</string>
+    <string name="transfer_phase_done">保存済み</string>
+    <string name="transfer_phase_failed">失敗</string>
+    <string name="progress_unit_mb">MB</string>
+    <string name="progress_unit_kb">KB</string>
+    <string name="progress_unit_b">B</string>
+
+    <string name="progress_estimated">推定</string>
+    <string name="phase_generate_preparing">準備中</string>
+    <string name="phase_generate_saving">保存中</string>
+    <string name="phase_generate_uploading">写真をアップロード中</string>
+    <string name="phase_generate_processing">処理中</string>
+    <string name="phase_generate_downloading">ダウンロード中</string>
+    <string name="phase_generate_done">完了</string>
+    <string name="phase_generate_error">エラー</string>
+
+    <string name="phase_print_editing">Grok 編集中</string>
+    <string name="phase_print_preparing">準備中</string>
+    <string name="phase_print_connecting">プリンターに接続中</string>
+    <string name="phase_print_sending">転送開始</string>
+    <string name="phase_print_uploading">データ転送中</string>
+    <string name="phase_print_printing">印刷中</string>
+    <string name="phase_print_done">完了</string>
+    <string name="phase_print_error">エラー</string>
+
+    <string name="job_state_downloading">転送中</string>
+    <string name="job_state_printing">印刷中</string>
+    <string name="job_state_queued">キュー中</string>
+    <string name="job_state_waiting">待機中</string>
+    <string name="job_state_pending">用紙なし</string>
+    <string name="job_state_no_paper">用紙なし</string>
+    <string name="job_state_out_of_paper">用紙切れ</string>
+    <string name="job_state_paper_empty">用紙なし</string>
+    <string name="job_state_done">完了</string>
+    <string name="job_state_success">完了</string>
+    <string name="job_state_finished">完了</string>
+    <string name="job_state_error">エラー</string>
+    <string name="job_state_failed">失敗</string>
+    <string name="job_state_cancelled">キャンセル済み</string>
+    <string name="job_state_aborted">中止（接続切断またはプリンターキャンセル）</string>
+</resources>

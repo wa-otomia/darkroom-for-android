@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phase_import_reading">读取中</string>
+    <string name="phase_studio_decoding">载入照片</string>
+    <string name="phase_probe">测试连接</string>
+    <string name="phase_bt_scan">扫描中</string>
+    <string name="phase_bt_pair">配对中</string>
+    <string name="progress_elapsed_fmt">%1$s</string>
+    <string name="progress_delete">删除中</string>
+    <string name="progress_delete_fmt">删除 %1$d / %2$d</string>
+    <string name="ai_cancelled">已取消生成/修图</string>
+</resources>

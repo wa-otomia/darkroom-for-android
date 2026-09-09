@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ftp_local_network_title">Local network permission required</string>
+    <string name="ftp_local_network_desc">Android 17 blocks LAN and hotspot traffic unless this app has local-network access. The camera cannot reach the FTP server without it.</string>
+    <string name="ftp_local_network_grant">Grant permission</string>
+</resources>

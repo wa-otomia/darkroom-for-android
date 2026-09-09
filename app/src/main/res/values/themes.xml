@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="room">#0E0D0B</color>
+    <color name="paper">#EFE6D4</color>
+    <color name="amber">#D9A441</color>
+
+    <!--
+        The window draws behind the system bars; MainActivity.onCreate is the
+        only place that configures them.
+
+        android:statusBarColor and android:navigationBarColor used to be set
+        here as well. They are ignored from API 35 on, and on API 29-34 they
+        were a second source of truth that enableEdgeToEdge() overwrote a moment
+        later. What is left here is the part that has to be in place before the
+        first frame: no light-bar icons, no platform contrast band and no
+        navigation bar divider, so no seam is painted between the bar areas and
+        the page.
+    -->
+    <style name="Theme.Darkroom" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/room</item>
+        <item name="android:colorPrimary">@color/paper</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:navigationBarDividerColor">@android:color/transparent</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+    </style>
+</resources>

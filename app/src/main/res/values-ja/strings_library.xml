@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 共通操作 -->
+    <string name="lib_action_undo">元に戻す</string>
+
+    <!-- ギャラリー: インポート -->
+    <string name="lib_gallery_import_formats">JPEG・HEIC・PNG・WebP をインポートできます。JPEG 以外は取り込み時に JPEG へ変換されます。</string>
+    <string name="lib_gallery_long_press_hint">写真をタップすると開きます。長押しで複数選択できます。</string>
+    <string name="lib_gallery_import_title">インポート</string>
+    <string name="lib_gallery_import_label">%1$d / %2$d</string>
+    <string name="lib_gallery_import_result_title">インポート完了</string>
+    <string name="lib_gallery_import_ok">インポート %1$d 件</string>
+    <string name="lib_gallery_import_failed_head">スキップ %1$d 件</string>
+    <string name="lib_gallery_import_failed_item">%1$s — %2$s</string>
+    <string name="lib_gallery_import_more">ほか %1$d 件</string>
+    <string name="lib_gallery_import_converted_head">JPEG に変換 %1$d 件（再エンコードされ、非常に大きな写真は縮小されます）</string>
+    <string name="lib_gallery_reason_unreadable">読み込めませんでした</string>
+    <string name="lib_gallery_reason_unsupported">対応していない画像形式です</string>
+    <string name="lib_gallery_reason_too_large">サイズが大きすぎて変換できません</string>
+
+    <!-- ギャラリー: 新着と選択 -->
+    <string name="lib_gallery_new_photos">新着 %1$d 件 · タップで先頭へ</string>
+    <string name="lib_gallery_selection_count">%1$d 件を選択中</string>
+    <string name="lib_gallery_select_all">すべて選択</string>
+    <string name="lib_gallery_selection_exit">選択モードを終了</string>
+    <string name="lib_gallery_deleted">%1$d 件を削除しました</string>
+    <string name="lib_gallery_thumb_failed">プレビューを表示できません</string>
+
+    <!-- 入出力 -->
+    <string name="lib_io_copy_field">%1$sをコピー</string>
+    <string name="lib_io_password_copy_hint">パスワードを表示してからコピーしてください。</string>
+    <string name="lib_io_start_failed">FTP サーバーを開始できませんでした。ポートが使用中でないか確認して再試行してください。</string>
+    <string name="lib_io_notif_blocked_title">通知が許可されていません</string>
+    <string name="lib_io_notif_blocked_desc">FTP サーバーの稼働状況を表示し続けるには通知権限が必要です。許可しない場合でも写真の受信は動作します。</string>
+    <string name="lib_io_open_settings">システム設定を開く</string>
+    <string name="lib_io_no_host_title">Wi-Fi アドレスが見つかりません</string>
+    <string name="lib_io_no_host_desc">カメラとこの端末は同じ Wi-Fi ネットワークに接続してください。端末のテザリングを使う場合は、カメラをそのアクセスポイントに接続してから更新してください。</string>
+    <string name="lib_io_refresh_hosts">アドレスを更新</string>
+
+    <!-- プリセット -->
+    <string name="lib_presets_default_current">使用中: %1$s</string>
+    <string name="lib_presets_default_none">なし</string>
+    <string name="lib_presets_default_clear">既定を解除</string>
+    <string name="lib_presets_default_hint">既定は下のプリセットカードで設定します。</string>
+    <string name="lib_presets_char_count">%1$d / %2$d</string>
+    <string name="lib_presets_category">カテゴリ</string>
+    <string name="lib_presets_discard_title">下書きを破棄しますか？</string>
+    <string name="lib_presets_discard_desc">このプリセットには未保存の変更があります。</string>
+    <string name="lib_presets_discard_confirm">破棄</string>
+    <string name="lib_presets_keep_editing">編集を続ける</string>
+    <string name="lib_presets_restore_builtin">組み込み設定に戻す</string>
+    <string name="lib_presets_restored">組み込みプリセットを復元しました</string>
+    <string name="lib_presets_card_actions">プリセットの操作</string>
+</resources>

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 设置：信息架构 -->
+    <string name="settings_group_setup">配置</string>
+    <string name="settings_group_printing">打印</string>
+    <string name="settings_group_diagnostics">诊断</string>
+    <string name="settings_group_app">应用</string>
+    <string name="settings_expanded">已展开</string>
+    <string name="settings_collapsed">已收起</string>
+    <string name="settings_printing">打印默认值</string>
+    <string name="settings_printing_summary">%1$s · %2$s</string>
+    <string name="settings_default_copies">默认份数</string>
+    <string name="settings_default_copies_desc">打印面板与「收图后自动打印」使用的初始份数。</string>
+    <string name="settings_about">关于「暗房」</string>
+    <string name="settings_about_summary">版本、隐私说明与开源许可</string>
+    <string name="settings_reset">恢复默认设置</string>
+    <string name="settings_reset_title">确认恢复默认设置？</string>
+    <string name="settings_reset_text">打印机绑定、打印默认值、收图后自动打印、FTP 账号与 Grok 配置将恢复为默认值，并重新生成 FTP 密码。界面语言、AI 预设与照片库不受影响。</string>
+    <string name="settings_reset_confirm">恢复</string>
+    <string name="settings_reset_done">已恢复默认设置</string>
+    <string name="settings_unsaved">存在未保存的更改</string>
+    <string name="settings_discard">放弃更改</string>
+    <string name="settings_clear">清除</string>
+
+    <!-- 设置：Grok Imagine -->
+    <string name="settings_grok_save_hint">模型、分辨率、接口地址与 API 密钥在保存时一并生效。</string>
+    <string name="settings_grok_url_preview">将保存为 %1$s</string>
+    <string name="settings_grok_url_saved">已保存为 %1$s</string>
+    <string name="settings_grok_key_present">已存储 API 密钥。留空即保留现有密钥。</string>
+    <string name="settings_grok_key_absent">使用 Grok 修图前必须填写，以 xai- 开头。</string>
+    <string name="settings_grok_key_clear">清除 API 密钥</string>
+    <string name="settings_grok_key_clear_title">确认清除已存储的 API 密钥？</string>
+    <string name="settings_grok_key_clear_text">清除后，Grok 修图与生成功能将不可用，直至重新保存 API 密钥。</string>
+    <string name="settings_grok_key_cleared">已清除 API 密钥</string>
+
+    <!-- Settings: Grok connection test -->
+    <string name="settings_grok_test">测试连接</string>
+    <string name="settings_grok_test_running">正在测试连接…</string>
+    <string name="settings_grok_test_target">测试对象：%1$s（%2$s）</string>
+    <string name="settings_grok_test_key_draft">使用上方输入的 API 密钥</string>
+    <string name="settings_grok_test_key_saved">使用已保存的 API 密钥</string>
+    <string name="settings_grok_test_ok">连接成功，API 密钥有效（%1$d 毫秒）。</string>
+    <string name="settings_grok_test_model_missing">连接成功，但接口未列出模型 %1$s。请核对模型名称，或改用其他模型。</string>
+    <string name="settings_grok_test_auth">API 密钥被拒绝（HTTP %1$d）。请确认密钥完整且未失效，并确认账户已开通图像模型权限。</string>
+    <string name="settings_grok_test_notfound">接口返回 404。请检查 API 地址，默认值为 https://api.x.ai/v1。</string>
+    <string name="settings_grok_test_http">接口返回 HTTP %1$d。请稍后重试，或检查 API 地址。</string>
+    <string name="settings_grok_test_unreachable">无法连接到接口。请检查网络连接与 API 地址后重试。</string>
+    <string name="settings_grok_test_timeout">连接超时，接口未在限定时间内响应。请检查网络后重试。</string>
+    <string name="settings_grok_test_nokey">尚无可测试的 API 密钥，请先填写。</string>
+    <string name="settings_grok_test_badurl">API 地址格式无效。请填写完整的 http:// 或 https:// 地址。</string>
+
+    <!-- 设置：打印机与蓝牙 -->
+    <string name="settings_bt_off">蓝牙未开启。开启后方可扫描并绑定打印机。</string>
+    <string name="settings_bt_open">打开蓝牙设置</string>
+    <string name="settings_perm_denied">扫描附近打印机需要蓝牙权限。</string>
+    <string name="settings_perm_denied_permanent">蓝牙权限已被永久拒绝。请在系统设置中授予权限后重新扫描。</string>
+    <string name="settings_perm_retry">重新请求权限</string>
+    <string name="settings_app_settings">打开应用设置</string>
+    <string name="settings_scan_stop">停止扫描</string>
+    <string name="settings_devices_paired">已配对设备</string>
+    <string name="settings_devices_found">扫描发现</string>
+    <string name="settings_devices_empty">暂无设备。请让打印机进入配对模式后扫描。</string>
+    <string name="settings_device_bound">已绑定</string>
+    <string name="settings_device_bind">绑定此打印机</string>
+    <string name="settings_device_pairing">正在配对…</string>
+    <string name="settings_signal_strong">信号强</string>
+    <string name="settings_signal_medium">信号中</string>
+    <string name="settings_signal_weak">信号弱</string>
+    <string name="settings_signal_fmt">%1$s · %2$d dBm</string>
+    <string name="settings_pair_failed_hint">配对失败。请确认打印机已开机并处于配对模式，然后重试。</string>
+
+    <!-- 设置：收图后自动打印 -->
+    <string name="settings_autoprint_blocked">「收图后自动打印」当前无法执行：</string>
+    <string name="settings_autoprint_need_printer">请先绑定打印机。</string>
+    <string name="settings_autoprint_need_key">所选预设需要 Grok，请先保存 API 密钥。</string>
+    <string name="settings_goto_printer">前往「打印机」</string>
+    <string name="settings_goto_ai">前往「AI 图片处理」</string>
+
+    <!-- 设置：相机 FTP -->
+    <string name="settings_ftp_pasv_min">PASV 起始端口</string>
+    <string name="settings_ftp_pasv_max">PASV 结束端口</string>
+    <string name="settings_ftp_pasv_desc">相机回连所用的被动模式数据端口，请至少保留 4 个端口。</string>
+    <string name="settings_ftp_user_hint">留空则使用默认用户名 camera。</string>
+    <string name="settings_ftp_password_hint">留空即保留现有密码；如需修改，长度至少 8 位。</string>
+    <string name="settings_err_pasv_range">端口须在 1024 到 65535 之间</string>
+    <string name="settings_err_pasv_order">起始端口须小于结束端口</string>
+    <string name="settings_err_pasv_span">请至少保留 4 个端口</string>
+    <string name="settings_ftp_restart_title">确认重启 FTP 服务？</string>
+    <string name="settings_ftp_restart_text">FTP 服务监听中。重启将应用新设置，并中断正在进行的传输。</string>
+    <string name="settings_ftp_restart_confirm">保存并重启</string>
+    <string name="settings_ftp_restart_skip">仅保存</string>
+    <string name="settings_ftp_saved_pending">已保存。重启 FTP 服务后生效。</string>
+
+    <!-- 设置：最近活动 -->
+    <string name="settings_activity_summary">%1$d 条记录</string>
+    <string name="settings_log_copy">复制日志</string>
+    <string name="settings_log_share">分享日志</string>
+    <string name="settings_log_copied">已复制日志</string>
+    <string name="settings_log_share_title">暗房活动日志</string>
+    <string name="settings_log_expand">查看错误详情</string>
+    <string name="settings_log_clear">清空日志</string>
+    <string name="settings_log_clear_title">清空活动日志？</string>
+    <string name="settings_log_clear_text">全部记录将被删除且无法恢复。若仍需用于排查故障，请先复制或分享日志。</string>
+    <string name="settings_log_cleared">活动日志已清空</string>
+    <string name="settings_kind_ai">AI 修图</string>
+    <string name="settings_kind_catalog">照片库</string>
+    <string name="settings_kind_ftp">相机 FTP</string>
+    <string name="settings_kind_share">分享导入</string>
+    <string name="settings_kind_spp">打印机</string>
+
+    <!-- 设置：界面语言 -->
+    <string name="settings_language">界面语言</string>
+    <string name="settings_language_desc">切换后界面立即重新载入。这与系统设置中的「应用语言」是同一项设置。</string>
+    <string name="settings_language_unsupported">此设备的 Android 版本不支持单独设置应用语言，界面跟随系统语言。</string>
+    <string name="settings_lang_system">跟随系统</string>
+
+    <!-- 关于 -->
+    <string name="about_title">关于</string>
+    <string name="about_desc">版本信息、隐私说明，以及本应用所使用的开源组件。</string>
+    <string name="about_version">版本 %1$s（构建号 %2$d）</string>
+    <string name="about_privacy_title">隐私说明</string>
+    <string name="about_privacy_ai">使用 AI 图片处理功能时，所选照片会上传至设置中配置的接口，并在该服务端完成处理。不使用 AI 功能时，照片不会上传。</string>
+    <string name="about_privacy_ftp">相机 FTP 服务运行期间会在局域网内开放监听端口。同一网络中知晓账号的人均可向本机上传照片。不使用时请停止该服务。</string>
+    <string name="about_privacy_storage">API 密钥与 FTP 密码保存在本机的加密存储中，除发送至您所配置的接口外不会外传。</string>
+    <string name="about_privacy_local">照片、编辑结果与活动日志仅保存在本机。</string>
+    <string name="about_policy_title">隐私政策</string>
+    <string name="about_policy_placeholder">待补充正式隐私政策链接，需由产品方在应用上架前提供。</string>
+    <string name="about_licenses_title">开源许可</string>
+    <string name="about_licenses_desc">本应用包含以下第三方组件。</string>
+</resources>

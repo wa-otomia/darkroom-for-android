@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phase_import_reading">읽는 중</string>
+    <string name="phase_studio_decoding">사진을 불러오는 중</string>
+    <string name="phase_probe">연결 테스트 중</string>
+    <string name="phase_bt_scan">스캔 중</string>
+    <string name="phase_bt_pair">페어링 중</string>
+    <string name="progress_elapsed_fmt">%1$s</string>
+    <string name="progress_delete">삭제 중</string>
+    <string name="progress_delete_fmt">삭제 %1$d / %2$d</string>
+    <string name="ai_cancelled">생성/보정을 취소했습니다</string>
+</resources>

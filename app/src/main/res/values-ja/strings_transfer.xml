@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="transfer_error_incomplete">ファイルが不完全です</string>
+    <string name="transfer_error_undecodable">画像を復号できません</string>
+    <string name="transfer_error_stalled">転送が中断されました</string>
+</resources>

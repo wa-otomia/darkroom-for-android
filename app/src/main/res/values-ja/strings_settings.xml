@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 設定：情報設計 -->
+    <string name="settings_group_setup">構成</string>
+    <string name="settings_group_printing">印刷</string>
+    <string name="settings_group_diagnostics">診断</string>
+    <string name="settings_group_app">アプリ</string>
+    <string name="settings_expanded">展開中</string>
+    <string name="settings_collapsed">折りたたみ中</string>
+    <string name="settings_printing">印刷の既定値</string>
+    <string name="settings_printing_summary">%1$s · %2$s</string>
+    <string name="settings_default_copies">既定の部数</string>
+    <string name="settings_default_copies_desc">印刷パネルと「受信後に自動印刷」で使用される初期部数です。</string>
+    <string name="settings_about">「暗房」について</string>
+    <string name="settings_about_summary">バージョン、プライバシー、オープンソースライセンス</string>
+    <string name="settings_reset">既定の設定に戻す</string>
+    <string name="settings_reset_title">既定の設定に戻しますか？</string>
+    <string name="settings_reset_text">プリンタの登録、印刷の既定値、受信後に自動印刷、FTP アカウント、Grok の構成が既定値に戻り、FTP パスワードが再生成されます。アプリの言語、AI プリセットと写真カタログは影響を受けません。</string>
+    <string name="settings_reset_confirm">戻す</string>
+    <string name="settings_reset_done">既定の設定に戻しました</string>
+    <string name="settings_unsaved">未保存の変更があります</string>
+    <string name="settings_discard">変更を破棄</string>
+    <string name="settings_clear">消去</string>
+
+    <!-- 設定：Grok Imagine -->
+    <string name="settings_grok_save_hint">モデル、解像度、API URL、API キーは保存時にまとめて適用されます。</string>
+    <string name="settings_grok_url_preview">%1$s として保存されます</string>
+    <string name="settings_grok_url_saved">%1$s として保存しました</string>
+    <string name="settings_grok_key_present">API キーは保存済みです。空欄のままにすると維持されます。</string>
+    <string name="settings_grok_key_absent">Grok 編集の利用に必要です。xai- で始まります。</string>
+    <string name="settings_grok_key_clear">API キーを消去</string>
+    <string name="settings_grok_key_clear_title">保存済みの API キーを消去しますか？</string>
+    <string name="settings_grok_key_clear_text">消去すると、新しい API キーを保存するまで Grok の編集と生成が利用できません。</string>
+    <string name="settings_grok_key_cleared">API キーを消去しました</string>
+
+    <!-- Settings: Grok connection test -->
+    <string name="settings_grok_test">接続テスト</string>
+    <string name="settings_grok_test_running">接続をテスト中…</string>
+    <string name="settings_grok_test_target">テスト対象: %1$s（%2$s）</string>
+    <string name="settings_grok_test_key_draft">上に入力した API キーを使用</string>
+    <string name="settings_grok_test_key_saved">保存済みの API キーを使用</string>
+    <string name="settings_grok_test_ok">接続に成功し、API キーは有効です（%1$d ミリ秒）。</string>
+    <string name="settings_grok_test_model_missing">接続には成功しましたが、モデル %1$s はエンドポイントの一覧にありません。モデル名を確認するか、別のモデルを選択してください。</string>
+    <string name="settings_grok_test_auth">API キーが拒否されました（HTTP %1$d）。キーが完全で有効であること、アカウントに画像モデルの利用権限があることを確認してください。</string>
+    <string name="settings_grok_test_notfound">エンドポイントが 404 を返しました。API URL を確認してください。既定値は https://api.x.ai/v1 です。</string>
+    <string name="settings_grok_test_http">エンドポイントが HTTP %1$d を返しました。時間をおいて再試行するか、API URL を確認してください。</string>
+    <string name="settings_grok_test_unreachable">エンドポイントに接続できません。ネットワーク接続と API URL を確認して再試行してください。</string>
+    <string name="settings_grok_test_timeout">接続がタイムアウトしました。エンドポイントから応答がありません。ネットワークを確認して再試行してください。</string>
+    <string name="settings_grok_test_nokey">テストできる API キーがありません。先に入力してください。</string>
+    <string name="settings_grok_test_badurl">API URL の形式が正しくありません。http:// または https:// で始まる完全な URL を入力してください。</string>
+
+    <!-- 設定：プリンタと Bluetooth -->
+    <string name="settings_bt_off">Bluetooth がオフです。オンにするとプリンタを検索して登録できます。</string>
+    <string name="settings_bt_open">Bluetooth 設定を開く</string>
+    <string name="settings_perm_denied">付近のプリンタを検索するには Bluetooth の権限が必要です。</string>
+    <string name="settings_perm_denied_permanent">Bluetooth の権限が完全に拒否されています。システム設定で許可してから再度スキャンしてください。</string>
+    <string name="settings_perm_retry">権限を再度リクエスト</string>
+    <string name="settings_app_settings">アプリ設定を開く</string>
+    <string name="settings_scan_stop">スキャンを停止</string>
+    <string name="settings_devices_paired">ペアリング済みデバイス</string>
+    <string name="settings_devices_found">スキャンで検出</string>
+    <string name="settings_devices_empty">デバイスがありません。プリンタをペアリングモードにしてスキャンしてください。</string>
+    <string name="settings_device_bound">登録済み</string>
+    <string name="settings_device_bind">このプリンタを登録</string>
+    <string name="settings_device_pairing">ペアリング中…</string>
+    <string name="settings_signal_strong">強</string>
+    <string name="settings_signal_medium">中</string>
+    <string name="settings_signal_weak">弱</string>
+    <string name="settings_signal_fmt">%1$s · %2$d dBm</string>
+    <string name="settings_pair_failed_hint">ペアリングに失敗しました。プリンタの電源とペアリングモードを確認して再試行してください。</string>
+
+    <!-- 設定：受信して印刷 -->
+    <string name="settings_autoprint_blocked">「受信後に自動印刷」は現在実行できません:</string>
+    <string name="settings_autoprint_need_printer">先にプリンタを登録してください。</string>
+    <string name="settings_autoprint_need_key">選択中のプリセットは Grok を使用します。先に API キーを保存してください。</string>
+    <string name="settings_goto_printer">「プリンタ」へ移動</string>
+    <string name="settings_goto_ai">「AI 画像処理」へ移動</string>
+
+    <!-- 設定：カメラ FTP -->
+    <string name="settings_ftp_pasv_min">PASV 開始ポート</string>
+    <string name="settings_ftp_pasv_max">PASV 終了ポート</string>
+    <string name="settings_ftp_pasv_desc">カメラが接続し直すパッシブモードのデータポートです。4 ポート以上を確保してください。</string>
+    <string name="settings_ftp_user_hint">空欄の場合は既定のユーザー名 camera を使用します。</string>
+    <string name="settings_ftp_password_hint">空欄のままにすると現在のパスワードを維持します。変更する場合は 8 文字以上です。</string>
+    <string name="settings_err_pasv_range">ポートは 1024 〜 65535 の範囲で指定してください</string>
+    <string name="settings_err_pasv_order">開始ポートは終了ポートより小さくしてください</string>
+    <string name="settings_err_pasv_span">4 ポート以上を確保してください</string>
+    <string name="settings_ftp_restart_title">FTP サーバーを再起動しますか？</string>
+    <string name="settings_ftp_restart_text">サーバーは待ち受け中です。再起動すると新しい設定が適用され、進行中の転送は中断されます。</string>
+    <string name="settings_ftp_restart_confirm">保存して再起動</string>
+    <string name="settings_ftp_restart_skip">保存のみ</string>
+    <string name="settings_ftp_saved_pending">保存しました。FTP サーバーを再起動すると適用されます。</string>
+
+    <!-- 設定：最近の操作 -->
+    <string name="settings_activity_summary">%1$d 件</string>
+    <string name="settings_log_copy">ログをコピー</string>
+    <string name="settings_log_share">ログを共有</string>
+    <string name="settings_log_copied">ログをコピーしました</string>
+    <string name="settings_log_share_title">暗房の操作ログ</string>
+    <string name="settings_log_expand">エラーの詳細を表示</string>
+    <string name="settings_log_clear">ログを消去</string>
+    <string name="settings_log_clear_title">アクティビティログを消去しますか？</string>
+    <string name="settings_log_clear_text">すべての記録が削除され、復元できません。トラブルシューティングに必要な場合は、先にログをコピーまたは共有してください。</string>
+    <string name="settings_log_cleared">アクティビティログを消去しました</string>
+    <string name="settings_kind_ai">AI 編集</string>
+    <string name="settings_kind_catalog">カタログ</string>
+    <string name="settings_kind_ftp">カメラ FTP</string>
+    <string name="settings_kind_share">共有の取り込み</string>
+    <string name="settings_kind_spp">プリンタ</string>
+
+    <!-- 設定: アプリの言語 -->
+    <string name="settings_language">アプリの言語</string>
+    <string name="settings_language_desc">切り替えると画面がすぐに再読み込みされます。システム設定の「アプリの言語」と同じ設定です。</string>
+    <string name="settings_language_unsupported">この端末の Android バージョンではアプリごとに言語を設定できません。画面はシステムの言語に従います。</string>
+    <string name="settings_lang_system">システムに従う</string>
+
+    <!-- について -->
+    <string name="about_title">このアプリについて</string>
+    <string name="about_desc">バージョン情報、プライバシー、および本アプリが利用しているオープンソースコンポーネント。</string>
+    <string name="about_version">バージョン %1$s（ビルド %2$d）</string>
+    <string name="about_privacy_title">プライバシー</string>
+    <string name="about_privacy_ai">AI 画像処理を使用すると、選択した写真は設定で構成した API エンドポイントにアップロードされ、そのサービス上で処理されます。AI 機能を使わない場合、写真はアップロードされません。</string>
+    <string name="about_privacy_ftp">カメラ FTP サービスの稼働中は、ローカルネットワーク上に待ち受けポートが開かれます。同じネットワーク上でアカウントを知る人は本端末に写真をアップロードできます。使用しないときはサービスを停止してください。</string>
+    <string name="about_privacy_storage">API キーと FTP パスワードは本端末の暗号化ストレージに保存され、構成した API エンドポイント以外へ送信されることはありません。</string>
+    <string name="about_privacy_local">写真、編集結果、操作ログは本端末内にのみ保存されます。</string>
+    <string name="about_policy_title">プライバシーポリシー</string>
+    <string name="about_policy_placeholder">正式なプライバシーポリシーのリンクは未確定です。ストア公開前に製品側から提供される必要があります。</string>
+    <string name="about_licenses_title">オープンソースライセンス</string>
+    <string name="about_licenses_desc">本アプリには以下のサードパーティコンポーネントが含まれます。</string>
+</resources>

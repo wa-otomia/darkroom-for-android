@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ftp_local_network_title">ローカルネットワークの許可が必要です</string>
+    <string name="ftp_local_network_desc">Android 17 は、ローカルネットワーク権限がないと LAN / テザリング宛の通信を遮断します。この権限がないとカメラは FTP サーバーに到達できません。</string>
+    <string name="ftp_local_network_grant">許可する</string>
+</resources>

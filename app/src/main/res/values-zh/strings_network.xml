@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ftp_local_network_title">需要本地网络权限</string>
+    <string name="ftp_local_network_desc">Android 17 在未授予本地网络权限时会拦截局域网和热点流量。相机将无法连接本机 FTP 服务。</string>
+    <string name="ftp_local_network_grant">授予权限</string>
+</resources>

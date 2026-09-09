@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings: information architecture -->
+    <string name="settings_group_setup">Setup</string>
+    <string name="settings_group_printing">Printing</string>
+    <string name="settings_group_diagnostics">Diagnostics</string>
+    <string name="settings_group_app">App</string>
+    <string name="settings_expanded">Expanded</string>
+    <string name="settings_collapsed">Collapsed</string>
+    <string name="settings_printing">Print defaults</string>
+    <string name="settings_printing_summary">%1$s · %2$s</string>
+    <string name="settings_default_copies">Default copies</string>
+    <string name="settings_default_copies_desc">Initial value in the print sheet and for print-on-receive.</string>
+    <string name="settings_about">About Darkroom</string>
+    <string name="settings_about_summary">Version, privacy, open-source licenses</string>
+    <string name="settings_reset">Restore default settings</string>
+    <string name="settings_reset_title">Restore default settings?</string>
+    <string name="settings_reset_text">Printer binding, print defaults, print-on-receive, the FTP account and the Grok configuration return to their defaults, and a new FTP password is generated. The app language, AI presets and the photo catalog are not affected.</string>
+    <string name="settings_reset_confirm">Restore</string>
+    <string name="settings_reset_done">Default settings restored</string>
+    <string name="settings_unsaved">Unsaved changes</string>
+    <string name="settings_discard">Discard changes</string>
+    <string name="settings_clear">Clear</string>
+
+    <!-- Settings: Grok Imagine -->
+    <string name="settings_grok_save_hint">Model, resolution, API URL and API key take effect together when you save.</string>
+    <string name="settings_grok_url_preview">Will be saved as %1$s</string>
+    <string name="settings_grok_url_saved">Saved as %1$s</string>
+    <string name="settings_grok_key_present">An API key is stored. Leave blank to keep it.</string>
+    <string name="settings_grok_key_absent">Required for Grok editing. Begins with xai-.</string>
+    <string name="settings_grok_key_clear">Clear API key</string>
+    <string name="settings_grok_key_clear_title">Clear the stored API key?</string>
+    <string name="settings_grok_key_clear_text">Grok editing and generation stop working until a new API key is saved.</string>
+    <string name="settings_grok_key_cleared">API key cleared</string>
+
+    <!-- Settings: Grok connection test -->
+    <string name="settings_grok_test">Test connection</string>
+    <string name="settings_grok_test_running">Testing connection…</string>
+    <string name="settings_grok_test_target">Tested %1$s (%2$s)</string>
+    <string name="settings_grok_test_key_draft">using the API key typed above</string>
+    <string name="settings_grok_test_key_saved">using the stored API key</string>
+    <string name="settings_grok_test_ok">Connection succeeded and the API key was accepted (%1$d ms).</string>
+    <string name="settings_grok_test_model_missing">Connection succeeded, but the endpoint does not list the model %1$s. Check the model name or pick another one.</string>
+    <string name="settings_grok_test_auth">The API key was rejected (HTTP %1$d). Check that the key is complete and still valid, and that the account has image model access.</string>
+    <string name="settings_grok_test_notfound">The endpoint returned 404. Check the API URL; the default is https://api.x.ai/v1.</string>
+    <string name="settings_grok_test_http">The endpoint returned HTTP %1$d. Try again later, or check the API URL.</string>
+    <string name="settings_grok_test_unreachable">Could not reach the endpoint. Check the network connection and the API URL, then try again.</string>
+    <string name="settings_grok_test_timeout">The connection timed out before the endpoint answered. Check the network, then try again.</string>
+    <string name="settings_grok_test_nokey">No API key to test. Enter one first.</string>
+    <string name="settings_grok_test_badurl">The API URL is not a valid address. Enter a full http:// or https:// URL.</string>
+
+    <!-- Settings: printer and Bluetooth -->
+    <string name="settings_bt_off">Bluetooth is off. Turn it on to scan for and bind the printer.</string>
+    <string name="settings_bt_open">Open Bluetooth settings</string>
+    <string name="settings_perm_denied">Scanning for nearby printers requires Bluetooth permission.</string>
+    <string name="settings_perm_denied_permanent">Bluetooth permission was permanently denied. Grant it in system settings, then scan again.</string>
+    <string name="settings_perm_retry">Request permission again</string>
+    <string name="settings_app_settings">Open app settings</string>
+    <string name="settings_scan_stop">Stop scanning</string>
+    <string name="settings_devices_paired">Paired devices</string>
+    <string name="settings_devices_found">Discovered by scan</string>
+    <string name="settings_devices_empty">No devices yet. Put the printer in pairing mode, then scan.</string>
+    <string name="settings_device_bound">Bound</string>
+    <string name="settings_device_bind">Bind this printer</string>
+    <string name="settings_device_pairing">Pairing…</string>
+    <string name="settings_signal_strong">Strong</string>
+    <string name="settings_signal_medium">Medium</string>
+    <string name="settings_signal_weak">Weak</string>
+    <string name="settings_signal_fmt">%1$s · %2$d dBm</string>
+    <string name="settings_pair_failed_hint">Pairing failed. Check that the printer is on and in pairing mode, then try again.</string>
+
+    <!-- Settings: print on receive -->
+    <string name="settings_autoprint_blocked">Print-on-receive cannot run yet:</string>
+    <string name="settings_autoprint_need_printer">Bind a printer first.</string>
+    <string name="settings_autoprint_need_key">The selected preset uses Grok. Save an API key first.</string>
+    <string name="settings_goto_printer">Go to Printer</string>
+    <string name="settings_goto_ai">Go to AI image processing</string>
+
+    <!-- Settings: camera FTP -->
+    <string name="settings_ftp_pasv_min">PASV port from</string>
+    <string name="settings_ftp_pasv_max">PASV port to</string>
+    <string name="settings_ftp_pasv_desc">Passive-mode data ports the camera connects back on. Keep at least 4 ports free.</string>
+    <string name="settings_ftp_user_hint">Defaults to camera when left blank.</string>
+    <string name="settings_ftp_password_hint">Leave blank to keep the stored password. At least 8 characters.</string>
+    <string name="settings_err_pasv_range">Port must be between 1024 and 65535</string>
+    <string name="settings_err_pasv_order">The start port must be lower than the end port</string>
+    <string name="settings_err_pasv_span">Reserve at least 4 ports</string>
+    <string name="settings_ftp_restart_title">Restart the FTP server?</string>
+    <string name="settings_ftp_restart_text">The server is listening. Restarting applies the new settings and interrupts any transfer in progress.</string>
+    <string name="settings_ftp_restart_confirm">Save and restart</string>
+    <string name="settings_ftp_restart_skip">Save only</string>
+    <string name="settings_ftp_saved_pending">Saved. Restart the FTP server to apply.</string>
+
+    <!-- Settings: recent activity -->
+    <string name="settings_activity_summary">%1$d entries</string>
+    <string name="settings_log_copy">Copy log</string>
+    <string name="settings_log_share">Share log</string>
+    <string name="settings_log_copied">Log copied</string>
+    <string name="settings_log_share_title">Darkroom activity log</string>
+    <string name="settings_log_expand">Show error details</string>
+    <string name="settings_log_clear">Clear log</string>
+    <string name="settings_log_clear_title">Clear the activity log?</string>
+    <string name="settings_log_clear_text">All entries are removed and cannot be recovered. Copy or share the log first if you still need it for troubleshooting.</string>
+    <string name="settings_log_cleared">Activity log cleared</string>
+    <string name="settings_kind_ai">AI edit</string>
+    <string name="settings_kind_catalog">Catalog</string>
+    <string name="settings_kind_ftp">Camera FTP</string>
+    <string name="settings_kind_share">Share import</string>
+    <string name="settings_kind_spp">Printer</string>
+
+    <!-- Settings: app language -->
+    <string name="settings_language">App language</string>
+    <string name="settings_language_desc">The interface reloads straight away. This is the same setting as App language in system settings.</string>
+    <string name="settings_language_unsupported">This device runs an Android version that cannot set a language per app. The interface follows the system language.</string>
+    <string name="settings_lang_system">Follow system</string>
+    <!--
+        Each language is written the way that language writes it, so it stays legible to someone
+        who ended up in a language they cannot read. Never translated.
+    -->
+    <string name="settings_lang_zh" translatable="false">简体中文</string>
+    <string name="settings_lang_en" translatable="false">English</string>
+    <string name="settings_lang_ja" translatable="false">日本語</string>
+    <string name="settings_lang_ko" translatable="false">한국어</string>
+
+    <!-- About -->
+    <string name="about_title">About</string>
+    <string name="about_desc">Version, privacy and the open-source components this app is built on.</string>
+    <string name="about_version">Version %1$s (build %2$d)</string>
+    <string name="about_privacy_title">Privacy</string>
+    <string name="about_privacy_ai">When you use an AI image feature, the selected photo is uploaded to the API endpoint configured in Settings and processed on that service. No photo is uploaded when AI processing is not used.</string>
+    <string name="about_privacy_ftp">While the camera FTP service runs, it opens a listening port on the local network. Anyone on the same network who knows the account can upload photos to this device. Stop the service when it is not needed.</string>
+    <string name="about_privacy_storage">The API key and the FTP password are held in the encrypted storage of this device and are never transmitted anywhere except to the API endpoint you configured.</string>
+    <string name="about_privacy_local">Photos, edits and the activity log remain on this device.</string>
+    <string name="about_policy_title">Privacy policy</string>
+    <string name="about_policy_placeholder">Formal privacy policy link to be supplied. The product owner must provide it before store release.</string>
+    <string name="about_licenses_title">Open-source licenses</string>
+    <string name="about_licenses_desc">This app includes the following third-party components.</string>
+</resources>

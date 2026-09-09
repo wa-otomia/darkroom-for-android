@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="transfer_error_incomplete">文件不完整</string>
+    <string name="transfer_error_undecodable">无法解码图片</string>
+    <string name="transfer_error_stalled">传输中断</string>
+</resources>

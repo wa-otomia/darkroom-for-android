@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="studio_framing">구도</string>
+    <string name="studio_frame_portrait">세로 2:3</string>
+    <string name="studio_frame_landscape">가로 3:2</string>
+    <string name="studio_rotate_left">왼쪽으로 90° 회전</string>
+    <string name="studio_rotate_right">오른쪽으로 90° 회전</string>
+    <string name="studio_rotation_state">%1$d° 회전됨</string>
+    <string name="studio_crop_overlay_landscape">3×2 in · 1560×1040</string>
+    <string name="studio_landscape_note">용지는 항상 세로입니다. 가로 구도는 시계 방향으로 90° 돌려 용지를 채우므로, 인쇄물을 옆으로 돌려서 보세요.</string>
+    <string name="studio_crop_locked">작업이 진행 중입니다. 완료될 때까지 구도와 자르기가 잠깁니다.</string>
+    <string name="studio_crop_locked_short">자르기 잠금</string>
+    <string name="studio_preset_prompt_label">프리셋 프롬프트</string>
+    <string name="studio_preset_stacks">프리셋은 자동으로 전송됩니다. 아래 입력한 내용은 프리셋 뒤에 덧붙으며 덮어쓰지 않습니다.</string>
+    <string name="studio_generate_vs_edit">갤러리로 생성은 옆에 새 사진을 만듭니다. 이 사진만 편집은 현재 사진에 버전을 추가하고 자르기를 유지합니다.</string>
+    <string name="studio_open_photo">사진 %1$s 열기</string>
+    <string name="studio_print_direct">대기열에 추가</string>
+
+    <string name="job_error_title">완료하지 못했습니다</string>
+    <string name="job_hide">진행률 숨기기</string>
+    <string name="job_scrim_a11y">작업이 진행 중입니다</string>
+    <string name="ai_generated">생성했습니다</string>
+    <string name="ai_generated_view">보기</string>
+    <string name="transfer_phase_receiving">수신 중</string>
+    <string name="transfer_phase_transcoding">변환 중</string>
+    <string name="transfer_phase_ingesting">저장 중</string>
+    <string name="transfer_phase_done">저장됨</string>
+    <string name="transfer_phase_failed">실패</string>
+    <string name="progress_unit_mb">MB</string>
+    <string name="progress_unit_kb">KB</string>
+    <string name="progress_unit_b">B</string>
+
+    <string name="progress_estimated">추정</string>
+    <string name="phase_generate_preparing">준비 중</string>
+    <string name="phase_generate_saving">저장 중</string>
+    <string name="phase_generate_uploading">사진 업로드 중</string>
+    <string name="phase_generate_processing">처리 중</string>
+    <string name="phase_generate_downloading">다운로드 중</string>
+    <string name="phase_generate_done">완료</string>
+    <string name="phase_generate_error">오류</string>
+
+    <string name="phase_print_editing">Grok 편집 중</string>
+    <string name="phase_print_preparing">준비 중</string>
+    <string name="phase_print_connecting">프린터 연결 중</string>
+    <string name="phase_print_sending">전송 시작</string>
+    <string name="phase_print_uploading">데이터 전송 중</string>
+    <string name="phase_print_printing">인쇄 중</string>
+    <string name="phase_print_done">완료</string>
+    <string name="phase_print_error">오류</string>
+
+    <string name="job_state_downloading">전송 중</string>
+    <string name="job_state_printing">인쇄 중</string>
+    <string name="job_state_queued">대기열</string>
+    <string name="job_state_waiting">대기 중</string>
+    <string name="job_state_pending">용지 없음</string>
+    <string name="job_state_no_paper">용지 없음</string>
+    <string name="job_state_out_of_paper">용지 부족</string>
+    <string name="job_state_paper_empty">용지 없음</string>
+    <string name="job_state_done">완료</string>
+    <string name="job_state_success">완료</string>
+    <string name="job_state_finished">완료</string>
+    <string name="job_state_error">오류</string>
+    <string name="job_state_failed">실패</string>
+    <string name="job_state_cancelled">취소됨</string>
+    <string name="job_state_aborted">중단됨(연결 끊김 또는 프린터 취소)</string>
+</resources>

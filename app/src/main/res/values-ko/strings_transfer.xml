@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="transfer_error_incomplete">파일이 완전하지 않습니다</string>
+    <string name="transfer_error_undecodable">이미지를 디코딩할 수 없습니다</string>
+    <string name="transfer_error_stalled">전송이 중단되었습니다</string>
+</resources>

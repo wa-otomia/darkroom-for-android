@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shared actions -->
+    <string name="lib_action_undo">Undo</string>
+
+    <!-- Gallery: import -->
+    <string name="lib_gallery_import_formats">Imports JPEG, HEIC, PNG and WebP. Anything other than JPEG is converted on import.</string>
+    <string name="lib_gallery_long_press_hint">Tap a photo to open it. Long-press to select several.</string>
+    <string name="lib_gallery_import_title">Import</string>
+    <string name="lib_gallery_import_label">%1$d / %2$d</string>
+    <string name="lib_gallery_import_result_title">Import finished</string>
+    <string name="lib_gallery_import_ok">Imported: %1$d</string>
+    <string name="lib_gallery_import_failed_head">Skipped: %1$d</string>
+    <string name="lib_gallery_import_failed_item">%1$s — %2$s</string>
+    <string name="lib_gallery_import_more">and %1$d more</string>
+    <string name="lib_gallery_import_converted_head">Converted to JPEG: %1$d (re-encoded, and very large photos are scaled down)</string>
+    <string name="lib_gallery_reason_unreadable">Could not be read</string>
+    <string name="lib_gallery_reason_unsupported">Unsupported image format</string>
+    <string name="lib_gallery_reason_too_large">Too large to convert</string>
+
+    <!-- Gallery: new arrivals and selection -->
+    <string name="lib_gallery_new_photos">New photos: %1$d · tap to jump to top</string>
+    <string name="lib_gallery_selection_count">Selected: %1$d</string>
+    <string name="lib_gallery_select_all">Select all</string>
+    <string name="lib_gallery_selection_exit">Leave selection mode</string>
+    <string name="lib_gallery_deleted">Deleted: %1$d</string>
+    <string name="lib_gallery_thumb_failed">Preview unavailable</string>
+
+    <!-- I/O -->
+    <string name="lib_io_copy_field">Copy %1$s</string>
+    <string name="lib_io_password_copy_hint">Show the password before copying it.</string>
+    <string name="lib_io_start_failed">The FTP server did not start. Check that the port is free, then try again.</string>
+    <string name="lib_io_notif_blocked_title">Notifications are blocked</string>
+    <string name="lib_io_notif_blocked_desc">Android needs notification permission to keep the FTP server visible while it runs. Receiving photos still works without it.</string>
+    <string name="lib_io_open_settings">Open system settings</string>
+    <string name="lib_io_no_host_title">No Wi-Fi address</string>
+    <string name="lib_io_no_host_desc">The camera and this phone must be on the same Wi-Fi network. If you use the phone hotspot, connect the camera to that hotspot, then refresh.</string>
+    <string name="lib_io_refresh_hosts">Refresh addresses</string>
+
+    <!-- Presets -->
+    <string name="lib_presets_default_current">In use: %1$s</string>
+    <string name="lib_presets_default_none">None</string>
+    <string name="lib_presets_default_clear">Clear default</string>
+    <string name="lib_presets_default_hint">Set the default on a preset card below.</string>
+    <string name="lib_presets_char_count">%1$d / %2$d</string>
+    <string name="lib_presets_category">Category</string>
+    <string name="lib_presets_discard_title">Discard this draft?</string>
+    <string name="lib_presets_discard_desc">The preset has unsaved changes.</string>
+    <string name="lib_presets_discard_confirm">Discard</string>
+    <string name="lib_presets_keep_editing">Keep editing</string>
+    <string name="lib_presets_restore_builtin">Restore built-in</string>
+    <string name="lib_presets_restored">Built-in preset restored</string>
+    <string name="lib_presets_card_actions">Preset actions</string>
+</resources>

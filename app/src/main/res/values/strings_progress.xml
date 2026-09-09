@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phase_import_reading">Reading</string>
+    <string name="phase_studio_decoding">Loading photo</string>
+    <string name="phase_probe">Testing connection</string>
+    <string name="phase_bt_scan">Scanning</string>
+    <string name="phase_bt_pair">Pairing</string>
+    <string name="progress_elapsed_fmt">%1$s</string>
+    <string name="progress_delete">Deleting</string>
+    <string name="progress_delete_fmt">Deleting %1$d / %2$d</string>
+    <string name="ai_cancelled">Generation / edit cancelled</string>
+</resources>

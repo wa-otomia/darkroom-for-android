@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="transfer_error_incomplete">The file is incomplete</string>
+    <string name="transfer_error_undecodable">Could not decode the image</string>
+    <string name="transfer_error_stalled">Transfer interrupted</string>
+</resources>

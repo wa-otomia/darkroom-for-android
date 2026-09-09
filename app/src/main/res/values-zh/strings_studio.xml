@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="studio_framing">取景</string>
+    <string name="studio_frame_portrait">竖幅 2:3</string>
+    <string name="studio_frame_landscape">横幅 3:2</string>
+    <string name="studio_rotate_left">向左旋转 90°</string>
+    <string name="studio_rotate_right">向右旋转 90°</string>
+    <string name="studio_rotation_state">已旋转 %1$d°</string>
+    <string name="studio_crop_overlay_landscape">3×2 in · 1560×1040</string>
+    <string name="studio_landscape_note">相纸方向固定为竖向。横幅取景会顺时针旋转 90° 后铺满相纸，出纸后横持照片即可正常观看。</string>
+    <string name="studio_crop_locked">任务进行中，取景与裁切已锁定，完成后可继续调整。</string>
+    <string name="studio_crop_locked_short">裁切已锁定</string>
+    <string name="studio_preset_prompt_label">预设提示词</string>
+    <string name="studio_preset_stacks">预设提示词会自动发送，下方输入的内容将追加在其后，不会覆盖预设。</string>
+    <string name="studio_generate_vs_edit">「生成到相册」会新建一张照片并入库；「只修这一张」只为当前照片新增一个版本，并保留当前裁切。</string>
+    <string name="studio_open_photo">打开照片 %1$s</string>
+    <string name="studio_print_direct">加入队列</string>
+
+    <string name="job_error_title">未能完成</string>
+    <string name="job_hide">隐藏进度</string>
+    <string name="job_scrim_a11y">任务进行中</string>
+    <string name="ai_generated">已生成</string>
+    <string name="ai_generated_view">查看</string>
+    <string name="transfer_phase_receiving">接收中</string>
+    <string name="transfer_phase_transcoding">转码中</string>
+    <string name="transfer_phase_ingesting">入库中</string>
+    <string name="transfer_phase_done">已保存</string>
+    <string name="transfer_phase_failed">失败</string>
+    <string name="progress_unit_mb">MB</string>
+    <string name="progress_unit_kb">KB</string>
+    <string name="progress_unit_b">B</string>
+
+    <string name="progress_estimated">预估</string>
+    <string name="phase_generate_preparing">准备中</string>
+    <string name="phase_generate_saving">保存中</string>
+    <string name="phase_generate_uploading">上传照片</string>
+    <string name="phase_generate_processing">处理</string>
+    <string name="phase_generate_downloading">下载</string>
+    <string name="phase_generate_done">完成</string>
+    <string name="phase_generate_error">出错</string>
+
+    <string name="phase_print_editing">Grok 修图</string>
+    <string name="phase_print_preparing">准备中</string>
+    <string name="phase_print_connecting">连接打印机</string>
+    <string name="phase_print_sending">开始传输</string>
+    <string name="phase_print_uploading">传输数据</string>
+    <string name="phase_print_printing">打印中</string>
+    <string name="phase_print_done">完成</string>
+    <string name="phase_print_error">出错</string>
+
+    <string name="job_state_downloading">传输中</string>
+    <string name="job_state_printing">打印中</string>
+    <string name="job_state_queued">队列中</string>
+    <string name="job_state_waiting">等待</string>
+    <string name="job_state_pending">缺纸</string>
+    <string name="job_state_no_paper">缺纸</string>
+    <string name="job_state_out_of_paper">缺纸</string>
+    <string name="job_state_paper_empty">缺纸</string>
+    <string name="job_state_done">完成</string>
+    <string name="job_state_success">完成</string>
+    <string name="job_state_finished">完成</string>
+    <string name="job_state_error">出错</string>
+    <string name="job_state_failed">失败</string>
+    <string name="job_state_cancelled">已取消</string>
+    <string name="job_state_aborted">已中止（连接中断或打印机取消）</string>
+</resources>

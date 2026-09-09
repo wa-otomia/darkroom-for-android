@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The four locales the app actually ships strings for. The tags match the
+    resource qualifiers one for one (values, values-zh, values-ja, values-ko),
+    so what the system language picker offers is exactly what resolves at
+    runtime. "zh" rather than "zh-Hans": the resource folder is language-only,
+    so a Traditional Chinese preference would be served the Simplified strings
+    either way, and claiming zh-Hans here would only misreport that.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="zh" />
+    <locale android:name="ja" />
+    <locale android:name="ko" />
+</locale-config>

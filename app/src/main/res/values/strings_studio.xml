@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="studio_framing">Framing</string>
+    <string name="studio_frame_portrait">Portrait 2:3</string>
+    <string name="studio_frame_landscape">Landscape 3:2</string>
+    <string name="studio_rotate_left">Rotate 90° left</string>
+    <string name="studio_rotate_right">Rotate 90° right</string>
+    <string name="studio_rotation_state">Turned %1$d°</string>
+    <string name="studio_crop_overlay_landscape">3×2 in · 1560×1040</string>
+    <string name="studio_landscape_note">The sheet is always portrait. A landscape frame is turned a quarter clockwise onto the paper, so hold the print sideways to view it.</string>
+    <string name="studio_crop_locked">A job is running. Framing and crop stay locked until it finishes.</string>
+    <string name="studio_crop_locked_short">CROP LOCKED</string>
+    <string name="studio_preset_prompt_label">PRESET PROMPT</string>
+    <string name="studio_preset_stacks">The preset is sent automatically. What you type below is appended after it and never replaces it.</string>
+    <string name="studio_generate_vs_edit">Generate to gallery saves a new photo next to this one. Edit this photo only adds a version to the current photo and keeps your crop.</string>
+    <string name="studio_open_photo">Open photo %1$s</string>
+    <string name="studio_print_direct">Add to queue</string>
+
+    <string name="job_error_title">Couldn\'t finish</string>
+    <string name="job_hide">Hide overlay</string>
+    <string name="job_scrim_a11y">A job is running</string>
+    <string name="ai_generated">Generated</string>
+    <string name="ai_generated_view">View</string>
+    <string name="transfer_phase_receiving">Receiving</string>
+    <string name="transfer_phase_transcoding">Converting</string>
+    <string name="transfer_phase_ingesting">Saving</string>
+    <string name="transfer_phase_done">Saved</string>
+    <string name="transfer_phase_failed">Failed</string>
+    <string name="progress_unit_mb">MB</string>
+    <string name="progress_unit_kb">KB</string>
+    <string name="progress_unit_b">B</string>
+
+    <string name="progress_estimated">est.</string>
+    <string name="phase_generate_preparing">Preparing</string>
+    <string name="phase_generate_saving">Saving</string>
+    <string name="phase_generate_uploading">Uploading photo</string>
+    <string name="phase_generate_processing">Processing</string>
+    <string name="phase_generate_downloading">Downloading</string>
+    <string name="phase_generate_done">Done</string>
+    <string name="phase_generate_error">Error</string>
+
+    <string name="phase_print_editing">Grok editing</string>
+    <string name="phase_print_preparing">Preparing</string>
+    <string name="phase_print_connecting">Connecting to printer</string>
+    <string name="phase_print_sending">Starting transfer</string>
+    <string name="phase_print_uploading">Transferring data</string>
+    <string name="phase_print_printing">Printing</string>
+    <string name="phase_print_done">Done</string>
+    <string name="phase_print_error">Error</string>
+
+    <string name="job_state_downloading">Transferring</string>
+    <string name="job_state_printing">Printing</string>
+    <string name="job_state_queued">In queue</string>
+    <string name="job_state_waiting">Waiting</string>
+    <string name="job_state_pending">No paper</string>
+    <string name="job_state_no_paper">No paper</string>
+    <string name="job_state_out_of_paper">Out of paper</string>
+    <string name="job_state_paper_empty">Paper empty</string>
+    <string name="job_state_done">Done</string>
+    <string name="job_state_success">Done</string>
+    <string name="job_state_finished">Done</string>
+    <string name="job_state_error">Error</string>
+    <string name="job_state_failed">Failed</string>
+    <string name="job_state_cancelled">Cancelled</string>
+    <string name="job_state_aborted">Aborted (connection lost or printer cancelled)</string>
+</resources>
