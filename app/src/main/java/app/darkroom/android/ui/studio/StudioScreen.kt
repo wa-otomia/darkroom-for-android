@@ -81,6 +81,7 @@ import app.darkroom.android.core.PRINT_ASPECT_LANDSCAPE
 import app.darkroom.android.core.PhotoMeta
 import app.darkroom.android.core.SNAP_POSITION_DP
 import app.darkroom.android.core.ViewportPlacement
+import app.darkroom.android.core.defaultLandscape
 import app.darkroom.android.core.isConfigured
 import app.darkroom.android.core.exactQuarterTurns
 import app.darkroom.android.core.formatCropSpec
@@ -170,7 +171,16 @@ fun StudioScreen(
     var panX by rememberSaveable(photoId) { mutableStateOf(0f) }
     var panY by rememberSaveable(photoId) { mutableStateOf(0f) }
     var rotationDegrees by rememberSaveable(photoId) { mutableStateOf(0f) }
-    var landscape by rememberSaveable(photoId) { mutableStateOf(false) }
+    var landscapeTouched by rememberSaveable(photoId) { mutableStateOf(false) }
+    var landscape by rememberSaveable(photoId) {
+        mutableStateOf(defaultLandscape(photo?.width ?: 0, photo?.height ?: 0))
+    }
+    LaunchedEffect(photoId, photo?.width, photo?.height) {
+        val meta = photo ?: return@LaunchedEffect
+        if (!landscapeTouched && meta.width > 0 && meta.height > 0) {
+            landscape = defaultLandscape(meta.width, meta.height)
+        }
+    }
     var cropSpec by rememberSaveable(photoId, source) { mutableStateOf("") }
     var placement by remember(photoId, source) { mutableStateOf<ViewportPlacement?>(null) }
     var prompt by rememberSaveable(photoId) { mutableStateOf("") }
@@ -478,14 +488,20 @@ fun StudioScreen(
                     landscape = landscape,
                     rotationDegrees = rotationDegrees,
                     enabled = !cropLocked,
-                    onOrientation = { landscape = it },
+                    onOrientation = {
+                        landscapeTouched = true
+                        landscape = it
+                    },
                     onRotate = onRotate,
                     onReset = {
                         zoom = 1f
                         panX = 0f
                         panY = 0f
                         rotationDegrees = 0f
-                        landscape = false
+                        landscapeTouched = false
+                        val autoW = orientedW.takeIf { it > 0 } ?: photo.width
+                        val autoH = orientedH.takeIf { it > 0 } ?: photo.height
+                        landscape = defaultLandscape(autoW, autoH)
                         snapState.begin(0f, 0f, 0f)
                     },
                 )

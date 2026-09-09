@@ -179,6 +179,7 @@ fun DarkroomNav(
                     autoPrint = appSettings.autoPrint,
                     catalog = catalog,
                     automation = automation,
+                    printQueue = printQueue,
                     reselect = galleryReselect,
                     onOpen = { nav.navigate("studio/$it") },
                     onDismissTransfer = { transferRegistry.dismiss(it) },

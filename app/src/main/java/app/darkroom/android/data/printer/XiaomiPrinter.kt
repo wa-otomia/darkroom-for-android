@@ -47,15 +47,40 @@ class NoPaperError(message: String = NO_PAPER_MESSAGE) : PrinterError(message) {
     val code: String = "NO_PAPER"
 }
 
+/** Throughput of the last [XiaomiPrinter.printJpeg] upload, for logs and the activity feed. */
+data class SendStats(val bytes: Int, val frames: Int, val writes: Int, val elapsedMs: Long) {
+    val kbPerSec: Double get() = if (elapsedMs <= 0L) 0.0 else bytes / 1024.0 / (elapsedMs / 1000.0)
+    override fun toString(): String = "%d B in %d frames / %d writes, %d ms, %.1f KB/s".format(bytes, frames, writes, elapsedMs, kbPerSec)
+}
+
+/**
+ * @param interWritePaceMs sleep after each coalesced write. The official app (and the
+ *   reference Python client) write back-to-back and let RFCOMM credit flow control throttle;
+ *   the old 65 ms came from the Pi's pyserial tty and cost ~10 s per photo on Android.
+ *   Left as a knob in case a firmware turns out to need breathing room.
+ */
 class XiaomiPrinter(
     private val pipe: BytePipe,
     private val readTimeout: Int = 8_000,
+    private val interWritePaceMs: Long = 0L,
+    private val framesPerWrite: Int = MAX_FRAMES_PER_WRITE,
+    private val log: (String) -> Unit = { android.util.Log.i(LOG_TAG, it) },
 ) {
     var key: ByteArray? = null
         private set
+
+    /** Test seam: skip the DH handshake and use [k] as the AES session key. */
+    internal fun useSessionKey(k: ByteArray) {
+        key = k
+    }
     private var sn = 0
     @Volatile
     private var pendingCancelJobId: Int? = null
+
+    /** Set after each successful upload. */
+    @Volatile
+    var lastSendStats: SendStats? = null
+        private set
 
     fun requestCancel(jobId: Int) {
         pendingCancelJobId = jobId
@@ -277,44 +302,76 @@ class XiaomiPrinter(
         }
     }
 
+    /**
+     * Streams the JPEG on channel 4: `AES-ECB(K, int32_le(job_id) || chunk)` per 988-byte
+     * chunk, [framesPerWrite] frames coalesced per socket write (as the official app does).
+     * Writes block on RFCOMM credits, so no artificial pacing is needed; a failed write is
+     * retried twice after a short pause before the job is abandoned.
+     */
     private fun sendFile(sessionKey: ByteArray, fileBytes: ByteArray, jobId: Int, onProgress: ((Int, Int) -> Unit)?) {
         val total = (fileBytes.size + CHUNK_BYTES - 1) / CHUNK_BYTES
-        val pending = ArrayList<ByteArray>()
+        val batch = java.io.ByteArrayOutputStream(framesPerWrite * (CHUNK_BYTES + 4 + 22 + 16))
         var saved = 0
+        var writes = 0
+        val t0 = System.currentTimeMillis()
         for (j in 0 until total) {
             throwIfCancelled()
             val from = j * CHUNK_BYTES
             val to = minOf(from + CHUNK_BYTES, fileBytes.size)
-            val piece = fileBytes.copyOfRange(from, to)
-            val body = ByteArray(4 + piece.size)
+            val body = ByteArray(4 + (to - from))
             writeU32LE(body, 0, jobId)
-            System.arraycopy(piece, 0, body, 4, piece.size)
+            System.arraycopy(fileBytes, from, body, 4, to - from)
             val enc = encryptEcb(sessionKey, body)
-            pending += buildFrame(
-                channelId = CHANNEL_FILE_ENC,
-                interactive = INTERACTIVE_REQUEST,
-                encoding = ENCODING_HEX,
-                arcMsgSn = nextSn(),
-                msgSn = sn,
-                encryptOffset = ENCRYPT_ECB_OFFSET,
-                body = enc,
-                pkgTotal = total,
-                pkgNum = j + 1,
+            batch.write(
+                buildFrame(
+                    channelId = CHANNEL_FILE_ENC,
+                    interactive = INTERACTIVE_REQUEST,
+                    encoding = ENCODING_HEX,
+                    arcMsgSn = nextSn(),
+                    msgSn = sn,
+                    encryptOffset = ENCRYPT_ECB_OFFSET,
+                    body = enc,
+                    pkgTotal = total,
+                    pkgNum = j + 1,
+                ),
             )
             saved += 1
-            if (saved >= 3 || j == total - 1) {
-                val blob = pending.fold(ByteArray(0)) { acc, b -> acc + b }
-                pending.clear()
+            if (saved >= framesPerWrite || j == total - 1) {
+                writeWithRetry(batch.toByteArray())
+                batch.reset()
                 saved = 0
-                pipe.write(blob)
-                if (j < total - 1) Thread.sleep(65)
+                writes += 1
+                if (interWritePaceMs > 0L && j < total - 1) Thread.sleep(interWritePaceMs)
             }
             if (onProgress != null && (j == 0 || (j + 1) % 5 == 0)) onProgress(j + 1, total)
         }
+        val stats = SendStats(fileBytes.size, total, writes, System.currentTimeMillis() - t0)
+        lastSendStats = stats
+        log("upload job $jobId: $stats")
         onProgress?.invoke(total, total)
     }
 
+    private fun writeWithRetry(data: ByteArray, retries: Int = 2) {
+        var attempt = 0
+        while (true) {
+            try {
+                pipe.write(data)
+                return
+            } catch (e: java.io.IOException) {
+                if (attempt >= retries) throw e
+                attempt += 1
+                log("write failed (${e.message}), retry $attempt/$retries")
+                Thread.sleep(250)
+            }
+        }
+    }
+
     companion object {
+        const val LOG_TAG = "Darkroom.SPP"
+
+        /** Frames coalesced into one socket write; matches the official app. */
+        const val MAX_FRAMES_PER_WRITE = 3
+
         fun parseLooseJson(text: String): Map<String, Any?>? {
             return try {
                 jsonToMap(JSONObject(text))

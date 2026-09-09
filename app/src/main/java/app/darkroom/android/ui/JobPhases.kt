@@ -26,6 +26,7 @@ private val GENERATE_PHASES: Map<String, Int> = mapOf(
 )
 
 private val PRINT_PHASES: Map<String, Int> = mapOf(
+    "queued" to R.string.job_state_queued,
     "editing" to R.string.phase_print_editing,
     "preparing" to R.string.phase_print_preparing,
     "connecting" to R.string.phase_print_connecting,

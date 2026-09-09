@@ -80,4 +80,7 @@ dependencies {
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Real org.json for JVM tests; the android.jar stubs throw, which makes
+    // XiaomiPrinter.parseLooseJson silently return null.
+    testImplementation("org.json:json:20240303")
 }

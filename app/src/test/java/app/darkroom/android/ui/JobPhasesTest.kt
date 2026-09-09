@@ -8,6 +8,7 @@ import org.junit.Test
 class JobPhasesTest {
     @Test
     fun knownWireKeysMap() {
+        assertEquals(R.string.job_state_queued, printPhaseRes("queued"))
         assertEquals(R.string.phase_print_connecting, printPhaseRes("connecting"))
         assertEquals(R.string.phase_print_uploading, printPhaseRes("uploading"))
         assertEquals(R.string.phase_generate_uploading, generatePhaseRes("uploading"))

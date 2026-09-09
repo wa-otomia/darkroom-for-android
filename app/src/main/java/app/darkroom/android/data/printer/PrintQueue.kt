@@ -1,6 +1,7 @@
 package app.darkroom.android.data.printer
 
 import android.content.Context
+import app.darkroom.android.core.OrientedSize
 import app.darkroom.android.core.PhotoMeta
 import app.darkroom.android.core.PixelCrop
 import app.darkroom.android.core.PrintFit
@@ -10,6 +11,8 @@ import app.darkroom.android.core.ViewportPlacement
 import app.darkroom.android.core.combineGeneratePrompt
 import app.darkroom.android.core.PrintJobCancelFlags
 import app.darkroom.android.core.mapPrintWorkerFailure
+import app.darkroom.android.core.printImageSize
+import app.darkroom.android.core.resolvePrintLandscape
 import app.darkroom.android.core.restoreRunningPrintJob
 import app.darkroom.android.core.shouldEditBeforePrint
 import app.darkroom.android.data.catalog.CatalogRepository
@@ -186,7 +189,7 @@ class PrintQueue @Inject constructor(
         cropImageWidth: Int? = null,
         cropImageHeight: Int? = null,
         rotateQuarters: Int = 0,
-        landscape: Boolean = false,
+        landscape: Boolean? = null,
         rotationDegrees: Float = rotateQuarters * 90f,
         placement: ViewportPlacement? = null,
         watermark: Boolean = false,
@@ -219,7 +222,7 @@ class PrintQueue @Inject constructor(
         cropImageWidth: Int? = null,
         cropImageHeight: Int? = null,
         rotateQuarters: Int = 0,
-        landscape: Boolean = false,
+        landscape: Boolean? = null,
         rotationDegrees: Float = rotateQuarters * 90f,
         placement: ViewportPlacement? = null,
         origin: String = ORIGIN_MANUAL,
@@ -227,6 +230,7 @@ class PrintQueue @Inject constructor(
     ) {
         appScope.launch {
             val copiesN = (copies ?: settings.readSettings().defaultCopies).coerceIn(1, 9)
+            val resolvedLandscape = resolveEnqueueLandscape(photoId, source, landscape)
             persist(
                 PrintJobEntity(
                     id = UUID.randomUUID().toString(),
@@ -239,7 +243,7 @@ class PrintQueue @Inject constructor(
                     cropImageWidth = cropImageWidth,
                     cropImageHeight = cropImageHeight,
                     rotateQuarters = rotateQuarters,
-                    landscape = landscape,
+                    landscape = resolvedLandscape,
                     rotationDegrees = rotationDegrees,
                     placementJson = placement?.let { encodePlacement(json, it) },
                     origin = origin,
@@ -497,7 +501,8 @@ class PrintQueue @Inject constructor(
             )
             tracker.succeed()
             emit(photoId, "done", jobId = jobId, jobState = jobState, elapsedMs = System.currentTimeMillis() - t0)
-            activityLog.record("spp", "job $jobId $jobState")
+            val sent = printer.lastSendStats?.let { " · upload ${it.elapsedMs} ms, %.1f KB/s".format(it.kbPerSec) }.orEmpty()
+            activityLog.record("spp", "job $jobId $jobState$sent")
             jobId to jobState
         } catch (e: CancellationException) {
             throw e
@@ -671,6 +676,24 @@ class PrintQueue @Inject constructor(
 
     private fun throwIfCancelled() {
         if (cancelFlags.isRequested(activeRowId ?: currentJobId)) error("已取消")
+    }
+
+    private suspend fun resolveEnqueueLandscape(
+        photoId: String,
+        source: String,
+        explicit: Boolean?,
+    ): Boolean {
+        if (explicit != null) return explicit
+        val photo = catalog.get(photoId)
+        val fromMeta = printImageSize(photo, source)
+        if (fromMeta != null) return resolvePrintLandscape(null, fromMeta)
+        val probed = withContext(Dispatchers.IO) {
+            val file = catalog.sourceFile(photoId, source)
+            if (!file.exists()) return@withContext null
+            val info = ImagePipeline.probe(file.readBytes())
+            OrientedSize(info.width, info.height).takeIf { it.width > 0 && it.height > 0 }
+        }
+        return resolvePrintLandscape(null, probed)
     }
 
     private fun emit(

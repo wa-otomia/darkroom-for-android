@@ -24,6 +24,28 @@ fun orientedDimensions(width: Int, height: Int, orientation: Int = 1): OrientedS
     return if (orientation in 5..8) OrientedSize(height, width) else OrientedSize(width, height)
 }
 
+/** Landscape sheet when the decoded, EXIF-corrected image is wider than it is tall. Square is portrait. */
+fun defaultLandscape(width: Int, height: Int): Boolean = width > height
+
+/**
+ * Pixel size of the image a print job will read: the chosen edit when [source] is an
+ * edit id with stored dimensions, otherwise the original [PhotoMeta] size.
+ */
+fun printImageSize(photo: PhotoMeta?, source: String): OrientedSize? {
+    if (photo == null) return null
+    val edit = source.takeIf { it.isNotBlank() && it != "original" }?.let { id ->
+        photo.edits.find { it.id == id }?.takeIf { it.width > 0 && it.height > 0 }
+    }
+    val width = edit?.width ?: photo.width
+    val height = edit?.height ?: photo.height
+    if (width <= 0 || height <= 0) return null
+    return OrientedSize(width, height)
+}
+
+/** Studio (or any caller) can pass [explicit]; otherwise fall back to [defaultLandscape], or portrait. */
+fun resolvePrintLandscape(explicit: Boolean?, size: OrientedSize?): Boolean =
+    explicit ?: size?.let { defaultLandscape(it.width, it.height) } ?: false
+
 fun cropAspect(landscape: Boolean): Double = if (landscape) PRINT_ASPECT_LANDSCAPE else PRINT_ASPECT
 
 fun normalizeQuarterTurns(quarterTurns: Int): Int = ((quarterTurns % 4) + 4) % 4

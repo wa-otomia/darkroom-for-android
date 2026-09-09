@@ -91,8 +91,10 @@ import androidx.compose.ui.unit.sp
 import app.darkroom.android.R
 import app.darkroom.android.core.EditJobOverlay
 import app.darkroom.android.core.GalleryItem
+import app.darkroom.android.core.OverlayKind
 import app.darkroom.android.core.PendingKind
 import app.darkroom.android.core.PhotoMeta
+import app.darkroom.android.core.PrintJobSnapshot
 import app.darkroom.android.core.fallbackImportName
 import app.darkroom.android.core.isJpegBytes
 import app.darkroom.android.core.isJpegName
@@ -101,6 +103,9 @@ import app.darkroom.android.data.automation.Automation
 import app.darkroom.android.data.catalog.CatalogRepository
 import app.darkroom.android.data.imaging.ImagePipeline
 import app.darkroom.android.data.jobs.AiJob
+import app.darkroom.android.data.printer.PrintJob
+import app.darkroom.android.data.printer.PrintProgress
+import app.darkroom.android.data.printer.PrintQueue
 import app.darkroom.android.data.progress.JobKind
 import app.darkroom.android.data.progress.JobProgressTracker
 import app.darkroom.android.data.progress.PrefsProgressStats
@@ -122,8 +127,10 @@ import app.darkroom.android.ui.components.StatusBadge
 import app.darkroom.android.ui.components.StatusChip
 import app.darkroom.android.ui.components.contentBlur
 import app.darkroom.android.ui.theme.SurfacePanel
+import app.darkroom.android.ui.jobFieldKey
 import app.darkroom.android.ui.localizedByteProgress
 import app.darkroom.android.ui.localizedGeneratePhase
+import app.darkroom.android.ui.localizedPrintPhase
 import app.darkroom.android.ui.localizedTransferPhase
 import app.darkroom.android.ui.theme.Amber
 import app.darkroom.android.ui.theme.Danger
@@ -166,6 +173,7 @@ fun GalleryScreen(
     autoPrint: Boolean,
     catalog: CatalogRepository,
     automation: Automation,
+    printQueue: PrintQueue,
     reselect: Flow<Unit> = emptyFlow(),
     onOpen: (String) -> Unit,
     onDismissTransfer: (String) -> Unit,
@@ -191,7 +199,14 @@ fun GalleryScreen(
     var seenTopId by rememberSaveable { mutableStateOf<String?>(null) }
     var newArrivals by rememberSaveable { mutableStateOf(0) }
 
-    val items = remember(photos, transfers, aiJobs) { mergeGalleryItems(photos, transfers, aiJobs) }
+    val printJobs by printQueue.printJobs.collectAsState(initial = emptyList())
+    val runningProgress by printQueue.runningProgress.collectAsState(initial = null)
+    val printSnapshots = remember(printJobs, runningProgress) {
+        printJobs.map { it.toGallerySnapshot(runningProgress) }
+    }
+    val items = remember(photos, transfers, aiJobs, printSnapshots) {
+        mergeGalleryItems(photos, transfers, aiJobs, printSnapshots)
+    }
     val photoItems = remember(items) { items.filterIsInstance<GalleryItem.Photo>() }
     val selectionMode = selection.isNotEmpty()
     val deletedTemplate = stringResource(R.string.lib_gallery_deleted)
@@ -525,7 +540,13 @@ fun GalleryScreen(
                                     },
                                     onDismissPending = {},
                                     onCancelPending = {},
-                                    onCancelOverlay = { item.overlay?.let { onCancelAi(it.jobId) } },
+                                    onCancelOverlay = {
+                                        val overlay = item.overlay ?: return@PhotoCard
+                                        when (overlay.kind) {
+                                            OverlayKind.Print -> printQueue.cancel(overlay.jobId)
+                                            OverlayKind.Edit -> onCancelAi(overlay.jobId)
+                                        }
+                                    },
                                 )
                             }
                         }
@@ -981,7 +1002,11 @@ private fun PendingFooter(
 
 @Composable
 private fun OverlayBar(overlay: EditJobOverlay, modifier: Modifier) {
-    val phase = localizedGeneratePhase(overlay.phase)
+    val phase = if (overlay.kind == OverlayKind.Print) {
+        localizedPrintPhase(overlay.phase, overlay.jobProgress?.jobState)
+    } else {
+        localizedGeneratePhase(overlay.phase)
+    }
     val detail = localizedByteProgress(overlay.loaded, overlay.total).ifEmpty { null }
     val ui = overlay.jobProgress?.toUi(phase, detail) ?: indeterminateUi(phase, detail)
     val estimated = stringResource(R.string.progress_estimated)
@@ -1300,4 +1325,17 @@ private fun photoTimeLabel(context: Context, iso: String): String {
             DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH or DateUtils.FORMAT_SHOW_YEAR
     }
     return DateUtils.formatDateTime(context, instant.toEpochMilli(), flags)
+}
+
+private fun PrintJob.toGallerySnapshot(running: PrintProgress?): PrintJobSnapshot {
+    val live = running?.takeIf { it.photoId == photoId && jobFieldKey(state) == "running" }
+    return PrintJobSnapshot(
+        id = id,
+        photoId = photoId,
+        state = state,
+        phase = live?.phase ?: phase,
+        jobProgress = live?.progress,
+        createdAt = createdAt,
+        error = live?.error ?: error,
+    )
 }
