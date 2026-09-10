@@ -2,9 +2,8 @@
 
 独立原生暗房：相机 FTP 入匣 → 相册 → 2:3 裁切 / Grok → 米家便携照片打印机（Bluetooth Classic SPP）。
 
-```
-android-app/
-  ./gradlew :app:test :app:assembleDebug
+```bash
+./gradlew :app:test :app:assembleDebug
 ```
 
 - minSdk 29 / targetSdk 37 / compileSdk 37
