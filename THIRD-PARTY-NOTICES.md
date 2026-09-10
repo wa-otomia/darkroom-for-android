@@ -1,6 +1,6 @@
 # Third-party notices
 
-Darkroom is licensed under GPL-3.0 (see [LICENSE](LICENSE)). It builds on the work below.
+Darkroom is licensed under [GPL-3.0](LICENSE). It builds on the work below.
 
 ## Protocol reference
 
@@ -9,13 +9,11 @@ Darkroom is licensed under GPL-3.0 (see [LICENSE](LICENSE)). It builds on the wo
 <https://github.com/tuat-yate/xiaomi-photo-printer>
 
 A Python client for the Xiaomi Portable Photo Printer Pro that reverse-engineered the official
-React Native plugin and verified the Diffie–Hellman handshake, the `0x7E` frame format, and the
-chunked JPEG upload against real hardware. The Kotlin printer implementation in
+React Native plugin and verified the Diffie–Hellman handshake, the `0x7E` frame format and the
+chunked JPEG upload on real hardware. The printer code in
 `app/src/main/java/app/darkroom/android/data/printer/` and the frame and crypto helpers in
-`app/src/main/java/app/darkroom/android/core/` were written against that reference.
-
-MIT is compatible with GPL-3.0, so the combined work ships under the GPL while this notice
-preserves the original attribution, as MIT requires.
+`app/src/main/java/app/darkroom/android/core/` were written against it. MIT text reproduced as
+that license requires:
 
 ```
 MIT License
@@ -43,8 +41,8 @@ SOFTWARE.
 
 ## Bundled dependencies
 
-Every shipped dependency is Apache License 2.0. The in-app About screen lists the same set;
-keep it, this file, and `gradle/libs.versions.toml` in sync when a dependency changes.
+All Apache License 2.0. The in-app About screen lists the same set; keep it, this file and
+`gradle/libs.versions.toml` in sync when a dependency changes.
 
 | Component | License |
 |---|---|
@@ -63,9 +61,3 @@ keep it, this file, and `gradle/libs.versions.toml` in sync when a dependency ch
 | OkHttp — Square | Apache-2.0 |
 | Okio — Square | Apache-2.0 |
 | Coil — Coil Contributors | Apache-2.0 |
-
-## Trademarks
-
-Xiaomi, Mijia, and Hannto are trademarks of their respective owners. This project is not
-affiliated with, endorsed by, or supported by any of them. Model names appear only to identify
-compatible hardware.
