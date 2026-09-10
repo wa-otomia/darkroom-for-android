@@ -24,7 +24,7 @@ API key 与 FTP 密码存在 `EncryptedSharedPreferences`。
 
 ## 构建
 
-需要 JDK 17 和 Android SDK。minSdk 29，target/compileSdk 37，应用 ID `app.darkroom.android`。
+需要 JDK 17 和 Android SDK。minSdk 29，target/compileSdk 37，应用 ID `io.github.wa_otomia.darkroom`。
 技术栈 Kotlin、Compose、Room、Hilt、OkHttp、Coil。
 
 ```bash
@@ -32,6 +32,10 @@ API key 与 FTP 密码存在 `EncryptedSharedPreferences`。
 ```
 
 `local.properties` 不入库 —— Android Studio 会自动生成，或自己写 `sdk.dir=/path/to/Android/sdk`。
+
+## 发布
+
+`git tag v1.0.0 && git push origin v1.0.0`，CI 会把 release APK 挂到 GitHub Release。可选签名 secrets：`SIGNING_STORE_BASE64`、`SIGNING_STORE_PASSWORD`、`SIGNING_KEY_ALIAS`、`SIGNING_KEY_PASSWORD`。
 
 ## 打印机
 

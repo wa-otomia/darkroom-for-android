@@ -25,7 +25,7 @@ API keys and the FTP password are kept in `EncryptedSharedPreferences`.
 
 ## Build
 
-JDK 17 and the Android SDK. minSdk 29, target/compileSdk 37, application ID `app.darkroom.android`.
+JDK 17 and the Android SDK. minSdk 29, target/compileSdk 37, application ID `io.github.wa_otomia.darkroom`.
 Kotlin, Compose, Room, Hilt, OkHttp, Coil.
 
 ```bash
@@ -33,6 +33,10 @@ Kotlin, Compose, Room, Hilt, OkHttp, Coil.
 ```
 
 `local.properties` is not committed — Android Studio writes it, or add `sdk.dir=/path/to/Android/sdk`.
+
+## Release
+
+`git tag v1.0.0 && git push origin v1.0.0` — CI attaches a release APK. Optional signing secrets: `SIGNING_STORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`.
 
 ## Printer
 

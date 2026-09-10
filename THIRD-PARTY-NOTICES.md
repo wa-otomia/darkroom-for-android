@@ -11,8 +11,8 @@ Darkroom is licensed under [GPL-3.0](LICENSE). It builds on the work below.
 A Python client for the Xiaomi Portable Photo Printer Pro that reverse-engineered the official
 React Native plugin and verified the Diffie–Hellman handshake, the `0x7E` frame format and the
 chunked JPEG upload on real hardware. The printer code in
-`app/src/main/java/app/darkroom/android/data/printer/` and the frame and crypto helpers in
-`app/src/main/java/app/darkroom/android/core/` were written against it. MIT text reproduced as
+`app/src/main/java/io/github/wa_otomia/darkroom/data/printer/` and the frame and crypto helpers in
+`app/src/main/java/io/github/wa_otomia/darkroom/core/` were written against it. MIT text reproduced as
 that license requires:
 
 ```

@@ -25,7 +25,7 @@ API キーと FTP パスワードは `EncryptedSharedPreferences` に保存さ�
 
 ## ビルド
 
-JDK 17 と Android SDK が必要です。minSdk 29、target/compileSdk 37、アプリケーション ID `app.darkroom.android`。
+JDK 17 と Android SDK が必要です。minSdk 29、target/compileSdk 37、アプリケーション ID `io.github.wa_otomia.darkroom`。
 構成は Kotlin、Compose、Room、Hilt、OkHttp、Coil。
 
 ```bash
@@ -33,6 +33,10 @@ JDK 17 と Android SDK が必要です。minSdk 29、target/compileSdk 37、ア�
 ```
 
 `local.properties` はコミットしていません。Android Studio が生成するか、`sdk.dir=/path/to/Android/sdk` を自分で記述してください。
+
+## リリース
+
+`git tag v1.0.0 && git push origin v1.0.0` で CI が release APK を GitHub Release に添付します。任意の署名 secrets：`SIGNING_STORE_BASE64`、`SIGNING_STORE_PASSWORD`、`SIGNING_KEY_ALIAS`、`SIGNING_KEY_PASSWORD`。
 
 ## プリンター
 
