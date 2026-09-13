@@ -45,6 +45,8 @@ channel 1: baseline JPEG 1040 × 1560 sent in 988-byte chunks, Diffie–Hellman 
 AES-128-ECB. No Mi Home account or device token. Pair in Android's Bluetooth settings, then bind
 in the app's Settings. Only the Pro is supported.
 
+Protocol (EN / 中文 / 日本語), with source examples: [docs/protocol](docs/protocol/README.md).
+
 ## Credits
 
 Protocol reference: **[tuat-yate/xiaomi-photo-printer](https://github.com/tuat-yate/xiaomi-photo-printer)**

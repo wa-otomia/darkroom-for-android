@@ -1,0 +1,1612 @@
+__d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, exports, _dependencyMap) {
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.OOBE_STATE_PH = exports.OOBE_STATE_CARRIER = exports.OOBE_STATE_NETWORK = exports.OOBE_STATE_INK = exports.OOBE_STATE_COVER = exports.ERROR_CODE = exports.RESET_TYPE = exports.TRANSFER_MODE = exports.RESOLUTION = exports.CHANNEL = exports.SCAN_SOURCE = exports.SCAN_COLOR_MODE = exports.MEDIA_TYPE = exports.MEDIA_SIZE = exports.HASH_METHOD = exports.DOCUMENT_TYPE = exports.DOCUMENT_FORMAT = exports.PRINT_COLOR_MODE = exports.PRINT_QUALITY = exports.DOCUMENT_SCNNED_FILE_NAVIGATION_TYPE = exports.DOUCMENT_TYPES = exports.JOB_TYPE = exports.JOB_INFO = exports.JOB_STATE_REASON = exports.JOB_SUB_STATE = exports.JOB_STATE_STR = exports.JOB_STATE = exports.PRINTER_STATE_ALERTS = exports.PRINTER_SUB_STATE = exports.PRINTER_STATE = exports.TARGET_DATA_SOURCE = exports.DATA_SOURCE = exports.DEVICE_STATUS_LEVEL = exports.FAR_AND_NEAR_CONFIG = exports.PATHS = exports.BasePath = exports.VIEW_NAME = exports.STORAGE_VALUE = exports.RICOTTA_G_HELP_URL = exports.RICOTTA_P_HELP_URL = exports.RICOTTA_HELP_URL = exports.FW_NEW_FEATURE = exports.PRIVACY_REPORT_FAIL = exports.PRIVACY_REPORT_KEY = exports.IDCARD_DOC_PRINT_HISTORY_INFO = exports.DOC_PRINT_HISTORY_INFO = exports.PIC_PRINT_HISTORY_INFO = exports.SCAN_IDPHOTO_CACHE = exports.IDPHOTOCACHE = exports.DEVICESTATECHANGE = exports.FROM_TYPE_AUTO_ALIGNMENT_FAIL = exports.RICOTTA_FILTER_NEW_READ_KEY = exports.RICOTTA_FILTER_CONFIG_KEY = exports.RICOTTA_KEY_PLUGIN_DURATION = exports.RICOTTA_KEY_LIVEPHOTO_FIRST_CHECK = exports.RICOTTA_KEY_LIVEPHOTO_CHECK = exports.RICOTTA_KEY_COPIES_CHECK = exports.RICOTTA_KEY_DEVICE_SHARE_INTRODUCE = exports.RICOTTA_KEY_AR_SHARE_INTRODUCE = exports.MINT_KEY_COMPATIBLE_WITH_LOW_FW_VERSION = exports.MINT_KEY_FW_UPGRADE_TIME_KEY = exports.MINT_EVENT_FW_UPGRADE_PROGRESS = exports.MINT_EVENT_TRANSFERRING_PROGRESS = exports.MINT_EVENT_CREATE_JOB_RESULT = exports.DUPLEX_PRITING = exports.PDF_NUP_CHANGE = exports.PRINTER_QUEUE_LAST_INFO = exports.LOCAL_JOB_STATE_ERROR = exports.LOCAL_JOB_STATE_NORMAL = exports.PRINTERP_RINTING_JOB_STATE_CHANGE = exports.PRINTER_QUEUE_CHANGE = exports.PRINTER_STATE_CHANGE = exports.OOBE_STATE = exports.MY_DEVICE_MAC_KEY = exports.MINT_CURRENT_JOB_KEY = exports.MINT_ERROR_JOBS_KEY = exports.MINT_LOCAL_JOBS_KEY = exports.PRINTER_QUEUE_KEY = exports.SCANJOBINFO = exports.PRINTJOBINFO = exports.DEVICESTATUS = exports.DEVICEINFO = exports.TAG_REMEMBER_IDCARD_DOC_PRINT_SETTINGS = exports.TAG_REMEMBER_DOC_PRINT_SETTINGS = exports.IDCARD_PHOTOEDITKEY = exports.TAG_PUZZLE_HIGH_QUALITY = exports.TAG_IDCARD_HIGH_QUALITY = exports.PHOTOEDITKEY = exports.PROTOCOLCACHEKEY = exports.INSTANCECACHEKEY = exports.DeviceID = exports.PAPER_SIZE = exports.DEVICE_SUPPORT_DOC_PAGE_COUNT = exports.DEVICE_SUPPORT_DOC_FILE_SIZE = exports.IPHONE_SE_HEIGHT = exports.IC_CARD_RADIUS = exports.HEIGHT = exports.WIDTH = exports.ANDROID_MIN_SUPPORTED_VERSION = exports.MIN_SUPPORTED_VERSION = undefined;
+  exports.BIGDATA_KEYS = exports.RICOTTA_ERROR_HELP_URL = exports.RICOTTA_JOB_ERROR_CODE = exports.RICOTTA_PRINTER_ERROR_CODE = exports.RICOTTA_G_GUIDE_URL = exports.RICOTTA_AR_VIDEO_URL = exports.MINT_ERROR_HELP_URL = exports.MINT_TEMP = exports.MINT_BATTERY = exports.MINT_PRINTING_UI_STAGE = exports.MINT_TASK_STATUS = exports.CONNECT_STAGE_RICOTTA = exports.MINT_BLUETOOTH_STATE = exports.MINT_PRINTER_ERROR_CODE = exports.MINT_PRINTER_ERROR = exports.MINT_JOB_STATUS = exports.MINT_PRINTER_SUB_CATEGORY = exports.MINT_PRINTER_STATUS_CATEGORY = exports.NAVIGATION = exports.SCALE = exports.fULLBLEED = exports.alignment_from_type = exports.INK_STATE = exports.ROTATION = exports.MAINTENACE_TYPE = exports.LOG_SCOPE = exports.FROM_TYPE = exports.MANUAL_ALIGNMENT_PARAMS = exports.ALIGNMENT_TYPE = exports.AUTO_ALIGNMENT_COMPLETION = exports.SEMI_AUTO_ALIGNMENT_COMPLETION = exports.MANUAL_ALIGNMENT_COMPLETION = exports.ALIGNMENT_COMPLETION = exports.FIDELITY = exports.COLLATE = exports.CHARGING_STATE = exports.BLACK_INK_STATE = exports.AUTI_SLEEP_MODE = exports.REGION_UNIT = exports.LINK_TYPE = exports.CHANNEL_TYPE = exports.RECEIVE_FILE_RESULT_CODE = exports.RECEIVE_FILE_RESULT = exports.ERR_HANDLE_STYLE = exports.ERR_BG = exports.EVENT_ID = exports.ACTION_ID = exports.PROPERTY_ID = exports.SERVICE_ID = exports.OTA_METHOD = exports.OOBE_STATE_KEY = exports.OOBE_STATE_CALIBRATION = undefined;
+
+  var _reactNative = _$$_REQUIRE(_dependencyMap[0]);
+
+  var _miot = _$$_REQUIRE(_dependencyMap[1]);
+
+  var _UtilsHeadFile = _$$_REQUIRE(_dependencyMap[2]);
+
+  var MIN_SUPPORTED_VERSION = '2.1.1';
+  exports.MIN_SUPPORTED_VERSION = MIN_SUPPORTED_VERSION;
+  var ANDROID_MIN_SUPPORTED_VERSION = '2.1.1.19';
+  exports.ANDROID_MIN_SUPPORTED_VERSION = ANDROID_MIN_SUPPORTED_VERSION;
+
+  var window = _reactNative.Dimensions.get('window');
+
+  var WIDTH = window.width;
+  exports.WIDTH = WIDTH;
+  var HEIGHT = window.height;
+  exports.HEIGHT = HEIGHT;
+  var IC_CARD_RADIUS = 31.8;
+  exports.IC_CARD_RADIUS = IC_CARD_RADIUS;
+  var IPHONE_SE_HEIGHT = 667;
+  exports.IPHONE_SE_HEIGHT = IPHONE_SE_HEIGHT;
+  var DEVICE_SUPPORT_DOC_FILE_SIZE = 20;
+  exports.DEVICE_SUPPORT_DOC_FILE_SIZE = DEVICE_SUPPORT_DOC_FILE_SIZE;
+  var DEVICE_SUPPORT_DOC_PAGE_COUNT = 50;
+  exports.DEVICE_SUPPORT_DOC_PAGE_COUNT = DEVICE_SUPPORT_DOC_PAGE_COUNT;
+  var PAPER_SIZE = {
+    A4: {
+      w: 210,
+      h: 297
+    },
+    A5: {
+      w: 148,
+      h: 210
+    },
+    A6: {
+      w: 105,
+      h: 148
+    },
+    B5: {
+      w: 182,
+      h: 257
+    },
+    B6: {
+      w: 125,
+      h: 176
+    },
+    '6寸': {
+      w: 102,
+      h: 152
+    },
+    '7寸': {
+      w: 127,
+      h: 178
+    }
+  };
+  exports.PAPER_SIZE = PAPER_SIZE;
+  var DeviceID = _miot.Device.deviceID;
+  exports.DeviceID = DeviceID;
+  var INSTANCECACHEKEY = "INSTANCECACHE:" + DeviceID;
+  exports.INSTANCECACHEKEY = INSTANCECACHEKEY;
+  var PROTOCOLCACHEKEY = "PROTOCOLCACHE:" + DeviceID;
+  exports.PROTOCOLCACHEKEY = PROTOCOLCACHEKEY;
+  var PHOTOEDITKEY = "PHOTOEDITKEY:" + DeviceID;
+  exports.PHOTOEDITKEY = PHOTOEDITKEY;
+  var TAG_IDCARD_HIGH_QUALITY = "TAG_IDCARD_HIGH_QUALITY:" + DeviceID;
+  exports.TAG_IDCARD_HIGH_QUALITY = TAG_IDCARD_HIGH_QUALITY;
+  var TAG_PUZZLE_HIGH_QUALITY = "TAG_PUZZLE_HIGH_QUALITY:" + DeviceID;
+  exports.TAG_PUZZLE_HIGH_QUALITY = TAG_PUZZLE_HIGH_QUALITY;
+  var IDCARD_PHOTOEDITKEY = "IDCARD_PHOTOEDITKEY:" + DeviceID;
+  exports.IDCARD_PHOTOEDITKEY = IDCARD_PHOTOEDITKEY;
+  var TAG_REMEMBER_DOC_PRINT_SETTINGS = "TAG_REMEMBER_DOC_PRINT_SETTINGS:" + DeviceID;
+  exports.TAG_REMEMBER_DOC_PRINT_SETTINGS = TAG_REMEMBER_DOC_PRINT_SETTINGS;
+  var TAG_REMEMBER_IDCARD_DOC_PRINT_SETTINGS = "TAG_REMEMBER_IDCARD_DOC_PRINT_SETTINGS:" + DeviceID;
+  exports.TAG_REMEMBER_IDCARD_DOC_PRINT_SETTINGS = TAG_REMEMBER_IDCARD_DOC_PRINT_SETTINGS;
+  var DEVICEINFO = 1;
+  exports.DEVICEINFO = DEVICEINFO;
+  var DEVICESTATUS = 2;
+  exports.DEVICESTATUS = DEVICESTATUS;
+  var PRINTJOBINFO = 3;
+  exports.PRINTJOBINFO = PRINTJOBINFO;
+  var SCANJOBINFO = 4;
+  exports.SCANJOBINFO = SCANJOBINFO;
+  var PRINTER_QUEUE_KEY = "PRINTER_QUEUE_KEY:" + DeviceID;
+  exports.PRINTER_QUEUE_KEY = PRINTER_QUEUE_KEY;
+  var MINT_LOCAL_JOBS_KEY = "MINT_LOCAL_JOBS_KEY:" + DeviceID;
+  exports.MINT_LOCAL_JOBS_KEY = MINT_LOCAL_JOBS_KEY;
+  var MINT_ERROR_JOBS_KEY = "MINT_ERROR_JOBS_KEY:" + DeviceID;
+  exports.MINT_ERROR_JOBS_KEY = MINT_ERROR_JOBS_KEY;
+  var MINT_CURRENT_JOB_KEY = "MINT_CURRENT_JOB_KEY:" + DeviceID;
+  exports.MINT_CURRENT_JOB_KEY = MINT_CURRENT_JOB_KEY;
+  var MY_DEVICE_MAC_KEY = "MY_DEVICE_MAC_KEY";
+  exports.MY_DEVICE_MAC_KEY = MY_DEVICE_MAC_KEY;
+  var OOBE_STATE = 5;
+  exports.OOBE_STATE = OOBE_STATE;
+  var PRINTER_STATE_CHANGE = "PRINTER_STATE_CHANGE";
+  exports.PRINTER_STATE_CHANGE = PRINTER_STATE_CHANGE;
+  var PRINTER_QUEUE_CHANGE = "PRINTER_QUEUE_CHANGE";
+  exports.PRINTER_QUEUE_CHANGE = PRINTER_QUEUE_CHANGE;
+  var PRINTERP_RINTING_JOB_STATE_CHANGE = "PRINTERP_RINTING_JOB_STATE_CHANGE";
+  exports.PRINTERP_RINTING_JOB_STATE_CHANGE = PRINTERP_RINTING_JOB_STATE_CHANGE;
+  var LOCAL_JOB_STATE_NORMAL = -9999;
+  exports.LOCAL_JOB_STATE_NORMAL = LOCAL_JOB_STATE_NORMAL;
+  var LOCAL_JOB_STATE_ERROR = -8888;
+  exports.LOCAL_JOB_STATE_ERROR = LOCAL_JOB_STATE_ERROR;
+  var PRINTER_QUEUE_LAST_INFO = 'PRINTER_QUEUE_LAST_INFO';
+  exports.PRINTER_QUEUE_LAST_INFO = PRINTER_QUEUE_LAST_INFO;
+  var PDF_NUP_CHANGE = "PDF_NUP_CHANGE";
+  exports.PDF_NUP_CHANGE = PDF_NUP_CHANGE;
+  var DUPLEX_PRITING = "DUPLEX_PRITING";
+  exports.DUPLEX_PRITING = DUPLEX_PRITING;
+  var MINT_EVENT_CREATE_JOB_RESULT = "MINT_EVENT_CREATE_JOB_RESULT";
+  exports.MINT_EVENT_CREATE_JOB_RESULT = MINT_EVENT_CREATE_JOB_RESULT;
+  var MINT_EVENT_TRANSFERRING_PROGRESS = "MINT_EVENT_TRANSFERRING_PROGRESS";
+  exports.MINT_EVENT_TRANSFERRING_PROGRESS = MINT_EVENT_TRANSFERRING_PROGRESS;
+  var MINT_EVENT_FW_UPGRADE_PROGRESS = "MINT_EVENT_FW_UPGRADE_PROGRESS";
+  exports.MINT_EVENT_FW_UPGRADE_PROGRESS = MINT_EVENT_FW_UPGRADE_PROGRESS;
+  var MINT_KEY_FW_UPGRADE_TIME_KEY = "MINT_KEY_FW_UPGRADE_TIME_KEY:" + DeviceID;
+  exports.MINT_KEY_FW_UPGRADE_TIME_KEY = MINT_KEY_FW_UPGRADE_TIME_KEY;
+  var MINT_KEY_COMPATIBLE_WITH_LOW_FW_VERSION = "MINT_KEY_COMPATIBLE_WITH_LOW_FW_VERSION:" + DeviceID;
+  exports.MINT_KEY_COMPATIBLE_WITH_LOW_FW_VERSION = MINT_KEY_COMPATIBLE_WITH_LOW_FW_VERSION;
+  var RICOTTA_KEY_AR_SHARE_INTRODUCE = "RICOTTA_KEY_AR_SHARE_INTRODUCE:" + DeviceID;
+  exports.RICOTTA_KEY_AR_SHARE_INTRODUCE = RICOTTA_KEY_AR_SHARE_INTRODUCE;
+  var RICOTTA_KEY_DEVICE_SHARE_INTRODUCE = "RICOTTA_KEY_DEVICE_SHARE_INTRODUCE:" + DeviceID;
+  exports.RICOTTA_KEY_DEVICE_SHARE_INTRODUCE = RICOTTA_KEY_DEVICE_SHARE_INTRODUCE;
+  var RICOTTA_KEY_COPIES_CHECK = "RICOTTA_KEY_COPIES_CHECK:" + DeviceID;
+  exports.RICOTTA_KEY_COPIES_CHECK = RICOTTA_KEY_COPIES_CHECK;
+  var RICOTTA_KEY_LIVEPHOTO_CHECK = "RICOTTA_KEY_LIVEPHOTO_CHECK:" + DeviceID;
+  exports.RICOTTA_KEY_LIVEPHOTO_CHECK = RICOTTA_KEY_LIVEPHOTO_CHECK;
+  var RICOTTA_KEY_LIVEPHOTO_FIRST_CHECK = "RICOTTA_KEY_LIVEPHOTO_FIRST_CHECK:" + DeviceID;
+  exports.RICOTTA_KEY_LIVEPHOTO_FIRST_CHECK = RICOTTA_KEY_LIVEPHOTO_FIRST_CHECK;
+  var RICOTTA_KEY_PLUGIN_DURATION = "RICOTTA_KEY_PLUGIN_DURATION:" + DeviceID;
+  exports.RICOTTA_KEY_PLUGIN_DURATION = RICOTTA_KEY_PLUGIN_DURATION;
+  var RICOTTA_FILTER_CONFIG_KEY = "RICOTTA_FILTER_CONFIG:" + DeviceID;
+  exports.RICOTTA_FILTER_CONFIG_KEY = RICOTTA_FILTER_CONFIG_KEY;
+  var RICOTTA_FILTER_NEW_READ_KEY = "RICOTTA_FILTER_NEW_READ:" + DeviceID;
+  exports.RICOTTA_FILTER_NEW_READ_KEY = RICOTTA_FILTER_NEW_READ_KEY;
+  var FROM_TYPE_AUTO_ALIGNMENT_FAIL = 'FROM_TYPE_AUTO_ALIGNMENT_FAIL';
+  exports.FROM_TYPE_AUTO_ALIGNMENT_FAIL = FROM_TYPE_AUTO_ALIGNMENT_FAIL;
+  var DEVICESTATECHANGE = "DEVICESTATECHANGE";
+  exports.DEVICESTATECHANGE = DEVICESTATECHANGE;
+  var IDPHOTOCACHE = "IDPHOTOCACHE:" + DeviceID;
+  exports.IDPHOTOCACHE = IDPHOTOCACHE;
+  var SCAN_IDPHOTO_CACHE = "SCAN_IDPHOTO_CACHE:" + DeviceID;
+  exports.SCAN_IDPHOTO_CACHE = SCAN_IDPHOTO_CACHE;
+  var PIC_PRINT_HISTORY_INFO = "pic_print_history_info";
+  exports.PIC_PRINT_HISTORY_INFO = PIC_PRINT_HISTORY_INFO;
+  var DOC_PRINT_HISTORY_INFO = "doc_print_history_info";
+  exports.DOC_PRINT_HISTORY_INFO = DOC_PRINT_HISTORY_INFO;
+  var IDCARD_DOC_PRINT_HISTORY_INFO = "idcard_doc_print_history_info";
+  exports.IDCARD_DOC_PRINT_HISTORY_INFO = IDCARD_DOC_PRINT_HISTORY_INFO;
+  var PRIVACY_REPORT_KEY = "privacy_report_key:" + DeviceID;
+  exports.PRIVACY_REPORT_KEY = PRIVACY_REPORT_KEY;
+  var PRIVACY_REPORT_FAIL = "privacy_report_fail:" + DeviceID;
+  exports.PRIVACY_REPORT_FAIL = PRIVACY_REPORT_FAIL;
+  var FW_NEW_FEATURE = "FW_NEW_FEATURE:" + DeviceID;
+  exports.FW_NEW_FEATURE = FW_NEW_FEATURE;
+  var RICOTTA_HELP_URL = "https://m.mi.com/mfbs/dghd/m_universal?_rt=rn&pageid=15392&pdl=mishop&sign=5769525d1d4609310cf3418674ca9df7";
+  exports.RICOTTA_HELP_URL = RICOTTA_HELP_URL;
+  var RICOTTA_P_HELP_URL = "https://m.mi.com/mfbs/dghd/m_universal?_rt=rn&pageid=15655&pdl=mishop&sign=9d737d5160c64ed0d98d9469b20418ab";
+  exports.RICOTTA_P_HELP_URL = RICOTTA_P_HELP_URL;
+  var RICOTTA_G_HELP_URL = "https://m.mi.com/mfbs/dghd/m_universal?_rt=rn&pageid=15657&pdl=mishop&sign=096c7eb21ce0512e48b566a6c5164ec8";
+  exports.RICOTTA_G_HELP_URL = RICOTTA_G_HELP_URL;
+  global.SPECVALUE = {};
+  global.devicePropertyEntity = {};
+  global.getJobInfo = [];
+  global.printPropertyEntity = {};
+  global.nearFieldFailedCount = 0;
+  global.nearFieldPrintConfig = 0;
+  global.nearFieldScanConfig = 0;
+  global.isOobeAlignment = false;
+  global.isDoubleAlignmentFail = false;
+  global.errorViewVisible = true;
+  global.warnViewVisible = true;
+  global.enableLogInRelease = false;
+  global.coutinueAlignment = false;
+  var STORAGE_VALUE = {
+    REVERSE_ORDER: 'reverseOrder',
+    COLLATE: 'collate'
+  };
+  exports.STORAGE_VALUE = STORAGE_VALUE;
+  var VIEW_NAME = {
+    HOME_VIEW: 'home_view',
+    ERROR_VIEW: 'error_view',
+    QUEUE_VIEW: 'queue_view'
+  };
+  exports.VIEW_NAME = VIEW_NAME;
+
+  var BasePath = function BasePath() {
+    return _miot.Host.isIOS ? _miot.Host.file.storageBasePath : "file://" + _miot.Host.file.storageBasePath;
+  };
+
+  exports.BasePath = BasePath;
+  var PATHS = {
+    SCANNED_PRINTER: 'scanned/printer',
+    SCANNED_PHONE: 'scanned/phone',
+    SCANNED_IDCARD: 'scanned/idcard',
+    SCANNED_CARD_ID: 'scanned/card/id',
+    SCANNED_CARD_RESIDENCE: 'scanned/card/residence',
+    SCANNED_CARD_PASSPORT: 'scanned/card/passport',
+    PRINT_IDCARD: 'print/idcard',
+    PDF_DIR: 'pdfDir',
+    TEMP_DIR: 'temp',
+    TEMP_LEARN_DIR: 'tmp/learn',
+    PIC_SCAN_CACHE: 'pic_scan_cache',
+    ID_PHOTO_CACHE: 'id_photo_cache',
+    PUZZLE_PRINTER: 'puzzle/printer',
+    HOME: 'home',
+    FOLDER: 'folder',
+    SHARE: 'share',
+    EDUCATION: 'edcuation'
+  };
+  exports.PATHS = PATHS;
+  var FAR_AND_NEAR_CONFIG = {
+    AUTO: 0,
+    FAR_ONLY: 1,
+    NEAR_ONLY: 2
+  };
+  exports.FAR_AND_NEAR_CONFIG = FAR_AND_NEAR_CONFIG;
+  var DEVICE_STATUS_LEVEL = {
+    ERROR: 4,
+    WARN: 3,
+    STATUS: 2,
+    INFO: 1
+  };
+  exports.DEVICE_STATUS_LEVEL = DEVICE_STATUS_LEVEL;
+  var DATA_SOURCE = {
+    CACHE_RPC: 1,
+    RPC: 2,
+    CACHE: 3
+  };
+  exports.DATA_SOURCE = DATA_SOURCE;
+  var TARGET_DATA_SOURCE = DATA_SOURCE.RPC;
+  exports.TARGET_DATA_SOURCE = TARGET_DATA_SOURCE;
+  var PRINTER_STATE = {
+    INITIALIZING: 10,
+    READY: 20,
+    SLEEP: 30,
+    PROCESSING: 40,
+    OFF: 50,
+    ERROR: 60
+  };
+  exports.PRINTER_STATE = PRINTER_STATE;
+  var PRINTER_SUB_STATE = {
+    INITIALIZING_NONE: 1000,
+    INITIALIZING_WARMINGUP: 1001,
+    IDLE_NONE: 2000,
+    IDLE_INITIAL_SPITTING: 2001,
+    IDLE_LOW_POWER: 2002,
+    PROCESSING_PRINTING: 3001,
+    PROCESSING_FILE_TRANSFERRING: 3002,
+    PROCESSING_SCANNING: 3003,
+    PROCESSING_COPYING: 3004,
+    PROCESSING_NOZZLE_CLEANING: 3005,
+    PROCESSING_CANCELLING: 3006,
+    PROCESSING_UPGRADING: 3007,
+    CALIBRATING: 3008,
+    SEMI_AUTO_PRINTING: 3009,
+    SEMI_AUTO_SCAN_REQUIRED: 3010,
+    SEMI_AUTO_SCANNING: 3011,
+    SCAN_WAITING: 3012,
+    COPY_WAITING: 3013,
+    RENDERING: 3014,
+    APPLYING_AI_URL: 3015,
+    APPLYING_AI_PROCESS: 3016,
+    CLOUD_AI_PROCESSING: 3017,
+    SLEEP_ENTERING: 4001,
+    SLEEP_NOMAL: 4002,
+    SLEEP_SILENT: 4003,
+    SLEEP_EXITING_SLEEP: 4004,
+    OFF_ENTERING: 5001,
+    OFF_NOT_REAL: 5002,
+    OFF_SHUTTING_DOWN: 5003,
+    ERROR_NONE: 6000
+  };
+  exports.PRINTER_SUB_STATE = PRINTER_SUB_STATE;
+  var PRINTER_STATE_ALERTS = {
+    ERR_SYSTEM_OUT_OF_MEMORY: 1,
+    ERR_SYSTEM_FATAL_ERROR: 2,
+    ERR_SYSTEM_SMALLBOOT: 3,
+    ERR_SYSTEM_MEMORY_INVALID: 4,
+    ERR_SYSTEM_IMPROPER_SHUTDOWN: 5,
+    NETWORK_WIFI_OK: 1000,
+    INFO_NETWORK_WIFI_AP_MODE: 1001,
+    INFO_NETWORK_WIFI_ROUTER_CONNECTING: 1002,
+    INFO_NETWORK_WIFI_ROUTER_CONNECTED: 1003,
+    INFO_NETWORK_WIFI_INTERNET_CONNECTED: 1004,
+    INFO_NETWORK_WIFI_CLOUD_CONNECTED: 1005,
+    INFO_NETWORK_WIFI_ROUTER_DISCONNECTED: 1006,
+    INFO_NETWORK_WIFI_CLOUD_RETRY: 1007,
+    WRN_NETWORK_WIFI_UNKNOWN: 1008,
+    ERR_IDS_CARTRIDGE_BLACK_EMPTY: 2001,
+    ERR_IDS_CARTRIDGE_CMY_EMPTY: 2002,
+    ERR_IDS_CARTRIDGE_BOTH_EMPTY: 2003,
+    ERR_IDS_CARTRIDGE_BLACK_DEFECTIVE: 2004,
+    ERR_CARTRIDGE_CMY_DEFECTIVE: 2005,
+    ERR_IDS_CARTRIDGE_DEFECTIVE: 2006,
+    ERR_IDS_CARTRIDGE_BLACK_ABSENT: 2007,
+    ERR_IDS_CARTRIDGE_CMY_ABSENT: 2008,
+    ERR_IDS_CARTRIDGE_BOTH_ABSENT: 2009,
+    ERR_IDS_CARTRIDGE_BLACK_HIGH_TEMP: 2010,
+    ERR_IDS_CARTRIDGE_CMY_HIGH_TEMP: 2011,
+    ERR_IDS_CARTRIDGE_BOTH_HIGH_TEMP: 2012,
+    ERR_IDS_CARTRIDGE_BLACK_INCORRECT: 2013,
+    ERR_IDS_CARTRIDGE_CMY_INCORRECT: 2014,
+    ERR_IDS_CARTRIDGE_BOTH_INCORRECT: 2015,
+    ERR_IDS_CARTRIDGE_BLACK_ERROR: 2016,
+    ERR_IDS_CARTRIDGE_CMY_ERROR: 2017,
+    ERR_IDS_CARTRIDGE_BOTH_ERROR: 2018,
+    ERR_IDS_CARTRIDGE_CONTACT_FAILURE: 2019,
+    ERR_IDS_CARTRIDGE_BLACK_LOW: 2020,
+    ERR_IDS_CARTRIDGE_CMY_LOW: 2021,
+    ERR_IDS_CARTRIDGE_BOTH_LOW: 2022,
+    ERR_IDS_CARTRIDGE_BLACK_USED: 2023,
+    ERR_IDS_CARTRIDGE_CMY_USED: 2024,
+    ERR_IDS_CARTRIDGE_BOTH_USED: 2025,
+    WRN_IDS_CARTRIDGE_CALIBRATION_REQUIRED: 2026,
+    ERR_IDS_CARTRIDGE_BLACK_INCOMPITABLE: 2027,
+    ERR_IDS_CARTRIDGE_CMY_INCOMPITABLE: 2028,
+    ERR_IDS_CARTRIDGE_BOTH_INCOMPITABLE: 2029,
+    ERR_IDS_CARTRIDGE_BLACK_GAS_GAUGE_END: 2030,
+    ERR_IDS_CARTRIDGE_CMY_GAS_GAUGE_END: 2031,
+    ERR_IDS_CARTRIDGE_BOTH_GAS_GAUGE_END: 2032,
+    ERR_IDS_CARTRIDGE_BLACK_DETACH_END: 2033,
+    ERR_IDS_CARTRIDGE_CMY_DETACH_END: 2034,
+    ERR_IDS_CARTRIDGE_BOTH_DETACH_END: 2035,
+    ERR_IDS_CARTRIDGE_BLACK_PRIMING_END: 2036,
+    ERR_IDS_CARTRIDGE_CMY_PRIMING_END: 2037,
+    ERR_IDS_CARTRIDGE_BOTH_PRIMING_END: 2038,
+    WRN_IDS_INK_TANK_START: 2100,
+    WRN_IDS_INK_BLACK_LOW: 2101,
+    WRN_IDS_INK_CYAN_LOW: 2102,
+    WRN_IDS_INK_KC_LOW: 2103,
+    WRN_IDS_INK_CM_LOW: 2104,
+    WRN_IDS_INK_MAGENTA_LOW: 2105,
+    WRN_IDS_INK_KM_LOW: 2106,
+    WRN_IDS_INK_KCM_LOW: 2107,
+    WRN_IDS_INK_YELLOW_LOW: 2108,
+    WRN_IDS_INK_KY_LOW: 2109,
+    WRN_IDS_INK_CY_LOW: 2110,
+    WRN_IDS_INK_KCY_LOW: 2111,
+    WRN_IDS_INK_MY_LOW: 2112,
+    WRN_IDS_INK_KMY_LOW: 2113,
+    WRN_IDS_INK_CMY_LOW: 2114,
+    WRN_IDS_INK_KCMY_LOW: 2115,
+    ERR_IDS_INK_BLACK_EMPTY: 2201,
+    ERR_IDS_INK_CYAN_EMPTY: 2202,
+    ERR_IDS_INK_KC_EMPTY: 2203,
+    ERR_IDS_INK_CM_EMPTY: 2204,
+    ERR_IDS_INK_MAGENTA_EMPTY: 2205,
+    ERR_IDS_INK_KM_EMPTY: 2206,
+    ERR_IDS_INK_KCM_EMPTY: 2207,
+    ERR_IDS_INK_YELLOW_EMPTY: 2208,
+    ERR_IDS_INK_KY_EMPTY: 2209,
+    ERR_IDS_INK_CY_EMPTY: 2210,
+    ERR_IDS_INK_KCY_EMPTY: 2211,
+    ERR_IDS_INK_MY_EMPTY: 2212,
+    ERR_IDS_INK_KMY_EMPTY: 2213,
+    ERR_IDS_INK_CMY_EMPTY: 2214,
+    ERR_IDS_INK_KCMY_EMPTY: 2215,
+    WRN_IDS_INK_TANK_END: 2300,
+    ERR_IDS_LOI_SENSOR_ERROR: 2301,
+    INFO_PFS_EMPTY: 5001,
+    INFO_PFS_PAPER_EXIST_BUT_UNKNOWN_SIZE: 5002,
+    INFO_PFS_PAPER_SIZE_4X6: 5003,
+    INFO_PFS_PAPER_SIZE_5X7: 5004,
+    INFO_PFS_PAPER_SIZE_A4: 5005,
+    ERR_PFS_INVALID_ALIGNMENT_101: 5301,
+    ERR_PFS_INVALID_ALIGNMENT_1X0: 5302,
+    ERR_PFS_INVALID_ALIGNMENT_010: 5303,
+    ERR_PFS_PAPER_MISMATCH: 5304,
+    ERR_PFS_PAPER_OUT: 5401,
+    ERR_PFS_NO_PICK: 5402,
+    ERR_PFS_PAPER_JAM: 5403,
+    ERR_PFS_PAPER_SHORT: 5404,
+    INFO_TOP_COVER_OPEN: 5501,
+    ERR_TOP_COVER_OPEN_DURING_PROCESSING: 5502,
+    ERR_FEED_MOTOR_STALL: 5601,
+    ERR_CARRIER_MOTOR_STALL: 5602,
+    ERR_CARRIER_MOTOR_LOCK: 5603,
+    ERR_SC_HOME_NOT_DETECTED: 6001,
+    ERR_SC_OUT_OF_MEMORY: 6002,
+    ERR_ALIGNMENT_PARAMS_NONE: 7001,
+    ERR_ALIGNMENT_FAILURE_AS_PRESCAN_TOO_FEW_PATTERN: 7002,
+    ERR_ALIGNMENT_FAILURE_AS_PRESCAN_TOO_MANY_PATTERN: 7003,
+    ERR_ALIGNMENT_FAILURE_AS_PRESCAN_NO_TOP_LEFT: 7004,
+    ERR_ALIGNMENT_FAILURE_AS_PRESCAN_NO_TOP_RIGHT: 7005,
+    ERR_ALIGNMENT_FAILURE_AS_PRESCAN_NO_BOTTOM_LEFT: 7006,
+    ERR_ALIGNMENT_FAILURE_AS_PRESCAN_NO_BOTTOM_RIGHT: 7007,
+    ERR_ALIGNMENT_FAILURE_AS_PRESCAN_NO_TOO_MUCH_SKEW: 7008,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_NO_DIAG_PATTERN: 7009,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_BIDI_XAO_C: 7010,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_BIDI_XAO_M: 7011,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_BIDI_XAO_Y: 7012,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_BIDI_XAO_K: 7013,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_BIDI_DRAFT_K: 7014,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_BIDI_DRAFT_C: 7015,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_H2H_HORIZENTAL_C: 7016,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_H2H_HORIZENTAL_M: 7017,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_H2H_HORIZENTAL_Y: 7018,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_H2H_VERTICAL_C: 7019,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_H2H_VERTICAL_M: 7020,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_H2H_VERTICAL_Y: 7021,
+    ERR_ALIGNMENT_FAILURE_AS_MAINSCAN_SKEW_K: 7022,
+    ERROR_SELF_CLEARING_ERR: 10000,
+    ERROR_APPLY_AI_URL_ERR: 10001,
+    ERROR_APPLY_AI_PROCESS_ERR: 10002,
+    ERROR_CLOUD_AI_PROCESS_ERR: 10003,
+    ERROR_FAIL_TO_CORRECTLY_RECOGNIZE_TEXTBOOK: 10004
+  };
+  exports.PRINTER_STATE_ALERTS = PRINTER_STATE_ALERTS;
+  var JOB_STATE = {
+    WAITING: 1,
+    START: 2,
+    PROCESSING: 3,
+    PROCESSING_HELD: 4,
+    PENDING: 5,
+    TERMINATING: 6,
+    ABORTED: 7,
+    CANCELED: 8,
+    COMPLETED: 9
+  };
+  exports.JOB_STATE = JOB_STATE;
+  var JOB_STATE_STR = {
+    WAITING: 'waiting',
+    START: 'start',
+    PROCESSING: 'processing',
+    PROCESSING_HELD: 'progress_held',
+    PENDING: 'pending',
+    TERMINATING: 'terminating',
+    ABORTED: 'aborted',
+    CANCELED: 'canceled',
+    COMPLETED: 'completed',
+    SCANNING: 'scanning',
+    SCANNING_DATA_UPLOADING: 'scanning_data_uploading',
+    SCANNING_DATA_READY: 'scanning_data_ready',
+    PRINT_DATA_TRANSFERRING_UPLOADING: 'print_data_transferring_uploading',
+    PRINT_DATA_TRANSFERRING_DOWNLOADING: 'print_data_transferring_downloading',
+    CLOUD_RENDERING: 'cloud_rendering',
+    LOCALING_RENDERING: 'localing_rendering',
+    PRINTING: 'printing',
+    RESVERED_FOR_PRINTING: 'resvered_for_printing',
+    RESVERED_FOR_OTHER: 'resvered_for_other_scanning_sub_state',
+    RESVERED_FOR_COPYING: 'resvered_for_copying',
+    REVERED_FOR_OTHER_JOBS: 'resvered_for_other_jobs',
+    SCANNING_JOB_WAITING: 'scanning_job_waiting',
+    COPY_WAITING: 'copy_waiting',
+    SEMI_AUTO_WAITING: 'semi_auto_waiting',
+    SEMI_AUTO_PRINTING: 'semi_auto_printing',
+    SEMI_AUTO_SCANING: 'semi_auto_scaning',
+    MANUAL_WAITING: 'manual_waiting',
+    MANUAL_PRINTING: 'manual_printing',
+    SEMI_AUTO_SCAN_REQUIRED: 'semi_auto_scan_required',
+    REVERED_FOR_PENDING: 'revered_for_pending'
+  };
+  exports.JOB_STATE_STR = JOB_STATE_STR;
+  var JOB_SUB_STATE = {
+    WAITING: 1000,
+    NONE: 3000,
+    PRINT_DATA_TRANSFERRING_UPLOADING: 3001,
+    PRINT_DATA_TRANSFERRING_DOWNLOADING: 3002,
+    CLOUD_RENDERING: 3003,
+    LOCALING_RENDERING: 3004,
+    PRINTING: 3005,
+    SCANNING: 3101,
+    SCANNING_DATA_UPLOADING: 3102,
+    SCANNING_DATA_READY: 3103,
+    SCANNING_JOB_WAITING: 3104,
+    COPY_WAITING: 3201,
+    SEMI_AUTO_WAITING: 3301,
+    SEMI_AUTO_PRINTING: 3302,
+    SEMI_AUTO_SCANING: 3303,
+    MANUAL_WAITING: 3304,
+    MANUAL_PRINTING: 3305,
+    SEMI_AUTO_SCAN_REQUIRED: 5001,
+    COMPLETEED: 9000
+  };
+  exports.JOB_SUB_STATE = JOB_SUB_STATE;
+  var JOB_STATE_REASON = {
+    TESTING: 1
+  };
+  exports.JOB_STATE_REASON = JOB_STATE_REASON;
+  var JOB_INFO = {
+    jobId: 'jobId',
+    documentName: 'documentName',
+    printQuality: 'printQuality',
+    copies: 'copies',
+    fileSize: 'fileSize',
+    documentFormat: 'documentFormat',
+    channel: 'channel',
+    userAccount: 'userAccount',
+    printColorMode: 'printColorMode',
+    mediaSize: 'mediaSize',
+    jobUrl: 'jobUrl',
+    jobState: 'jobState',
+    jobSubState: 'jobSubState',
+    jobStateReason: 'jobStateReason',
+    printingPageNo: 'printingPageNo',
+    fileXferProg: 'fileXferProg',
+    totalPages: 'totalPages',
+    jobType: 'jobType',
+    mediaType: 'mediaType'
+  };
+  exports.JOB_INFO = JOB_INFO;
+  var JOB_TYPE = {
+    PHOTO_PRINT_JOB: 0,
+    ID_CARDING_PRINT_JOB: 1,
+    ID_PHOTO_PRINT_JOB: 2,
+    DOCUMENT_PRINT_JOB: 3,
+    SERVICE_JOB: 4,
+    WECHAT_PHONE_ALBUM_JOB: 5,
+    WECHAT_CHAT_PHOTO_JOB: 6,
+    WECHAT_PUB_SHOW_JOB: 7,
+    WECHAT_PUB_ALBUM_JOB: 8,
+    AR_PHOTO_JOB: 9,
+    PHONOGRAPH_JOB: 10,
+    JIGSAW_JOB: 11,
+    SPLIT_JOB: 12,
+    HEADSHOT_JOB: 13,
+    LABEL_JOB: 14,
+    CARD_JOB: 15,
+    GREETING_JOB: 16,
+    SHOOT_AND_DUPLICATE_JOB: 17,
+    SHOOT_AND_SCAN: 18,
+    WECHAT_CHAT_DOCUMENT_JOB: 19,
+    WECHAT_INVOICE_JOB: 20,
+    EDUCATION_JOB: 21,
+    CALIBRATION_JOB: 22,
+    WECHAT_OFFICIAL_JOB: 23,
+    RED_PACKAGE_JOB: 24,
+    SPRING_FESTIVAL_COUPLET_JOB: 25,
+    PHOTO_BOOTH: 26,
+    LIVE_PHOTO: 27,
+    PHOTO_TEMPLATE: 28,
+    NORMAL_SCAN_JOB: 70,
+    ID_CARDING_SCAN_JOB: 71,
+    AI_EXAM_PAPER_REMOVE_HANDWEITTEN_JOB: 81,
+    AI_TEXT_PREVIEW_JOB: 82,
+    OTA_JOB: 100,
+    OTA_BT_FW_JOB: 300,
+    TEST_JOB: 400,
+    PRINTER_JOB_TYPE_CLEAN: 500
+  };
+  exports.JOB_TYPE = JOB_TYPE;
+  var DOUCMENT_TYPES = {
+    ALL_SCANNED: 'allScanned',
+    PRINTER_SCANNED: 'printerScanned',
+    PHONE_SCANNED: 'phoneScanned',
+    ID_CARD_SCANNED: 'IDCardScanned',
+    OTHER: 'other',
+    OTHER_PDF: 'other_pdf',
+    OTHER_WORD: 'other_word',
+    OTHER_PPT: 'other_ppt',
+    OTHER_EXECL: 'other_execl',
+    APP_WECHAT: 'app_wechat',
+    APP_QQ: 'app_qq',
+    APP_DINGDING: 'app_dingding',
+    APP_WPS: 'app_wps',
+    APP_BAIDUYUN: 'app_baiduyun',
+    APP_ENTERPRISE_WECHAT: 'app_enterprise_wechat'
+  };
+  exports.DOUCMENT_TYPES = DOUCMENT_TYPES;
+  var DOCUMENT_SCNNED_FILE_NAVIGATION_TYPE = {
+    NAVIGATION_DEFAULT: 0,
+    NAVIGATION_SELECTED_NOT_ALL: 1,
+    NAVIGATION_SELECTED_ALL: 2,
+    NAVIGATION_ALLOW_EDIT: 3,
+    NAVIGATION_NOT_ALLOW_EDIT: 4
+  };
+  exports.DOCUMENT_SCNNED_FILE_NAVIGATION_TYPE = DOCUMENT_SCNNED_FILE_NAVIGATION_TYPE;
+  var PRINT_QUALITY = {
+    draft: 3,
+    normal: 4,
+    high: 5
+  };
+  exports.PRINT_QUALITY = PRINT_QUALITY;
+  var PRINT_COLOR_MODE = {
+    auto: 1,
+    biLevel: 2,
+    color: 3,
+    highlight: 4,
+    monochrome: 5,
+    processBiLevel: 6,
+    processMonochrome: 7
+  };
+  exports.PRINT_COLOR_MODE = PRINT_COLOR_MODE;
+  var DOCUMENT_FORMAT = {
+    pdf: 1,
+    doc: 2,
+    docx: 3,
+    xls: 4,
+    xlsx: 5,
+    ppt: 6,
+    pptx: 7,
+    urf: 8,
+    JPEG: 9,
+    png: 10,
+    bmp: 11,
+    HTML: 12,
+    Plain: 13,
+    Postscript: 14,
+    PCL: 15,
+    AutoSense: 16,
+    RawImage: 17
+  };
+  exports.DOCUMENT_FORMAT = DOCUMENT_FORMAT;
+  var DOCUMENT_TYPE = {
+    pdf: 'pdf',
+    doc: 'doc',
+    docx: 'docx',
+    xls: 'xls',
+    xlsx: 'xlsx',
+    ppt: 'ppt',
+    pptx: 'pptx',
+    urf: 'urf',
+    JPEG: 'jpeg',
+    png: 'png',
+    bmp: 'bmp',
+    HTML: 'html',
+    Plain: 'Plain',
+    Postscript: 'Postscript',
+    PCL: 'pcl',
+    AutoSense: 'AutoSense'
+  };
+  exports.DOCUMENT_TYPE = DOCUMENT_TYPE;
+  var HASH_METHOD = {
+    SHA1: 1,
+    MD5: 2
+  };
+  exports.HASH_METHOD = HASH_METHOD;
+  var MEDIA_SIZE = {
+    a10: 1000,
+    a9: 1001,
+    a8: 1002,
+    a7: 1003,
+    a6: 1004,
+    a5: 1005,
+    a5Extra: 1006,
+    a4: 1007,
+    a4Tab: 1008,
+    a4Extra: 1009,
+    a3: 1010,
+    a4x3: 1011,
+    a4x4: 1012,
+    a4x5: 1013,
+    a4x6: 1014,
+    a4x7: 1015,
+    a4x8: 1016,
+    a4x9: 1017,
+    a3Extra: 1018,
+    a2: 1019,
+    a3x3: 1020,
+    a3x4: 1021,
+    a3x5: 1022,
+    a3x6: 1023,
+    a3x7: 1024,
+    a1: 1025,
+    a2x3: 1026,
+    a2x4: 1027,
+    a2x5: 1028,
+    a0: 1029,
+    a1x3: 1030,
+    a1x4: 1031,
+    a0x2: 1032,
+    a0x3: 1033,
+    b10: 1034,
+    b9: 1035,
+    b8: 1036,
+    b7: 1037,
+    b6: 1038,
+    b6c4: 1039,
+    b5: 3005,
+    b5Extra: 1041,
+    b4: 1042,
+    b3: 1043,
+    b2: 1044,
+    b1: 1045,
+    b0: 1046,
+    c10: 1047,
+    c9: 1048,
+    c8: 1049,
+    c7: 1050,
+    c7c6: 1051,
+    c6: 1052,
+    c6c5: 1053,
+    c5: 1054,
+    c4: 1055,
+    c3: 1056,
+    c2: 1057,
+    c1: 1058,
+    c0: 1059,
+    dl: 1060,
+    ra4: 1061,
+    sra4: 1062,
+    ra3: 1063,
+    sra3: 1064,
+    ra2: 1065,
+    sra2: 1066,
+    ra1: 1067,
+    sra1: 1068,
+    ra0: 1069,
+    sra0: 1070,
+    index_3x5: 2000,
+    personal: 2001,
+    monarch_envelope: 2002,
+    na_number_9_envelope: 2003,
+    index_4x6: 2004,
+    na_number_10_envelope: 2005,
+    a2_envelope: 2006,
+    number_11: 2007,
+    number_12: 2008,
+    na_5x7: 2009,
+    index_5x8: 2010,
+    number_14: 2011,
+    invoice: 2012,
+    index_4x6_ext: 2013,
+    na_6x9_envelope: 2014,
+    c5_envelope: 2015,
+    na_7x9_envelope: 2016,
+    executive: 2017,
+    government_letter: 2018,
+    government_legal: 2019,
+    quarto: 2020,
+    na_letter: 2021,
+    fanfold_european: 2022,
+    letter_plus: 2023,
+    foolscap: 2024,
+    oficio: 2025,
+    na_legal: 2026,
+    super_a: 2027,
+    na_9x11_envelope: 2028,
+    arch_a: 2029,
+    letter_extra: 2030,
+    legal_extra: 2031,
+    na_10x11: 2032,
+    na_10x13_envelope: 2033,
+    na_10x14_envelope: 2034,
+    na_10x15_envelope: 2035,
+    na_11x12: 2036,
+    edp: 2037,
+    fanfold_us: 2038,
+    na_11x15: 2039,
+    tabloid: 2040,
+    european_edp: 2041,
+    arch_b: 2042,
+    na_12x19: 2043,
+    b_plus: 2044,
+    super_b: 2045,
+    engineering_c: 2046,
+    architecture_c: 2047,
+    engineering_d: 2048,
+    architecture_d: 2049,
+    e1: 2050,
+    wide_format: 2051,
+    engineering_e: 2052,
+    architecture_e: 2053,
+    engineering_f: 2054,
+    jis_b10: 3000,
+    jis_b9: 3001,
+    jis_b8: 3002,
+    jis_b7: 3003,
+    jis_b6: 3004,
+    jis_b5: 3005,
+    jis_b4: 3006,
+    jis_b3: 3007,
+    jis_b2: 3008,
+    jis_b1: 3009,
+    jis_b0: 3010,
+    exec: 3011,
+    kaku2: 3012,
+    jpn_kaku3: 3013,
+    jpn_kaku4: 3014,
+    jpn_kaku5: 3015,
+    jpn_kaku7: 3016,
+    jpn_kaku8: 3017,
+    jpn_chou4: 3018,
+    jpn_hagaki: 3019,
+    jpn_you4: 3020,
+    jpn_you6: 3021,
+    jpn_chou2: 3022,
+    jpn_chou3: 3023,
+    jpn_chou40: 3024,
+    jpn_oufuku: 3025,
+    jpn_kahu: 3026,
+    prc_32k: 4000,
+    prc1: 4001,
+    prc2: 4002,
+    prc4: 4003,
+    prc8: 4004,
+    prc6: 4005,
+    prc3: 4006,
+    prc_16k: 4007,
+    prc7: 4008,
+    juuro_ku_kai: 4009,
+    pa_kai: 4010,
+    dai_pa_kai: 4011,
+    prc10: 4012,
+    roc_16k: 4013,
+    roc_8k: 4014,
+    small_photo: 5000,
+    wide_photo: 5001,
+    Italian: 5002,
+    Postfix: 5003,
+    medium_photo: 5004,
+    large_photo: 5005,
+    folio: 5006,
+    folio_sp: 5007,
+    Invite: 5008,
+    honey1s: 5009,
+    mintOverSea: 5010
+  };
+  exports.MEDIA_SIZE = MEDIA_SIZE;
+  var MEDIA_TYPE = {
+    normal: 1000,
+    photo: 2000,
+    whiteCardPaper: 2100
+  };
+  exports.MEDIA_TYPE = MEDIA_TYPE;
+  var SCAN_COLOR_MODE = {
+    BlackAndWhite1: 1,
+    Grayscal8: 2,
+    RGB24: 3
+  };
+  exports.SCAN_COLOR_MODE = SCAN_COLOR_MODE;
+  var SCAN_SOURCE = {
+    Platen: 1,
+    ADF: 2,
+    Camera: 3
+  };
+  exports.SCAN_SOURCE = SCAN_SOURCE;
+  var CHANNEL = {
+    Platen: 1
+  };
+  exports.CHANNEL = CHANNEL;
+  var RESOLUTION = {
+    DPI75: 75,
+    DPI100: 100,
+    DPI200: 200,
+    DPI300: 300,
+    DPI600: 600,
+    DPI1200: 1200
+  };
+  exports.RESOLUTION = RESOLUTION;
+  var TRANSFER_MODE = {
+    FILE: 0,
+    INPUTSTREAM: 1
+  };
+  exports.TRANSFER_MODE = TRANSFER_MODE;
+  var RESET_TYPE = {
+    factoryReset: 0,
+    userDataReset: 1,
+    netWorkReset: 2
+  };
+  exports.RESET_TYPE = RESET_TYPE;
+  var ERROR_CODE = {
+    OK: 0,
+    INVALID_ARGUMENTS: -10001,
+    ACTION_NOT_SUPPORTED: -10002,
+    ARGUMENT_NOT_SUPPORTED: -10003,
+    OUT_OF_MEMORY: -10004,
+    INTERNAL_ERROR: -10005,
+    JOB_QUEUE_FULL: -20001
+  };
+  exports.ERROR_CODE = ERROR_CODE;
+  var OOBE_STATE_COVER = {
+    COVER_CLOSED: 0,
+    COVER_OPEN: 1
+  };
+  exports.OOBE_STATE_COVER = OOBE_STATE_COVER;
+  var OOBE_STATE_INK = {
+    INK_FINE: 0,
+    INK_EMPTY: 1
+  };
+  exports.OOBE_STATE_INK = OOBE_STATE_INK;
+  var OOBE_STATE_NETWORK = {
+    NETWORK_CONNECTED: 0,
+    NETWORK_DISCONNECTED: 1
+  };
+  exports.OOBE_STATE_NETWORK = OOBE_STATE_NETWORK;
+  var OOBE_STATE_CARRIER = {
+    CARRIER_FINE: 0,
+    CARRIER_LOCK_AT_HOME: 1,
+    CARRIER_STALL: 2
+  };
+  exports.OOBE_STATE_CARRIER = OOBE_STATE_CARRIER;
+  var OOBE_STATE_PH = {
+    PH_FINE: 0,
+    PH_ABSENT: 1,
+    PH_CONTACT_FAILURE: 2,
+    PH_DAMAGED: 3,
+    PH_HIGH_TEMP: 4,
+    PH_ERROR: 5,
+    PH_UNKNOWN: 6,
+    PH_INCORRECT: 7
+  };
+  exports.OOBE_STATE_PH = OOBE_STATE_PH;
+  var OOBE_STATE_CALIBRATION = {
+    CALIBRATION_DONE: 0,
+    CALIBRATION_NOT_DONE: 1,
+    CALIBRATION_PENDING: 2
+  };
+  exports.OOBE_STATE_CALIBRATION = OOBE_STATE_CALIBRATION;
+  var OOBE_STATE_KEY = {
+    NETWORK: 'NET',
+    INK_CYAN: 'INK-C',
+    INK_MAGENTA: 'INK-M',
+    INK_YELLOW: 'INK-Y',
+    INK_BLACK: 'INK-K',
+    COVER_0: 'COVER-0',
+    CARRIER: 'CARRIER',
+    PH_BLACK: 'PH-K',
+    PH_CMY: 'PH-CMY',
+    CALIBRATION: 'CALI'
+  };
+  exports.OOBE_STATE_KEY = OOBE_STATE_KEY;
+  var OTA_METHOD = {
+    DEFAULT: 0,
+    ONLY_DOWNLOAD: 1,
+    ONLY_INSTALL: 2
+  };
+  exports.OTA_METHOD = OTA_METHOD;
+  var SERVICE_ID = {
+    DEVICE_INFO: 1,
+    PRINTER_NOMAL: 2,
+    CARTRIDGE: 3,
+    PRINTER: 5
+  };
+  exports.SERVICE_ID = SERVICE_ID;
+  var PROPERTY_ID = {
+    MANUFACTURER: 1,
+    MODEL: 2,
+    SERIAL_NUMBER: 3,
+    FIRMWARE_REVISION: 4,
+    STATUS: 1,
+    CARTRIDGE_LEFT_LEVEL: 1,
+    HPP_VERSION: 3,
+    PRINTER_NAME: 6,
+    PRINTER_LOCATION: 7,
+    PRINTER_DESCRIPTION: 8,
+    PRINTER_CATEGORY: 9,
+    JOB_ID: 17,
+    JOB_URL: 19,
+    DOCUMENT_FORMAT: 21,
+    PRINT_QUALITY: 22,
+    DOCUMENT_NAME: 23,
+    MAC_ADDRESS: 24,
+    IP_ADDRESS: 25,
+    IP_ADDRESS_EX: 26,
+    HASH_VALUE: 27,
+    CHANNEL: 28,
+    USER_ACCOUNT: 29,
+    REGION_UNIT: 30,
+    HEIGHT: 31,
+    WIDTH: 32,
+    X_OFFSET: 33,
+    Y_OFFSET: 34,
+    SCAN_SOURCE: 35,
+    SCAN_COLOR_MODE: 36,
+    X_RESOLUTION: 37,
+    Y_RESOLUTION: 38,
+    TRANSFER_MODE: 39,
+    PRINTER_STATE: 40,
+    PRINTER_SUB_STATE: 41,
+    PRINTER_STATE_ALERTS: 42,
+    OOBE_STATE: 44,
+    OOBE_COMPLETE: 45,
+    JOB_ID_LIST: 46,
+    PRINT_COLOR_MODE: 47,
+    PAGE_RANGES: 48,
+    COPIES: 49,
+    FILE_SIZE: 50,
+    HASH_METHOD: 51,
+    MEDIA_SIZE: 52,
+    JOB_STATE: 53,
+    JOB_SUB_STATE: 54,
+    JOB_STATE_REASON: 55,
+    HANDSHAKE_TOKEN: 56,
+    JOB_TYPE: 76,
+    PRINTED_PAGE: 131,
+    ALERTS_COUNT: 132
+  };
+  exports.PROPERTY_ID = PROPERTY_ID;
+  var ACTION_ID = {
+    CREATE_JOB: 1,
+    PRINT_JOB: 2,
+    SCAN_JOB: 3,
+    JOB_ID_LIST: 4,
+    JOB_INFO: 5,
+    DEVICE_RESUME: 6,
+    CANCEL_JOB: 7,
+    JOB_ID_LIST_ACT: 8,
+    RESET_DEVICE: 9,
+    COPY_JOB: 10,
+    UPLOAD_LOG: 11,
+    START_ALIGNMENT: 12,
+    CONTINUE_ALIGNMENT: 13,
+    GET_ALIGNMENT_COMPL: 14,
+    GET_ALIGNMENT_VALUE: 15,
+    SET_ALIGNMENT_VALUE: 16,
+    CANCEL_ALIGNMENT: 17,
+    START_MAINTENANCE: 18
+  };
+  exports.ACTION_ID = ACTION_ID;
+  var EVENT_ID = {
+    JOB_COMPLETE: 1
+  };
+  exports.EVENT_ID = EVENT_ID;
+  var ERR_BG = {
+    ERR_BG_RED: _UtilsHeadFile.HTImage.error_error_background_red,
+    ERR_BG_BLUE: _UtilsHeadFile.HTImage.error_error_background_blue,
+    ERROR_BG_ORANGE: _UtilsHeadFile.HTImage.error_error_background_orange
+  };
+  exports.ERR_BG = ERR_BG;
+  var ERR_HANDLE_STYLE = {
+    COMPONENT: 0,
+    DIALOG: 1
+  };
+  exports.ERR_HANDLE_STYLE = ERR_HANDLE_STYLE;
+  var RECEIVE_FILE_RESULT = {
+    RECEIVE_ERROR: 'receive-error',
+    RECEIVE_WAITING: 'receive-waiting',
+    RECEIVE_COMPLETE: 'receive-complete',
+    SCANNING: 'scanning',
+    READY: 'ready'
+  };
+  exports.RECEIVE_FILE_RESULT = RECEIVE_FILE_RESULT;
+  var RECEIVE_FILE_RESULT_CODE = {
+    RECEIVE_COMPLETE: 0,
+    RECEIVE_ERROR: 1,
+    RECEIVE_DISCONNECTED: 2
+  };
+  exports.RECEIVE_FILE_RESULT_CODE = RECEIVE_FILE_RESULT_CODE;
+  var CHANNEL_TYPE = {
+    SEND_DOCUMENT_CHANNEL: 1,
+    RECEIVE_DOCUMENT_CHANNEL: 2,
+    FILE_SEND_CHANNEL: 4,
+    FILE_RECEIVE_CHANNEL: 3,
+    PRE_RECEIVE_DOCUMENT_CHANNEL: 5
+  };
+  exports.CHANNEL_TYPE = CHANNEL_TYPE;
+  var LINK_TYPE = {
+    SERVER: 1,
+    LOCAL: 2000
+  };
+  exports.LINK_TYPE = LINK_TYPE;
+  var REGION_UNIT = {
+    THREE_HUNDREDTHS_OF_INCHES: 1,
+    MM: 2
+  };
+  exports.REGION_UNIT = REGION_UNIT;
+  var AUTI_SLEEP_MODE = {
+    OFF: 0,
+    ON: 1
+  };
+  exports.AUTI_SLEEP_MODE = AUTI_SLEEP_MODE;
+  var BLACK_INK_STATE = {
+    INK_UNKNOWN: 0,
+    INK_FULL: 1,
+    INK_ERROR: 2,
+    INK_EMPTY: 3,
+    INK_LOW: 4
+  };
+  exports.BLACK_INK_STATE = BLACK_INK_STATE;
+  var CHARGING_STATE = {
+    CHARGING: 1,
+    NOT_CHARGING: 2,
+    NOT_CHARGEABLE: 3
+  };
+  exports.CHARGING_STATE = CHARGING_STATE;
+  var COLLATE = {
+    ONE_BY_ONE: 0,
+    PAGE_TO_PAGE: 1
+  };
+  exports.COLLATE = COLLATE;
+  var FIDELITY = {
+    FIDELITY: 0,
+    NON_FIDELITY: 1
+  };
+  exports.FIDELITY = FIDELITY;
+  var ALIGNMENT_COMPLETION = {
+    MANUAL_ALIGNMENT: 'manualAlignment',
+    SEMI_AUTO_ALIGNMENT: 'semiAutoAlignment',
+    AUTO_ALIGNMENT: 'autoAlignment'
+  };
+  exports.ALIGNMENT_COMPLETION = ALIGNMENT_COMPLETION;
+  var MANUAL_ALIGNMENT_COMPLETION = {
+    FAIL: 0,
+    SUCCESS: 1
+  };
+  exports.MANUAL_ALIGNMENT_COMPLETION = MANUAL_ALIGNMENT_COMPLETION;
+  var SEMI_AUTO_ALIGNMENT_COMPLETION = {
+    FAIL: 0,
+    SUCCESS: 1
+  };
+  exports.SEMI_AUTO_ALIGNMENT_COMPLETION = SEMI_AUTO_ALIGNMENT_COMPLETION;
+  var AUTO_ALIGNMENT_COMPLETION = {
+    FAIL: 0,
+    SUCCESS: 1
+  };
+  exports.AUTO_ALIGNMENT_COMPLETION = AUTO_ALIGNMENT_COMPLETION;
+  var ALIGNMENT_TYPE = {
+    MANUAL: 1,
+    SEMI_TO: 2
+  };
+  exports.ALIGNMENT_TYPE = ALIGNMENT_TYPE;
+  var MANUAL_ALIGNMENT_PARAMS = {
+    htohHorizental: 'htohHorizental',
+    htohVertical: 'htohVertical',
+    cmyBidi: 'cmyBidi',
+    kBidi: 'kBidi',
+    kSkew: 'kSkew',
+    cmySkew: 'cmySkew',
+    cmyBidiDraft: 'cmyBidiDraft',
+    kBidiDraft: 'kBidiDraft',
+    cmyXao: 'cmyXao',
+    kXao: 'kXao'
+  };
+  exports.MANUAL_ALIGNMENT_PARAMS = MANUAL_ALIGNMENT_PARAMS;
+  var FROM_TYPE = {
+    FROM_QUALITY_OPTIMIZE: 1,
+    FROM_REPORT: 2,
+    FROM_ALIGNMENT_FAIL: 3,
+    FROM_ALIGNMENT_SUCCESS: 4,
+    FROM_QUALITY_PRINT: 5,
+    FROM_MANUAL_ALIGNMENT_FAIL: 6,
+    FROM_PRINT_SAMPLE_PAGE_COMPLETE: 7,
+    FROM_OOBE_COMPLETE: 8
+  };
+  exports.FROM_TYPE = FROM_TYPE;
+  var LOG_SCOPE = {
+    LOG_ALL: 0,
+    LOG_ONLY_DB: 1,
+    LOG_ONLY_CB: 2
+  };
+  exports.LOG_SCOPE = LOG_SCOPE;
+  var MAINTENACE_TYPE = {
+    LTC: 1,
+    ITC: 2,
+    STC: 3,
+    IMP: 4,
+    EOP: 5,
+    FS: 7,
+    POR: 10,
+    MIHU: 11,
+    PM: 12,
+    HI: 13,
+    MCH: 14,
+    IS: 15
+  };
+  exports.MAINTENACE_TYPE = MAINTENACE_TYPE;
+  var ROTATION = {
+    AUTO: -1,
+    ROTATE_0: 0,
+    ROTATE_90: 90,
+    ROTATE_180: 180,
+    ROTATE_270: 270
+  };
+  exports.ROTATION = ROTATION;
+  var INK_STATE = {
+    INK_NORMAL: 1,
+    INK_LOW: 2,
+    INK_EMPTY: 3
+  };
+  exports.INK_STATE = INK_STATE;
+  var alignment_from_type = {
+    START_ALIGNMENT: 1,
+    ALIGNMENT_ANIMATION_CANCEL: 2,
+    ALIGNMENT_ANIMATION_FAIL: 3,
+    ALIGNMENT_ANIMATION_ERROR: 4
+  };
+  exports.alignment_from_type = alignment_from_type;
+  var fULLBLEED = {
+    false: 0,
+    true: 1
+  };
+  exports.fULLBLEED = fULLBLEED;
+  var SCALE = {
+    AUTO: 0,
+    FIT: 1,
+    FILL: 2,
+    ACTUAL: 3
+  };
+  exports.SCALE = SCALE;
+  var NAVIGATION = {
+    HONE: 1,
+    CARRIER: 2,
+    PRINT_HEAD: 3,
+    INK: 4
+  };
+  exports.NAVIGATION = NAVIGATION;
+  var MINT_PRINTER_STATUS_CATEGORY = {
+    PRINTER_STATUS_CATEGORY_IDLE: "idle",
+    PRINTER_STATUS_CATEGORY_PROCESSING: "processing",
+    PRINTER_STATUS_CATEGORY_ERROR: "error",
+    PRINTER_STATUS_CATEGORY_SLEEP: "sleep",
+    PRINTER_STATUS_CATEGORY_OFF: "off",
+    PRINTER_STATUS_CATEGORY_UPDATING: "updating",
+    PRINTER_STATUS_CATEGORY_MAINTENANCE: "maintenance",
+    PRINTER_STATUS_CATEGORY_UPDATING_FIRMWARE: "updating firmware",
+    PRINTER_STATUS_CATEGORY_FACTORY_RESET: "factory reset"
+  };
+  exports.MINT_PRINTER_STATUS_CATEGORY = MINT_PRINTER_STATUS_CATEGORY;
+  var MINT_PRINTER_SUB_CATEGORY = {
+    PRINTER_STATUS_SUB_CATEGORY_INIT: "init",
+    PRINTER_STATUS_SUB_CATEGORY_SMART_SHEET: "smart_sheet",
+    PRINTER_STATUS_SUB_CATEGORY_PRE_HEAT: "pre_heat",
+    PRINTER_STATUS_SUB_CATEGORY_COOL_DOWN: "cool_down",
+    PRINTER_STATUS_SUB_CATEGORY_LOAD_PAPER: "load_paper",
+    PRINTER_STATUS_SUB_CATEGORY_PRINTING: "printing",
+    PRINTER_STATUS_SUB_CATEGORY_CLEANING: "cleaning",
+    PRINTER_STATUS_SUB_CATEGORY_DECODING: "decoding",
+    PRINTER_STATUS_SUB_CATEGORY_INSTALLED: "installed",
+    PRINTER_STATUS_SUB_CATEGORY_INSTALLING: "installing",
+    PRINTER_STATUS_SUB_CATEGORY_DOWNLOADING: "downloading",
+    PRINTER_STATUS_SUB_CATEGORY_IDLE: "idle",
+    PRINTER_STATUS_SUB_CATEGORY_PRINTING_Y: "printing_Y",
+    PRINTER_STATUS_SUB_CATEGORY_PRINTING_M: "printing_M",
+    PRINTER_STATUS_SUB_CATEGORY_PRINTING_C: "printing_C",
+    PRINTER_STATUS_SUB_CATEGORY_PRINTING_OC: "printing_OC",
+    PRINTER_STATUS_SUB_CATEGORY_HOME_FEED: "home_feed",
+    PRINTER_STATUS_SUB_CATEGORY_EJECT: "eject",
+    PRINTER_STATUS_SUB_CATEGORY_DOWNLOADED: "downloaded"
+  };
+  exports.MINT_PRINTER_SUB_CATEGORY = MINT_PRINTER_SUB_CATEGORY;
+  var MINT_JOB_STATUS = {
+    PRINTER_JOB_STATUS_WAITING: "waiting",
+    PRINTER_JOB_STATUS_INIT: "init",
+    PRINTER_JOB_STATUS_INITLIZATION: "initlization",
+    PRINTER_JOB_STATUS_DOWNLOADING: "downloading",
+    PRINTER_JOB_STATUS_PRINTING_Y: "printing_Y",
+    PRINTER_JOB_STATUS_PRINTING_M: "printing_M",
+    PRINTER_JOB_STATUS_PRINTING_C: "printing_C",
+    PRINTER_JOB_STATUS_PRINTING_OC: "printing_OC",
+    PRINTER_JOB_STATUS_HOME_FEED: "home_feed",
+    PRINTER_JOB_STATUS_COOL_DOWN: "cool_down",
+    PRINTER_JOB_STATUS_FINISHED: "finished",
+    PRINTER_JOB_STATUS_CANCELED: "canceled",
+    PRINTER_JOB_STATUS_ABORTED: "aborted"
+  };
+  exports.MINT_JOB_STATUS = MINT_JOB_STATUS;
+  var MINT_PRINTER_ERROR = {
+    PRINTER_ERROR_PAPER_JAM: "PaperJam",
+    PRINTER_ERROR_PAPER_EMPTY: "PaperEmpty",
+    PRINTER_ERROR_NO_PAPER_TRAY: "NoPaperTray",
+    PRINTER_ERROR_NO_INK_RIBBON: "NoInkRibbon",
+    PRINTER_ERROR_INK_RIBBON_END: "InkRibbonEnd",
+    PRINTER_ERROR_NO_INK_RIBBON_MARKER: "NoInkRibbonMarker",
+    PRINTER_ERROR_PAPER_ERROR: "PaperError",
+    PRINTER_ERROR_INK_RIBBON_ERROR: "InkRibbonError",
+    PRINTER_ERROR_HW_ERROR: "HwError",
+    PRINTER_ERROR_PAPER_EJECT_ERROR: "PaperEjectError",
+    PRINTER_ERROR_PAPER_LENGTH_ERROR: "PaperLengthError"
+  };
+  exports.MINT_PRINTER_ERROR = MINT_PRINTER_ERROR;
+  var MINT_PRINTER_ERROR_CODE = {
+    PRINTER_DEVICE_ERROR_UNSUPPORTED_METHOD: -5001,
+    PRINTER_DEVICE_ERROR_INVALID_PARAMETERS: -5002,
+    PRINTER_DEVICE_ERROR_DATA_LENGTH_IS_OVERFLOW: -5003,
+    PRINTER_DEVICE_ERROR_OUT_OF_MEMORY: -5004,
+    PRINTER_DEVICE_ERROR_ATTRIBUTE_UNSUPPORTED: -6001,
+    PRINTER_DEVICE_ERROR_SYSTEM_ERROR: -6002,
+    PRINTER_DEVICE_ERROR_DECODE_ERROR: -6003,
+    PRINTER_DEVICE_ERROR_COVER_OPEN: -7001,
+    PRINTER_DEVICE_ERROR_HEAD_OVER_HEAT: -7002,
+    PRINTER_DEVICE_ERROR_PAPER_EMPTY: -7101,
+    PRINTER_DEVICE_ERROR_PAPER_MISMATCH: -7102,
+    PRINTER_DEVICE_ERROR_PAPER_LOAD: -7103,
+    PRINTER_DEVICE_ERROR_PAPER_JAM: -7104,
+    PRINTER_DEVICE_ERROR_PAPER_LENGTH_ERROR: -7105,
+    PRINTER_DEVICE_ERROR_PAPER_EJECT_ERROR: -7106,
+    PRINTER_DEVICE_ERROR_PAPER_ERROR: -7107,
+    PRINTER_DEVICE_ERROR_NO_PAPER_TRAY: -7108,
+    PRINTER_DEVICE_ERROR_NO_SMARTSHEET: -7109,
+    PRINTER_DEVICE_ERROR_PAPER_REMOVE: -7110,
+    PRINTER_DEVICE_ERROR_PAPER_REMOVE_B: -7111,
+    PRINTER_DEVICE_ERROR_PAPER_REMOVE_PRINTING: -7112,
+    PRINTER_DEVICE_ERROR_PAPER_REMOVE_LOAD: -7114,
+    PRINTER_DEVICE_ERROR_RIBBON_END: -7201,
+    PRINTER_DEVICE_ERROR_RIBBON_JAM: -7202,
+    PRINTER_DEVICE_ERROR_NO_RIBBON: -7203,
+    PRINTER_DEVICE_ERROR_NO_RIBBON_MARKER: -7204,
+    PRINTER_DEVICE_ERROR_RIBBON_ERROR: -7205,
+    PRINTER_DEVICE_ERROR_INVALLID_RIBBON_TYPE: -7206,
+    PRINTER_DEVICE_ERROR_RIBBON_ERROR_2: -7208,
+    PRINTER_DEVICE_ERROR_HW_ERROR: -7301,
+    PRINTER_DEVICE_ERROR_BROKEN_HEAD_DOTS: -7302,
+    PRINTER_DEVICE_ERROR_LOAD_ROLLER_UNIT_FAIL: -7303,
+    PRINTER_DEVICE_ERROR_PLATEN_UNIT_FAIL: -7304,
+    PRINTER_DEVICE_ERROR_PRINTER_OVERHEAT: -7308,
+    PRINTER_DEVICE_ERROR_PRINTER_OVERCOOL: -7309,
+    PRINTER_DEVICE_ERROR_PRINTER_BATTERY_CRITICAL: -7310,
+    PRINTER_DEVICE_ERROR_PRINTER_BATTERY_OFF: -7311,
+    PRINTER_DEVICE_ERROR_FIND_NO_JOB: -8001,
+    PRINTER_DEVICE_ERROR_QUEUE_FULL: -8002,
+    PRINTER_DEVICE_ERROR_QUEUE_EMPTY: -8003,
+    PRINTER_DEVICE_ERROR_OVER_LIMITED_SIZE: -8004,
+    PRINTER_DEVICE_ERROR_TRANSFER_ERROR: -8005,
+    PRINTER_DEVICE_ERROR_LOW_BATTERY_ERROR: -8006,
+    PRINTER_DEVICE_ERROR_OVERHEAT: -8108,
+    PRINTER_DEVICE_ERROR_OVERCOOL: -8109,
+    PRINTER_DEVICE_ERROR_RPT_ERROR: -8201,
+    PRINTER_DEVICE_BT_DISCONNECTED_ERROR: -9001,
+    PRINTER_DEVICE_APP_TRANSFER_ERROR: -9002,
+    PRINTER_DEVICE_OTA_TRANSFER_ERROR: -9003,
+    PRINTER_DEVICE_OTA_TIMEOUT_ERROR: -9004
+  };
+  exports.MINT_PRINTER_ERROR_CODE = MINT_PRINTER_ERROR_CODE;
+  var MINT_BLUETOOTH_STATE = {
+    DISCONNECTED: 0,
+    CONNECTING: 1,
+    CONNECTED: 2,
+    DISCONNECTING: 3,
+    NO_STATE: 4,
+    AUTH: 5,
+    AUTH_FAILED: 6,
+    CONNECTING_NEED_ALERT: 7
+  };
+  exports.MINT_BLUETOOTH_STATE = MINT_BLUETOOTH_STATE;
+  var CONNECT_STAGE_RICOTTA = {
+    CONNECTING_UNKNOWN: -1,
+    CONNECTING_BEFORE_3_MINS: 0,
+    CONNECTING_BEFORE_10_MINS: 1,
+    CONNECTING_AFTER_10_MINS: 2
+  };
+  exports.CONNECT_STAGE_RICOTTA = CONNECT_STAGE_RICOTTA;
+  var MINT_TASK_STATUS = {
+    MINT_TASK_STATUS_UNSTARTED: 0,
+    MINT_TASK_STATUS_CREATING: 1,
+    MINT_TASK_STATUS_TRANSFERRING: 2,
+    MINT_TASK_STATUS_PRINTING: 3,
+    MINT_TASK_STATUS_FINISHED: 4,
+    MINT_TASK_STATUS_FAILED: 5,
+    MINT_TASK_STATUS_SUCCEED: 6,
+    MINT_TASK_STATUS_SUCCEED_GET_ALL_INFO: 7,
+    MINT_TASK_STATUS_SUCCEED_REPORTED: 8
+  };
+  exports.MINT_TASK_STATUS = MINT_TASK_STATUS;
+  var MINT_PRINTING_UI_STAGE = {
+    MINT_PRINTING_TRANSFERRING: 0,
+    MINT_PRINTING_PREPARING: 1,
+    MINT_PRINTING_PRINTING: 2,
+    MINT_CLEAN_PREPAEING: 0,
+    MINT_CLEAN_CLEANING: 1
+  };
+  exports.MINT_PRINTING_UI_STAGE = MINT_PRINTING_UI_STAGE;
+  var MINT_BATTERY = {
+    DEVICE_CONNECTING: -3,
+    DEVICE_NOT_CONNECTED: -2,
+    POWER_CAP_UNKNOWN: -1,
+    POWER_CAP_CRITICAL: 0,
+    POWER_CAP_LOW: 1,
+    POWER_CAP_MEDIAN: 2,
+    POWER_CAP_HIGH: 3,
+    POWER_CAP_FULL: 4,
+    POWER_CAP_POWER_OFF: 5,
+    POWER_CAP_CHARGE_CRITICAL: 16,
+    POWER_CAP_CHARGE_LOW: 17,
+    POWER_CAP_CHARGE_MEDIAN: 18,
+    POWER_CAP_CHARGE_HIGH: 19,
+    POWER_CAP_CHARGE_FULL: 20,
+    POWER_CAP_CHARGE_POWER_OFF: 21,
+    POWER_CAP_NO_CHARGE_CRITICAL: 8,
+    POWER_CAP_NO_CHARGE_LOW: 9,
+    POWER_CAP_NO_CHARGE_MEDIAN: 10,
+    POWER_CAP_NO_CHARGE_HIGH: 11,
+    POWER_CAP_NO_CHARGE_FULL: 12,
+    POWER_CAP_NO_CHARGE_POWER_OFF: 13,
+    POWER_CAP_NO_CHARGE_FULL_TEMP_ERROR: 14
+  };
+  exports.MINT_BATTERY = MINT_BATTERY;
+  var MINT_TEMP = {
+    MINT_TEMP_TO_LOW: 0,
+    MINT_TEMP_LOW: 1,
+    MINT_TEMP_NORMAL: 2,
+    MINT_TEMP_HIGH: 3,
+    MINT_TEMP_TO_HIGH: 4,
+    MINT_TEMP_UNKNOWN: 5
+  };
+  exports.MINT_TEMP = MINT_TEMP;
+  var MINT_ERROR_HELP_URL = {
+    MINT_PAPER_LOAD_ERROR_CLEAN_CN: "https://cdn.eco.mi.com/hantu/static/mint/video/MN_Paper_load_error_clean.mp4",
+    MINT_PAPER_LOAD_ERROR_CLEAN_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/mint/video/MN_Paper_load_error_clean.mp4",
+    MINT_PAPER_LOAD_ERROR_CLEAN_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/mint/video/MN_Paper_load_error_clean.mp4",
+    MINT_PAPER_LOAD_ERROR_CLEAN_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/mint/video/MN_Paper_load_error_clean.mp4",
+    MINT_PAPER_LOAD_ERROR_CLEAN_OR: "https://or.cdn.eco.mi.com/hannto-static/static/mint/video/MN_Paper_load_error_clean.mp4",
+    MINT_PAPER_LOAD_ERROR_PRINT_CN: "https://cdn.eco.mi.com/hantu/static/mint/video/MN_Paper_load_error_print.mp4",
+    MINT_PAPER_LOAD_ERROR_PRINT_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/mint/video/MN_Paper_load_error_print.mp4",
+    MINT_PAPER_LOAD_ERROR_PRINT_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/mint/video/MN_Paper_load_error_print.mp4",
+    MINT_PAPER_LOAD_ERROR_PRINT_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/mint/video/MN_Paper_load_error_print.mp4",
+    MINT_PAPER_LOAD_ERROR_PRINT_OR: "https://or.cdn.eco.mi.com/hannto-static/static/mint/video/MN_Paper_load_error_print.mp4",
+    MINT_OUT_PAPER_CLEAN_CN: "https://cdn.eco.mi.com/hantu/static/mint/video/MN_out_paper_clean.mp4",
+    MINT_OUT_PAPER_CLEAN_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/mint/video/MN_out_paper_clean.mp4",
+    MINT_OUT_PAPER_CLEAN_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/mint/video/MN_out_paper_clean.mp4",
+    MINT_OUT_PAPER_CLEAN_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/mint/video/MN_out_paper_clean.mp4",
+    MINT_OUT_PAPER_CLEAN_OR: "https://or.cdn.eco.mi.com/hannto-static/static/mint/video/MN_out_paper_clean.mp4",
+    MINT_OUT_PAPER_PRINT_CN: "https://cdn.eco.mi.com/hantu/static/mint/video/MN_out_paper_print.mp4",
+    MINT_OUT_PAPER_PRINT_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/mint/video/MN_out_paper_print.mp4",
+    MINT_OUT_PAPER_PRINT_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/mint/video/MN_out_paper_print.mp4",
+    MINT_OUT_PAPER_PRINT_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/mint/video/MN_out_paper_print.mp4",
+    MINT_OUT_PAPER_PRINT_OR: "https://or.cdn.eco.mi.com/hannto-static/static/mint/video/MN_out_paper_print.mp4"
+  };
+  exports.MINT_ERROR_HELP_URL = MINT_ERROR_HELP_URL;
+  var RICOTTA_AR_VIDEO_URL = {
+    RICOTTA_P_MAKE_AR: "https://cdn.eco.mi.com/hantu/static/ricotta/RT_AR_Photo_Guide.mp4",
+    RICOTTA_MAKE_AR_CN: "https://cdn.eco.mi.com/hantu/static/ricotta/9-RT_Make_AR_Photo.mp4",
+    RICOTTA_MAKE_AR_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/ricotta/9-RT_Make_AR_Photo.mp4",
+    RICOTTA_MAKE_AR_OR: "https://or.cdn.eco.mi.com/hannto-static/static/ricotta/9-RT_Make_AR_Photo.mp4",
+    RICOTTA_MAKE_AR_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/ricotta/9-RT_Make_AR_Photo.mp4",
+    RICOTTA_MAKE_AR_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/ricotta/9-RT_Make_AR_Photo.mp4"
+  };
+  exports.RICOTTA_AR_VIDEO_URL = RICOTTA_AR_VIDEO_URL;
+  var RICOTTA_G_GUIDE_URL = {
+    RICOTTA_G_GUIDE_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/ricotta/help/index.html",
+    RICOTTA_G_GUIDE_OR: "https://or.cdn.eco.mi.com/hannto-static/static/ricotta/help/index.html",
+    RICOTTA_G_GUIDE_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/ricotta/help/index.html",
+    RICOTTA_G_GUIDE_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/ricotta/help/index.html"
+  };
+  exports.RICOTTA_G_GUIDE_URL = RICOTTA_G_GUIDE_URL;
+  var RICOTTA_PRINTER_ERROR_CODE = {
+    PRINTER_DEVICE_ERROR_COVER_OPEN: -7001,
+    PRINTER_DEVICE_ERROR_PAPER_LOAD: -7103,
+    PRINTER_DEVICE_ERROR_PAPER_JAM: -7104,
+    PRINTER_DEVICE_ERROR_PAPER_LENGTH_ERROR: -7105,
+    PRINTER_DEVICE_ERROR_PAPER_EJECT_ERROR: -7106,
+    PRINTER_DEVICE_ERROR_PAPER_ERROR: -7107,
+    PRINTER_DEVICE_ERROR_PAPER_REMOVE: -7110,
+    PRINTER_DEVICE_ERROR_RIBBON_END: -7201,
+    PRINTER_DEVICE_ERROR_NO_RIBBON: -7203,
+    PRINTER_DEVICE_ERROR_NO_RIBBON_MARKER: -7204,
+    PRINTER_DEVICE_ERROR_RIBBON_ERROR: -7205
+  };
+  exports.RICOTTA_PRINTER_ERROR_CODE = RICOTTA_PRINTER_ERROR_CODE;
+  var RICOTTA_JOB_ERROR_CODE = {
+    JOB_MGR_INVALID_ARGUMENT: -8001,
+    JOB_MGR_OVERFLOW_LENGTH: -8002,
+    JOB_MGR_OUT_OF_MEMORY: -8003,
+    JOB_MGR_SYSTEM_ERR: -8004,
+    JOB_MGR_FIND_NO_JOB: -8005,
+    JOB_MGR_QUEUE_FULL: -8006,
+    JOB_MGR_QUEUE_EMPTY: -8007,
+    JOB_MGR_OVER_SIZE_LIMIT: -8008,
+    JOB_MGR_TRANSFER_ERR: -8009,
+    JOB_MGR_PROCESS_BUSY: -8011,
+    JOB_MGR_JSON_PARSE_ERR: -8012,
+    JOB_MGR_JOB_TIMEOUT_ERR: -8013
+  };
+  exports.RICOTTA_JOB_ERROR_CODE = RICOTTA_JOB_ERROR_CODE;
+  var RICOTTA_ERROR_HELP_URL = {
+    RICOTTA_PAPER_LOAD_URL: "https://cdn.eco.mi.com/hantu/static/ricotta/1-RT_Paper_Load.mp4",
+    RICOTTA_PICKUP_PAPER_JAM_URL: "https://cdn.eco.mi.com/hantu/static/ricotta/2-RT_Pickup_Paper_Jam.mp4",
+    RICOTTA_PAPER_DETECT_B_URL: "https://cdn.eco.mi.com/hantu/static/ricotta/3-RT_Paper_DetectB.mp4",
+    RICOTTA_NO_RIBBON_URL: "https://cdn.eco.mi.com/hantu/static/ricotta/4-RT_No_Ribbon.mp4",
+    RICOTTA_PAPER_LENGTH_URL: "https://cdn.eco.mi.com/hantu/static/ricotta/5-RT_Paper_length_Error.mp4",
+    RICOTTA_RIBBON_ERROR_URL: "https://cdn.eco.mi.com/hantu/static/ricotta/6-RT_Ribbon_Error.mp4",
+    RICOTTA_SECOND_RIBBON_ERROR_URL: "https://cdn.eco.mi.com/hantu/static/ricotta/7-RT_Second_Ribbon_Error.mp4",
+    RICOTTA_PAPER_JAM_URL: "https://cdn.eco.mi.com/hantu/static/ricotta/8-RT_Paper_Jam.mp4",
+    RICOTTA_OVERSEAS_PAPER_LOAD_URL_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/ricotta/1-RT_Paper_Load.mp4",
+    RICOTTA_OVERSEAS_PAPER_LOAD_URL_OR: "https://or.cdn.eco.mi.com/hannto-static/static/ricotta/1-RT_Paper_Load.mp4",
+    RICOTTA_OVERSEAS_PAPER_LOAD_URL_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/ricotta/1-RT_Paper_Load.mp4",
+    RICOTTA_OVERSEAS_PAPER_LOAD_URL_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/ricotta/1-RT_Paper_Load.mp4",
+    RICOTTA_OVERSEAS_PICKUP_PAPER_JAM_URL_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/ricotta/2-RT_Pickup_Paper_Jam.mp4",
+    RICOTTA_OVERSEAS_PICKUP_PAPER_JAM_URL_OR: "https://or.cdn.eco.mi.com/hannto-static/static/ricotta/2-RT_Pickup_Paper_Jam.mp4",
+    RICOTTA_OVERSEAS_PICKUP_PAPER_JAM_URL_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/ricotta/2-RT_Pickup_Paper_Jam.mp4",
+    RICOTTA_OVERSEAS_PICKUP_PAPER_JAM_URL_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/ricotta/2-RT_Pickup_Paper_Jam.mp4",
+    RICOTTA_OVERSEAS_PAPER_DETECT_B_URL_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/ricotta/3-RT_Paper_DetectB.mp4",
+    RICOTTA_OVERSEAS_PAPER_DETECT_B_URL_OR: "https://or.cdn.eco.mi.com/hannto-static/static/ricotta/3-RT_Paper_DetectB.mp4",
+    RICOTTA_OVERSEAS_PAPER_DETECT_B_URL_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/ricotta/3-RT_Paper_DetectB.mp4",
+    RICOTTA_OVERSEAS_PAPER_DETECT_B_URL_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/ricotta/3-RT_Paper_DetectB.mp4",
+    RICOTTA_OVERSEAS_NO_RIBBON_URL_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/ricotta/4-RT_No_Ribbon.mp4",
+    RICOTTA_OVERSEAS_NO_RIBBON_URL_OR: "https://or.cdn.eco.mi.com/hannto-static/static/ricotta/4-RT_No_Ribbon.mp4",
+    RICOTTA_OVERSEAS_NO_RIBBON_URL_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/ricotta/4-RT_No_Ribbon.mp4",
+    RICOTTA_OVERSEAS_NO_RIBBON_URL_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/ricotta/4-RT_No_Ribbon.mp4",
+    RICOTTA_OVERSEAS_PAPER_LENGTH_URL_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/ricotta/5-RT_Paper_length_Error.mp4",
+    RICOTTA_OVERSEAS_PAPER_LENGTH_URL_OR: "https://or.cdn.eco.mi.com/hannto-static/static/ricotta/5-RT_Paper_length_Error.mp4",
+    RICOTTA_OVERSEAS_PAPER_LENGTH_URL_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/ricotta/5-RT_Paper_length_Error.mp4",
+    RICOTTA_OVERSEAS_PAPER_LENGTH_URL_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/ricotta/5-RT_Paper_length_Error.mp4",
+    RICOTTA_OVERSEAS_RIBBON_ERROR_URL_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/ricotta/6-RT_Ribbon_Error.mp4",
+    RICOTTA_OVERSEAS_RIBBON_ERROR_URL_OR: "https://or.cdn.eco.mi.com/hannto-static/static/ricotta/6-RT_Ribbon_Error.mp4",
+    RICOTTA_OVERSEAS_RIBBON_ERROR_URL_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/ricotta/6-RT_Ribbon_Error.mp4",
+    RICOTTA_OVERSEAS_RIBBON_ERROR_URL_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/ricotta/6-RT_Ribbon_Error.mp4",
+    RICOTTA_OVERSEAS_SECOND_RIBBON_ERROR_URL_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/ricotta/7-RT_Second_Ribbon_Error.mp4",
+    RICOTTA_OVERSEAS_SECOND_RIBBON_ERROR_URL_OR: "https://or.cdn.eco.mi.com/hannto-static/static/ricotta/7-RT_Second_Ribbon_Error.mp4",
+    RICOTTA_OVERSEAS_SECOND_RIBBON_ERROR_URL_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/ricotta/7-RT_Second_Ribbon_Error.mp4",
+    RICOTTA_OVERSEAS_SECOND_RIBBON_ERROR_URL_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/ricotta/7-RT_Second_Ribbon_Error.mp4",
+    RICOTTA_OVERSEAS_PAPER_JAM_URL_EU: "https://eu.cdn.eco.mi.com/hannto-static/static/ricotta/8-RT_Paper_Jam.mp4",
+    RICOTTA_OVERSEAS_PAPER_JAM_URL_OR: "https://or.cdn.eco.mi.com/hannto-static/static/ricotta/8-RT_Paper_Jam.mp4",
+    RICOTTA_OVERSEAS_PAPER_JAM_URL_RU: "https://ru.cdn.eco.mi.com/hannto-static/static/ricotta/8-RT_Paper_Jam.mp4",
+    RICOTTA_OVERSEAS_PAPER_JAM_URL_SG: "https://sg.cdn.eco.mi.com/hannto-static/static/ricotta/8-RT_Paper_Jam.mp4",
+    RICOTTA_P_PAPER_LOAD_URL: "https://cdn.eco.mi.com/hantu/static/ricotta_p/1-RT_P_Paper_Load.mp4",
+    RICOTTA_P_PICKUP_PAPER_JAM_URL: "https://cdn.eco.mi.com/hantu/static/ricotta_p/2-RT_P_Pickup_Paper_Jam.mp4",
+    RICOTTA_P_PAPER_DETECT_B_URL: "https://cdn.eco.mi.com/hantu/static/ricotta_p/3-RT_P_Paper_DetectB.mp4",
+    RICOTTA_P_NO_RIBBON_URL: "https://cdn.eco.mi.com/hantu/static/ricotta_p/4-RT_P_No_Ribbon.mp4",
+    RICOTTA_P_PAPER_LENGTH_URL: "https://cdn.eco.mi.com/hantu/static/ricotta_p/5-RT_P_Paper_length_Error.mp4",
+    RICOTTA_P_RIBBON_ERROR_URL: "https://cdn.eco.mi.com/hantu/static/ricotta_p/6-RT_P_Ribbon_Error.mp4",
+    RICOTTA_P_SECOND_RIBBON_ERROR_URL: "https://cdn.eco.mi.com/hantu/static/ricotta_p/7-RT_P_Second_Ribbon_Error.mp4",
+    RICOTTA_P_PAPER_JAM_URL: "https://cdn.eco.mi.com/hantu/static/ricotta_p/8-RT_P_Paper_Jam.mp4"
+  };
+  exports.RICOTTA_ERROR_HELP_URL = RICOTTA_ERROR_HELP_URL;
+  var BIGDATA_KEYS = {
+    FW_DEVICE_USG_BIGDATA_COMBO: 'FW_DEVICE_USG_BIGDATA_COMBO',
+    FW_DEVICE_PROP_DEVICEINFO_COMBO: 'FW_DEVICE_PROP_DEVICEINFO_COMBO',
+    APP_LAUNCH_USG_LAUNCH: 'APP_LAUNCH_USG_LAUNCH',
+    APP_CONN_BT_USG_START: 'APP_CONN_BT_USG_START',
+    APP_CONN_BT_USG_SUCCESS: 'APP_CONN_BT_USG_SUCCESS',
+    APP_CONN_BT_USG_FAIL: 'APP_CONN_BT_USG_FAIL',
+    APP_PG_HOME_USG_CONNBTN: 'APP_PG_HOME_USG_CONNBTN',
+    APP_FWUPDATE_USG_START: 'APP_FWUPDATE_USG_START',
+    APP_FWUPDATE_USG_SUCCESS: 'APP_FWUPDATE_USG_SUCCESS',
+    APP_FWUPDATE_USG_FAIL: 'APP_FWUPDATE_USG_FAIL',
+    APP_PG_HOME_USG_QUEUE: 'APP_PG_HOME_USG_QUEUE',
+    APP_PG_HOME_USG_HELP: 'APP_PG_HOME_USG_HELP',
+    APP_PG_HOME_USG_PHOTOPRINT: 'APP_PG_HOME_USG_PHOTOPRINT',
+    APP_PG_HOME_USG_PHOTOBOOTH: 'APP_PG_HOME_USG_PHOTOBOOTH',
+    APP_PG_HOME_USG_TEMPLATE: 'APP_PG_HOME_USG_TEMPLATE',
+    APP_PG_HOME_USG_ARPHOTO: 'APP_PG_HOME_USG_ARPHOTO',
+    APP_PG_HOME_USG_AUDIOPHOTO: 'APP_PG_HOME_USG_AUDIOPHOTO',
+    APP_PG_HOME_USG_MYAR: 'APP_PG_HOME_USG_MYAR',
+    APP_PG_HOME_USG_ARSCAN: 'APP_PG_HOME_USG_ARSCAN',
+    APP_PG_HOME_USG_PUZZLEPHOTO: 'APP_PG_HOME_USG_PUZZLEPHOTO',
+    APP_PG_HOME_USG_SPLITPHOTO: 'APP_PG_HOME_USG_SPLITPHOTO',
+    APP_PG_HOME_USG_HEADSHOTPHOTO: 'APP_PG_HOME_USG_HEADSHOTPHOTO',
+    APP_PG_HOME_USG_DEVICESHARE: 'APP_PG_HOME_USG_DEVICESHARE',
+    APP_PG_HOME_USG_BUYLINK: 'APP_PG_HOME_USG_BUYLINK',
+    APP_PG_HOME_USG_SETTING: 'APP_PG_HOME_USG_SETTING',
+    APP_PG_HOME_USG_LIVEPHOTO: 'APP_PG_HOME_USG_LIVEPHOTO',
+    FW_PRINT_PROP_JOBINFO: 'FW_PRINT_PROP_JOBINFO',
+    APP_PERF_USG_BACKGROUND: 'APP_PERF_USG_BACKGROUND',
+    APP_CONN_BT_USG_DISCONN: 'APP_CONN_BT_USG_DISCONN',
+    APP_NET_REQ_EVT_REQUEST: 'APP_NET_REQ_EVT_REQUEST',
+    APP_NET_REQ_EVT_TIMEOUT: 'APP_NET_REQ_EVT_TIMEOUT',
+    APP_NET_REQ_EVT_FAIL: 'APP_NET_REQ_EVT_FAIL',
+    APP_PERF_EVENT_PERMISSIONDENIED: 'APP_PERF_EVENT_PERMISSIONDENIED',
+    APP_LAUNCH_EVT_EXIT: 'APP_LAUNCH_EVT_EXIT',
+    APP_PG_PRINTPREVIEW_EVT_PRINT: 'APP_PG_PRINTPREVIEW_EVT_PRINT',
+    APP_PG_PHOTOBOOTHPREVIEW_EVT_PRINT: 'APP_PG_PHOTOBOOTHPREVIEW_EVT_PRINT',
+    APP_PG_MYARPREVIEW_EVT_PRINT: 'APP_PG_MYARPREVIEW_EVT_PRINT',
+    APP_PG_PUZZLEPREVIEW_EVT_PRINT: 'APP_PG_PUZZLEPREVIEW_EVT_PRINT',
+    APP_PG_SPLITPREVIEW_EVT_PRINT: 'APP_PG_SPLITPREVIEW_EVT_PRINT',
+    APP_PG_HEADSHOTPREVIEW_EVT_PRINT: 'APP_PG_HEADSHOTPREVIEW_EVT_PRINT',
+    APP_PERF_EVT_FIRSTPAGERENDER: 'APP_PERF_EVT_FIRSTPAGERENDER',
+    APP_PRINT_EVT_CREATEJOB: 'APP_PRINT_EVT_CREATEJOB',
+    APP_PRINT_EVT_CREATEJOBSUCCESS: 'APP_PRINT_EVT_CREATEJOBSUCCESS',
+    APP_PRINT_EVT_CREATEJOBFAIL: 'APP_PRINT_EVT_CREATEJOBFAIL',
+    APP_PERF_EVT_PREPAREJOBTIME: 'APP_PERF_EVT_PREPAREJOBTIME',
+    APP_PG_ERR_EVT_START: 'APP_PG_ERR_EVT_START',
+    APP_CONN_BT_EVT_HANDSHAKESTART: 'APP_CONN_BT_EVT_HANDSHAKESTART',
+    APP_CONN_BT_EVT_HANDSHAKESUCCESS: 'APP_CONN_BT_EVT_HANDSHAKESUCCESS',
+    APP_CONN_BT_EVT_HANDSHAKEFAIL: 'APP_CONN_BT_EVT_HANDSHAKEFAIL',
+    APP_DEVICE_REQ_EVT_DEVICEINFOFAIL: 'APP_DEVICE_REQ_EVT_DEVICEINFOFAIL',
+    APP_DEVICE_REQ_EVT_MIXSTATUSFAIL: 'APP_DEVICE_REQ_EVT_MIXSTATUSFAIL',
+    APP_PG_HOME_EVT_POPRPT: 'APP_PG_HOME_EVT_POPRPT',
+    APP_PG_HOME_EVT_POPFWFORCE: 'APP_PG_HOME_EVT_POPFWFORCE',
+    APP_PG_HOME_EVT_POPIOSSET: 'APP_PG_HOME_EVT_POPIOSSET',
+    APP_PG_HOME_EVT_POPLONGTIMECONNFAIL: 'APP_PG_HOME_EVT_POPLONGTIMECONNFAIL',
+    APP_PG_HOME_EVT_POPROMCHECK: 'APP_PG_HOME_EVT_POPROMCHECK',
+    APP_DEVICE_EVT_MIXSTATUS: 'APP_DEVICE_EVT_MIXSTATUS',
+    APP_PRINT_EVT_TRANSFERJOBSUCCESS: 'APP_PRINT_EVT_TRANSFERJOBSUCCESS',
+    APP_PRINT_EVT_TRANSFERJOBFAIL: 'APP_PRINT_EVT_TRANSFERJOBFAIL',
+    APP_PRINT_EVT_JOBINFOFAIL: 'APP_PRINT_EVT_JOBINFOFAIL',
+    APP_PRINT_PHOTO_EVT_CHECKCONNECT: 'APP_PRINT_PHOTO_EVT_CHECKCONNECT',
+    APP_PRINT_PHOTO_EVT_CHECKCOPIES: 'APP_PRINT_PHOTO_EVT_CHECKCOPIES',
+    APP_PRINT_PHOTO_EVT_IMAGEPROCESS: 'APP_PRINT_PHOTO_EVT_IMAGEPROCESS',
+    APP_PRINT_PHOTO_EVT_ARCREATE: 'APP_PRINT_PHOTO_EVT_ARCREATE',
+    APP_PRINT_EVT_ADDTOQUEUE: 'APP_PRINT_EVT_ADDTOQUEUE',
+    APP_CONN_EVT_CHECKIDFAIL: 'APP_CONN_EVT_CHECKIDFAIL',
+    APP_DEVICE_EVT_ISOWNER: 'APP_DEVICE_EVT_ISOWNER',
+    APP_FWUPDATE_EVT_DOWNLOADSTART: 'APP_FWUPDATE_EVT_DOWNLOADSTART',
+    APP_FWUPDATE_EVT_DOWNLOADSUCCESS: 'APP_FWUPDATE_EVT_DOWNLOADSUCCESS',
+    APP_FWUPDATE_EVT_DOWNLOADFAIL: 'APP_FWUPDATE_EVT_DOWNLOADFAIL',
+    APP_FWUPDATE_EVT_CREATEJOB: 'APP_FWUPDATE_EVT_CREATEJOB',
+    APP_FWUPDATE_EVT_CREATEJOBSUCCESS: 'APP_FWUPDATE_EVT_CREATEJOBSUCCESS',
+    APP_FWUPDATE_EVT_CREATEJOBFAIL: 'APP_FWUPDATE_EVT_CREATEJOBFAIL',
+    APP_FWUPDATE_EVT_TRANSFERSUCCESS: 'APP_FWUPDATE_EVT_TRANSFERSUCCESS',
+    APP_FWUPDATE_EVT_TRANSFERFAIL: 'APP_FWUPDATE_EVT_TRANSFERFAIL',
+    APP_CONN_BT_EVT_CONNSTATECHANGE: 'APP_CONN_BT_EVT_CONNSTATECHANGE',
+    APP_CONN_BT_EVT_BONDSTATECHANGE: 'APP_CONN_BT_EVT_BONDSTATECHANGE',
+    APP_PRINT_EVT_ADDTOERRQUEUE: 'APP_PRINT_EVT_ADDTOERRQUEUE',
+    APP_AR_CREATE_EVT_REFRESHTOKEN: 'APP_AR_CREATE_EVT_REFRESHTOKEN',
+    APP_AR_CREATE_EVT_REFRESHTOKENSUCCESS: 'APP_AR_CREATE_EVT_REFRESHTOKENSUCCESS',
+    APP_AR_CREATE_EVT_REFRESHTOKENFAIL: 'APP_AR_CREATE_EVT_REFRESHTOKENFAIL',
+    APP_AR_CREATE_EVT_UPLOADIMAGE: 'APP_AR_CREATE_EVT_UPLOADIMAGE',
+    APP_AR_CREATE_EVT_UPLOADIMAGESUCCESS: 'APP_AR_CREATE_EVT_UPLOADIMAGESUCCESS',
+    APP_AR_CREATE_EVT_UPLOADIMAGEFAIL: 'APP_AR_CREATE_EVT_UPLOADIMAGEFAIL',
+    APP_AR_CREATE_EVT_UPLOADVIDEO: 'APP_AR_CREATE_EVT_UPLOADVIDEO',
+    APP_AR_CREATE_EVT_UPLOADVIDEOSUCCESS: 'APP_AR_CREATE_EVT_UPLOADVIDEOSUCCESS',
+    APP_AR_CREATE_EVT_UPLOADVIDEOFAIL: 'APP_AR_CREATE_EVT_UPLOADVIDEOFAIL',
+    APP_AR_CREATE_EVT_CHECKPUB: 'APP_AR_CREATE_EVT_CHECKPUB',
+    APP_AR_CREATE_EVT_CHECKPUBSUCCESS: 'APP_AR_CREATE_EVT_CHECKPUBSUCCESS',
+    APP_AR_CREATE_EVT_CHECKPUBFAIL: 'APP_AR_CREATE_EVT_CHECKPUBFAIL',
+    APP_AR_CREATE_EVT_DOWNLOADZIP: 'APP_AR_CREATE_EVT_DOWNLOADZIP',
+    APP_AR_CREATE_EVT_DOWNLOADZIPSUCCESS: 'APP_AR_CREATE_EVT_DOWNLOADZIPSUCCESS',
+    APP_AR_CREATE_EVT_DOWNLOADZIPFAIL: 'APP_AR_CREATE_EVT_DOWNLOADZIPFAIL',
+    APP_PG_PRINTPREVIEW_EVT_USGCNT_TEMPLATE: 'APP_PG_PRINTPREVIEW_EVT_USGCNT_TEMPLATE',
+    APP_PG_HOME_EVT_ARTEMPLATE: 'APP_PG_HOME_EVT_ARTEMPLATE',
+    APP_PG_PRINTPREVIEW_EVT_ARTEMPLATE_VIDEO: 'APP_PG_PRINTPREVIEW_EVT_ARTEMPLATE_VIDEO',
+    APP_PG_ARPASSWORDINPUT_EVT_ARTEMPLATE_PRINT: 'APP_PG_ARPASSWORDINPUT_EVT_ARTEMPLATE_PRINT',
+    APP_GUIDE_SHOW_POPUP_ACTION: 'APP_GUIDE_SHOW_POPUP_ACTION',
+    APP_GUIDE_STEP_CLICK_ACTION: 'APP_GUIDE_STEP_CLICK_ACTION',
+    APP_GUIDE_SKIP_CLICK_ACTION: 'APP_GUIDE_SKIP_CLICK_ACTION',
+    APP_GUIDE_COMPLETE_FLOW_ACTION: 'APP_GUIDE_COMPLETE_FLOW_ACTION',
+    APP_PG_PHOTOEDIT_EVT_ENTER: 'APP_PG_PHOTOEDIT_EVT_ENTER',
+    APP_PG_PHOTOEDIT_EVT_ACTION: 'APP_PG_PHOTOEDIT_EVT_ACTION',
+    APP_PG_PHOTOEDIT_EVT_APPLY: 'APP_PG_PHOTOEDIT_EVT_APPLY'
+  };
+  exports.BIGDATA_KEYS = BIGDATA_KEYS;
+},12173,[10033,10074,10055]);

@@ -1,0 +1,446 @@
+[
+  {
+    "source_id": "S01",
+    "title": "Model identity and plugin provenance",
+    "spans": [
+      {
+        "module_id": 12179,
+        "start_line": 18,
+        "end_line": 79,
+        "bundle_offset": 745049,
+        "bytes": 2487,
+        "sha256": "c1b38edb16ddc06599ece8685c1ba3566964eda7f2c82868b574122e1648e2cb"
+      }
+    ]
+  },
+  {
+    "source_id": "S02",
+    "title": "Business request constructors",
+    "spans": [
+      {
+        "module_id": 12407,
+        "start_line": 201,
+        "end_line": 300,
+        "bundle_offset": 1487279,
+        "bytes": 2573,
+        "sha256": "b8c89f4f5eced114557f11d2b2a2e5ab5e8105271ed7d9f1451486b6657e8570"
+      },
+      {
+        "module_id": 12407,
+        "start_line": 686,
+        "end_line": 725,
+        "bundle_offset": 1502770,
+        "bytes": 1013,
+        "sha256": "2323f32e4843daac22bd6ab3eb8f0c02dd55fc26eea0f9175d36afd3e6ce909a"
+      }
+    ]
+  },
+  {
+    "source_id": "S03",
+    "title": "Polling interval and response envelopes",
+    "spans": [
+      {
+        "module_id": 12311,
+        "start_line": 104,
+        "end_line": 115,
+        "bundle_offset": 953830,
+        "bytes": 540,
+        "sha256": "841a8228ad98989cd00c698ff9e62bd3d7370b6bf2dc6b6a56443b443a98b3b7"
+      },
+      {
+        "module_id": 12311,
+        "start_line": 581,
+        "end_line": 619,
+        "bundle_offset": 973539,
+        "bytes": 2224,
+        "sha256": "7354b17dd827533267c26fe3c1e4e49c25cdce52acaa3e14367cd747fded10c4"
+      },
+      {
+        "module_id": 12311,
+        "start_line": 709,
+        "end_line": 742,
+        "bundle_offset": 980916,
+        "bytes": 1621,
+        "sha256": "fb987ce18455d8f8e740226bc34680a2576d431a62e2f8046d84ebc8210e8d2a"
+      }
+    ]
+  },
+  {
+    "source_id": "S04",
+    "title": "Embedded battery percentage samples, not live captures",
+    "spans": [
+      {
+        "module_id": 13166,
+        "start_line": 194,
+        "end_line": 235,
+        "bundle_offset": 5137403,
+        "bytes": 1430,
+        "sha256": "4b95c26a770f55c367163a97cf15b972bdbb06d4793c485e9144ae3dc4092113"
+      },
+      {
+        "module_id": 13166,
+        "start_line": 681,
+        "end_line": 700,
+        "bundle_offset": 5157246,
+        "bytes": 903,
+        "sha256": "c69cd880259c36d1aee8ff3ab495937955dd8c6bb6ff6040b73a69fef95dcf00"
+      }
+    ]
+  },
+  {
+    "source_id": "S05",
+    "title": "Production battery presentation and sensors",
+    "spans": [
+      {
+        "module_id": 12863,
+        "start_line": 811,
+        "end_line": 839,
+        "bundle_offset": 3044444,
+        "bytes": 1408,
+        "sha256": "ff213585a0eaa9a77bcd2a5ee2bcc3383414c736ffcc928dbb23a2ae4cd51020"
+      },
+      {
+        "module_id": 12419,
+        "start_line": 139,
+        "end_line": 179,
+        "bundle_offset": 1545456,
+        "bytes": 1968,
+        "sha256": "8a99508de211454cf6586f9e6d2f31f782752aec3282812eec2a4624d39787a5"
+      },
+      {
+        "module_id": 12419,
+        "start_line": 221,
+        "end_line": 307,
+        "bundle_offset": 1549050,
+        "bytes": 3144,
+        "sha256": "25d2b7bd58eb4917ab86366b2f44649d30327198f82824403fc426270d1aea9a"
+      },
+      {
+        "module_id": 12311,
+        "start_line": 1612,
+        "end_line": 1699,
+        "bundle_offset": 1017812,
+        "bytes": 3488,
+        "sha256": "0c8db734ce19dbc3477373cd7d3e6de0e533fd75e1c5f7131d42bb6f9e038a7e"
+      }
+    ]
+  },
+  {
+    "source_id": "S06",
+    "title": "Enum definitions and conflicting job code namespaces",
+    "spans": [
+      {
+        "module_id": 12173,
+        "start_line": 1197,
+        "end_line": 1246,
+        "bundle_offset": 696651,
+        "bytes": 2413,
+        "sha256": "bf7af2afd3da7e401976f6f243c02e691ad5ae9eff1566158435bff2ac9ba4d5"
+      },
+      {
+        "module_id": 12173,
+        "start_line": 1261,
+        "end_line": 1313,
+        "bundle_offset": 699693,
+        "bytes": 2502,
+        "sha256": "6d97fa105f7b64dc54bea7212f607a6ea25fb3e3fb9c4744c3e86e0572773cbb"
+      },
+      {
+        "module_id": 12173,
+        "start_line": 1352,
+        "end_line": 1384,
+        "bundle_offset": 703323,
+        "bytes": 922,
+        "sha256": "f1e4e8eead1032966414a5f669092d9a23ba750a66c247330398a24b58a59ea7"
+      },
+      {
+        "module_id": 12173,
+        "start_line": 1425,
+        "end_line": 1453,
+        "bundle_offset": 707896,
+        "bytes": 1118,
+        "sha256": "feecd466ff24d605d936caabc919263a6dfdc6958a2f1181c7d4866faaa65b3c"
+      }
+    ]
+  },
+  {
+    "source_id": "S07",
+    "title": "Ricotta error UI policy and Chinese explanations",
+    "spans": [
+      {
+        "module_id": 12332,
+        "start_line": 248,
+        "end_line": 447,
+        "bundle_offset": 1214609,
+        "bytes": 9763,
+        "sha256": "4d0a6c1aff78338e12109d9f978af30766867ad071d96ca116627fdb60d2d44d"
+      },
+      {
+        "module_id": 12332,
+        "start_line": 911,
+        "end_line": 934,
+        "bundle_offset": 1255719,
+        "bytes": 1169,
+        "sha256": "f0525b695d302e2e700eacdb02fea5a69042eef2beeaf25cf65107ab40f942ec"
+      },
+      {
+        "module_id": 13484,
+        "start_line": 934,
+        "end_line": 981,
+        "bundle_offset": 7081409,
+        "bytes": 4029,
+        "sha256": "c184ab0613f65f5387fc134fdc4c598920a666dc70d496627193bc96b5b2ccfc"
+      }
+    ]
+  },
+  {
+    "source_id": "S08",
+    "title": "Already handled button calls resume_printer",
+    "spans": [
+      {
+        "module_id": 13145,
+        "start_line": 293,
+        "end_line": 325,
+        "bundle_offset": 4958066,
+        "bytes": 1308,
+        "sha256": "ccf4ca9a18823d0f60ebbbafde03f9482acafeeee9e3baf579e30d058f6a28b7"
+      },
+      {
+        "module_id": 13145,
+        "start_line": 744,
+        "end_line": 753,
+        "bundle_offset": 4978773,
+        "bytes": 344,
+        "sha256": "e00714791df5eb747b007ebcdb5b353e4c1e85f059ab899ef12dd0c0dd6e49a6"
+      },
+      {
+        "module_id": 13154,
+        "start_line": 708,
+        "end_line": 750,
+        "bundle_offset": 5031194,
+        "bytes": 1614,
+        "sha256": "674c3fc6d4e2e55667171fb134fc24d05d019193f0f675b0ad4d51da1c1da3e6"
+      }
+    ]
+  },
+  {
+    "source_id": "S09",
+    "title": "Cancel current job UI and on-wire id",
+    "spans": [
+      {
+        "module_id": 13208,
+        "start_line": 820,
+        "end_line": 848,
+        "bundle_offset": 5420310,
+        "bytes": 1083,
+        "sha256": "638ef50d4eba9bf5875d46dfbad1f296a87cf8e4df71d538e3327253d304c64e"
+      },
+      {
+        "module_id": 12311,
+        "start_line": 1209,
+        "end_line": 1235,
+        "bundle_offset": 1002189,
+        "bytes": 873,
+        "sha256": "65984af2cbcc33c58e8c56c719cb0c96a61f6283c89c5ae1ca49f3eeda8b602e"
+      },
+      {
+        "module_id": 12407,
+        "start_line": 261,
+        "end_line": 299,
+        "bundle_offset": 1488807,
+        "bytes": 1037,
+        "sha256": "e3c42e9f1548b580b4015aadfd660144d82b7594152d7f8da341e353c0f6b2e9"
+      }
+    ]
+  },
+  {
+    "source_id": "S10",
+    "title": "Command queue and response id/error handling",
+    "spans": [
+      {
+        "module_id": 12407,
+        "start_line": 788,
+        "end_line": 895,
+        "bundle_offset": 1505317,
+        "bytes": 3421,
+        "sha256": "0942e29e4f3a7f55db43fa7500e763f58a04b6e3c02afa81c6eeb54ba14e8f63"
+      },
+      {
+        "module_id": 12311,
+        "start_line": 719,
+        "end_line": 733,
+        "bundle_offset": 981372,
+        "bytes": 923,
+        "sha256": "5f9cddaa996bbc41d5f8db08f88fbae4dd9d7a8bf880f6714cf25c69e7e6282c"
+      }
+    ]
+  },
+  {
+    "source_id": "S11",
+    "title": "Frame fields, AES padding, and parser",
+    "spans": [
+      {
+        "module_id": 12368,
+        "start_line": 23,
+        "end_line": 40,
+        "bundle_offset": 1425605,
+        "bytes": 613,
+        "sha256": "6e5b5cc15d7e72325e820da61ba176cb1e1596cfd08e121ea5e860f1cf6226d2"
+      },
+      {
+        "module_id": 12368,
+        "start_line": 121,
+        "end_line": 172,
+        "bundle_offset": 1428526,
+        "bytes": 1200,
+        "sha256": "7036e30a1839de2d6510c10fe5130678886d6f9ef7752be8219f8c83756ab32e"
+      },
+      {
+        "module_id": 12368,
+        "start_line": 183,
+        "end_line": 221,
+        "bundle_offset": 1430020,
+        "bytes": 1116,
+        "sha256": "5748a5ea836a790f12ab65d95b2231bc2aa67cb0c55e4d79edbe1043403c9f63"
+      },
+      {
+        "module_id": 12365,
+        "start_line": 11,
+        "end_line": 41,
+        "bundle_offset": 1423855,
+        "bytes": 904,
+        "sha256": "748d2b7161a0bed1704d06d1597b17afb0ae991880a637640ee0ca6fca076c98"
+      },
+      {
+        "module_id": 12359,
+        "start_line": 43,
+        "end_line": 78,
+        "bundle_offset": 1371169,
+        "bytes": 821,
+        "sha256": "a4ebe56f532232ecf4cba92ff103e644814b09baaf57929a7f1109f8e5addf95"
+      },
+      {
+        "module_id": 12359,
+        "start_line": 107,
+        "end_line": 128,
+        "bundle_offset": 1372717,
+        "bytes": 820,
+        "sha256": "64ba34ed3d371b843324c725897c237efbc5f422a5795f7d2b2c81a959d90df4"
+      }
+    ]
+  },
+  {
+    "source_id": "S12",
+    "title": "DH encoding and transport",
+    "spans": [
+      {
+        "module_id": 12407,
+        "start_line": 900,
+        "end_line": 924,
+        "bundle_offset": 1508788,
+        "bytes": 980,
+        "sha256": "f6b29b37495d123f40a546e077a98ea8e267f9266c963fdae6f407ce50548ce6"
+      },
+      {
+        "module_id": 12407,
+        "start_line": 938,
+        "end_line": 955,
+        "bundle_offset": 1510055,
+        "bytes": 861,
+        "sha256": "9fa3cb5e24153cfe6d268f672706c8af19949120c3734e6903a8fea4bf80c0d5"
+      },
+      {
+        "module_id": 12407,
+        "start_line": 974,
+        "end_line": 1055,
+        "bundle_offset": 1511475,
+        "bytes": 2989,
+        "sha256": "98d75f70ccfec0ab06b158cf8c6986204368d4a422146c6e913a3d406bb06a5f"
+      },
+      {
+        "module_id": 12359,
+        "start_line": 173,
+        "end_line": 226,
+        "bundle_offset": 1374894,
+        "bytes": 1606,
+        "sha256": "24942c7e4df6e0cbf47f6b020d6410e14f4c0588d5a1953e5a320e86c49e9596"
+      },
+      {
+        "module_id": 12407,
+        "start_line": 1197,
+        "end_line": 1224,
+        "bundle_offset": 1519225,
+        "bytes": 1029,
+        "sha256": "41289afabe048ae133716df1f160a6b090d88aad18aee81d423dcac5bca22f16"
+      }
+    ]
+  },
+  {
+    "source_id": "S13",
+    "title": "Printing and transfer flow; confirm_job is not auto-called",
+    "spans": [
+      {
+        "module_id": 12407,
+        "start_line": 327,
+        "end_line": 375,
+        "bundle_offset": 1490473,
+        "bytes": 1590,
+        "sha256": "94efc24367583948618948124c4a6badb95146414329e6d1adb9426fb8581932"
+      },
+      {
+        "module_id": 12407,
+        "start_line": 501,
+        "end_line": 611,
+        "bundle_offset": 1496274,
+        "bytes": 4240,
+        "sha256": "c8011322ca5f72ad4b1b59ea2a7b246e840c542d02a8074b0a7acdbe82770856"
+      },
+      {
+        "module_id": 12311,
+        "start_line": 1035,
+        "end_line": 1051,
+        "bundle_offset": 995035,
+        "bytes": 1219,
+        "sha256": "529257bb6b94f766bb6c7cb57082adefe17ac3ff8886e078d6726c98efea0407"
+      },
+      {
+        "module_id": 12311,
+        "start_line": 1091,
+        "end_line": 1100,
+        "bundle_offset": 997758,
+        "bytes": 529,
+        "sha256": "eef2e8df970c29d645865a6eb41e734bd5975898da29542a05239df5457faa8a"
+      }
+    ]
+  },
+  {
+    "source_id": "S14",
+    "title": "Job terminal states and queue handling",
+    "spans": [
+      {
+        "module_id": 12173,
+        "start_line": 1231,
+        "end_line": 1246,
+        "bundle_offset": 698380,
+        "bytes": 684,
+        "sha256": "e1991f987f8f318f129c5a7be0507360c894715616a83dfafbb897fdce6061f2"
+      },
+      {
+        "module_id": 12311,
+        "start_line": 906,
+        "end_line": 944,
+        "bundle_offset": 989067,
+        "bytes": 2142,
+        "sha256": "21c7aebb263583cff01259e3bc323a4c5a4c937a6e638c748f577ece9896aa24"
+      },
+      {
+        "module_id": 12311,
+        "start_line": 694,
+        "end_line": 706,
+        "bundle_offset": 979807,
+        "bytes": 1092,
+        "sha256": "92ee48972f1cc3c9f45afa7283d9df30e41d857e2513e87e90eb2ac6384f03ff"
+      }
+    ]
+  }
+]

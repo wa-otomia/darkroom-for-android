@@ -1,5 +1,7 @@
 # Xiaomi Portable Photo Printer Pro: status and recovery repair
 
+Protocol reference (EN / 中文 / 日本語): [docs/protocol](protocol/README.md).
+
 ## Scope
 
 Targets `xiaomi.printer.ricott` / `xiaomi.printer.ricotg`. The source contract is the supplied Mi Home `com.hannto.printer` plugin 1.1.15, version code 69, `Plugin_1065830/ios/main.bundle`.

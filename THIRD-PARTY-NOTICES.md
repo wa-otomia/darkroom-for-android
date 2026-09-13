@@ -39,6 +39,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+The study notes under `docs/protocol` use request shapes, error copy and golden
+frames reconstructed from a user-supplied Mi Home plugin sample
+(`com.hannto.printer` 1.1.15). Selected modules are kept in
+`docs/protocol/examples/js/modules` for verification only; they remain the
+property of their owners. The full plugin binary is not included.
+
 ## Bundled dependencies
 
 All Apache License 2.0. The in-app About screen lists the same set; keep it, this file and

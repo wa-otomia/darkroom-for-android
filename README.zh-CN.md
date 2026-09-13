@@ -43,6 +43,8 @@ API key 与 FTP 密码存在 `EncryptedSharedPreferences`。
 baseline JPEG 1040 × 1560，按 988 字节分片，Diffie–Hellman 握手后 AES-128-ECB。
 不需要米家账号和设备 token。先在系统蓝牙设置里配对，再到应用设置页绑定。仅支持 Pro。
 
+协议说明（中 / 英 / 日）与源码示例：[docs/protocol](docs/protocol/README.md)。
+
 ## 致谢
 
 协议参考：**[tuat-yate/xiaomi-photo-printer](https://github.com/tuat-yate/xiaomi-photo-printer)**（MIT）

@@ -45,6 +45,8 @@ Xiaomi / Mijia ポータブルフォトプリンター Pro（KDRSHDY03HT）。Bl
 ハンドシェイク後に AES-128-ECB。Mi Home アカウントもデバイストークンも不要です。
 Android の Bluetooth 設定でペアリングしてから、アプリの設定画面でバインドしてください。対応は Pro のみ。
 
+プロトコル（日 / 英 / 中）とソース例：[docs/protocol](docs/protocol/README.md)。
+
 ## クレジット
 
 プロトコルの参照元：**[tuat-yate/xiaomi-photo-printer](https://github.com/tuat-yate/xiaomi-photo-printer)**（MIT）
