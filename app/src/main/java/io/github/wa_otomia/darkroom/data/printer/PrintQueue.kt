@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -127,8 +128,8 @@ class PrintQueue @Inject constructor(
     private val wake = Channel<Unit>(Channel.CONFLATED)
     private val cancelFlags = PrintJobCancelFlags()
 
-    private var activePrinter: XiaomiPrinter? = null
-    private var activeRowId: String? = null
+    @Volatile private var activePrinter: XiaomiPrinter? = null
+    @Volatile private var activeRowId: String? = null
     private var currentWork: Job? = null
     private var currentJobId: String? = null
     private var lastPersistedPhase: String? = null
@@ -141,6 +142,48 @@ class PrintQueue @Inject constructor(
 
     private val _runningProgress = MutableStateFlow<PrintProgress?>(null)
     val runningProgress: StateFlow<PrintProgress?> = _runningProgress
+
+    private val _printerState = MutableStateFlow(PrinterUiState())
+    val printerState: StateFlow<PrinterUiState> = _printerState
+    private val _pauseReason = MutableStateFlow<String?>(null)
+    val pauseReason: StateFlow<String?> = _pauseReason
+
+    /** Explicitly requested read-only connection. Never competes with an active print socket. */
+    fun refreshPrinterStatus(reviewUncertainOutcome: Boolean = false) {
+        appScope.launch {
+            if (!mutex.tryLock()) return@launch
+            _printerState.value = PrinterUiState(busy = true)
+            var probe: XiaomiPrinter? = null
+            try {
+                val cfg = settings.readSettings()
+                check(cfg.printerMac.isNotBlank()) { "No printer is bound" }
+                val reading = withContext(Dispatchers.IO) {
+                    probe = XiaomiPrinter(bluetooth.connect(cfg.printerMac))
+                    probe!!.connect()
+                    probe!!.mixedStatus()
+                }
+                _printerState.value = PrinterUiState(reading, System.currentTimeMillis())
+                if (reviewUncertainOutcome) {
+                    check(reading.readyForNewJob) { "Printer is not idle; queued work remains paused" }
+                    rowMutex.withLock {
+                        db.printJobDao().observeAll().first().filter { it.phase == "outcome_unknown" }.forEach {
+                            db.printJobDao().upsert(it.copy(phase = "outcome_reviewed"))
+                        }
+                    }
+                    _pauseReason.value = null
+                    kick() // Does NOT retry the uncertain job; only releases unrelated queued work.
+                }
+            } catch (e: Exception) {
+                _printerState.value = PrinterUiState(error = e.message ?: "Status query failed")
+            } finally {
+                runCatching { probe?.disconnect() }
+                mutex.unlock()
+            }
+        }
+    }
+
+    fun resume(jobId: String): Boolean =
+        jobId == activeRowId && activePrinter?.requestResume() == true
 
     private val _jobs = MutableSharedFlow<StudioJobEvent>(extraBufferCapacity = 16)
     val jobs: SharedFlow<StudioJobEvent> = _jobs
@@ -158,7 +201,7 @@ class PrintQueue @Inject constructor(
     fun restore() {
         appScope.launch {
             for (row in db.printJobDao().listRunning()) {
-                when (restoreRunningPrintJob(row.phase)) {
+                when (restoreRunningPrintJob(row.phase, row.printerJobId != null)) {
                     PrintRestoreAction.Requeue -> persist(
                         row.copy(
                             state = STATE_QUEUED,
@@ -172,11 +215,15 @@ class PrintQueue @Inject constructor(
                     PrintRestoreAction.FailInterrupted -> persist(
                         row.copy(
                             state = STATE_FAILED,
+                            phase = "outcome_unknown",
                             error = "中断",
                             finishedAt = System.currentTimeMillis(),
                         ),
                     )
                 }
+            }
+            if (db.printJobDao().observeAll().first().any { it.phase == "outcome_unknown" }) {
+                _pauseReason.value = "A previous printer outcome is unknown; inspect the printer before continuing"
             }
             kick()
         }
@@ -288,45 +335,43 @@ class PrintQueue @Inject constructor(
     }
 
     fun remove(id: String) {
-        appScope.launch { db.printJobDao().delete(id) }
+        appScope.launch {
+            rowMutex.withLock {
+                val row = db.printJobDao().get(id) ?: return@withLock
+                if (row.state != STATE_RUNNING && row.phase != "outcome_unknown") db.printJobDao().delete(id)
+            }
+        }
     }
 
     fun cancel(jobId: Int): Pair<Boolean, String> {
-        val running = currentJobId
-        if (running != null) cancelFlags.request(running)
-        val printer = activePrinter
-        if (printer != null) printer.requestCancel(jobId)
-        if (running != null) {
-            currentWork?.cancel()
-            return true to "已请求取消"
-        }
-        return if (printer != null) true to "已请求取消" else false to "没有进行中的打印"
+        val accepted = activePrinter?.requestCancel(jobId) == true
+        if (accepted) currentJobId?.let { cancelFlags.request(it) }
+        return accepted to if (accepted) "Cancellation requested" else "No matching active printer job"
     }
 
     fun retry(id: String) {
         appScope.launch {
-            val old = db.printJobDao().get(id) ?: return@launch
-            persist(
-                old.copy(
-                    id = UUID.randomUUID().toString(),
-                    state = STATE_QUEUED,
-                    phase = null,
-                    createdAt = System.currentTimeMillis(),
-                    startedAt = null,
-                    finishedAt = null,
-                    printerJobId = null,
-                    jobState = null,
-                    error = null,
-                ),
-            )
-            db.printJobDao().delete(id)
+            rowMutex.withLock {
+                val old = db.printJobDao().get(id) ?: return@withLock
+                if (old.state !in listOf(STATE_FAILED, STATE_CANCELLED) || old.phase == "outcome_unknown") return@withLock
+                db.printJobDao().upsert(old.copy(
+                    id = UUID.randomUUID().toString(), state = STATE_QUEUED, phase = null,
+                    createdAt = System.currentTimeMillis(), startedAt = null, finishedAt = null,
+                    printerJobId = null, jobState = null, error = null,
+                ))
+                db.printJobDao().delete(id)
+            }
             kick()
         }
     }
 
     fun clearFinished() {
         appScope.launch {
-            db.printJobDao().deleteWhereState(listOf(STATE_FAILED, STATE_CANCELLED, STATE_DONE))
+            rowMutex.withLock {
+                db.printJobDao().observeAll().first().filter {
+                    it.state in listOf(STATE_FAILED, STATE_CANCELLED, STATE_DONE) && it.phase != "outcome_unknown"
+                }.forEach { db.printJobDao().delete(it.id) }
+            }
         }
     }
 
@@ -483,18 +528,42 @@ class PrintQueue @Inject constructor(
             tracker.startPhase("connecting")
             emit(photoId, "connecting")
             if (cfg.printerMac.isBlank()) error("打印机未绑")
+            _printerState.value = PrinterUiState(busy = true)
             val pipe = withContext(Dispatchers.IO) { bluetooth.connect(cfg.printerMac) }
-            printer = XiaomiPrinter(pipe, readTimeout = 30_000)
-            activePrinter = printer
+            val session = XiaomiPrinter(pipe, onStatus = { snapshot, control ->
+                val previous = _printerState.value
+                val observed = if (snapshot === previous.status) previous.observedAt else System.currentTimeMillis()
+                _printerState.value = PrinterUiState(snapshot, observed,
+                    busy = true, controlPhase = control,
+                    allowResume = snapshot != null && snapshot.canResume &&
+                        (!snapshot.raw.containsKey("job_id") ||
+                            (snapshot.jobId != null && snapshot.jobId == printer?.currentJobId)))
+                if (control != null) {
+                    emit(photoId, control, jobId = jobId.takeIf { it > 0 },
+                        jobState = _runningProgress.value?.jobState)
+                }
+            })
+            printer = session
+            activePrinter = session
             withContext(Dispatchers.IO) {
-                printer.connect()
-                printer.checkPaperReady()
+                if (cancelFlags.isRequested(activeRowId)) session.requestCancel()
+                session.connect()
+                session.awaitReady()
             }
             throwIfCancelled()
             tracker.startPhase("sending")
             emit(photoId, "sending")
+            // Persist the side-effect boundary before issuing print_job. Never auto-replay on restart.
+            activeRowId?.let { id -> patchRow(id) { it.copy(phase = "sending") } }
             jobId = withContext(Dispatchers.IO) {
-                printer.printJpeg(jpeg, copiesN) { chunk, total ->
+                if (cancelFlags.isRequested(activeRowId)) session.requestCancel()
+                session.printJpeg(jpeg, copiesN, onJobCreated = { createdId ->
+                    jobId = createdId
+                    // The callback precedes the first data frame; durable ID survives process death.
+                    kotlinx.coroutines.runBlocking {
+                        activeRowId?.let { id -> patchRow(id) { it.copy(printerJobId = createdId, phase = "sending") } }
+                    }
+                }) { chunk, total ->
                     tracker.setChunks(chunk, total)
                     emit(
                         photoId,
@@ -512,12 +581,13 @@ class PrintQueue @Inject constructor(
             tracker.startPhase("printing")
             emit(photoId, "printing", jobId = jobId, jobState = "downloading")
             val done = withContext(Dispatchers.IO) {
-                printer.waitUntilDone(jobId, 180_000, 2000) { state, _, elapsed ->
+                session.waitUntilDone(jobId, 180_000, 2000) { state, _, elapsed ->
                     tracker.setJobState(state)
-                    emit(photoId, "printing", jobId = jobId, jobState = state, elapsedMs = elapsed)
+                    emit(photoId, session.controlPhase ?: "printing", jobId = jobId, jobState = state, elapsedMs = elapsed)
                 }
             }
-            val jobState = done["job_state"]?.toString() ?: "finished"
+            val jobState = done["job_state"] as? String
+            check(jobState == "finished") { "Printer did not confirm successful completion" }
             catalog.recordPrint(
                 photoId,
                 PrintRecord(
@@ -531,16 +601,17 @@ class PrintQueue @Inject constructor(
             )
             tracker.succeed()
             emit(photoId, "done", jobId = jobId, jobState = jobState, elapsedMs = System.currentTimeMillis() - t0)
-            val sent = printer.lastSendStats?.let { " · upload ${it.elapsedMs} ms, %.1f KB/s".format(it.kbPerSec) }.orEmpty()
+            val sent = session.lastSendStats?.let { " · upload ${it.elapsedMs} ms, %.1f KB/s".format(it.kbPerSec) }.orEmpty()
             activityLog.record("spp", "job $jobId $jobState$sent")
             jobId to jobState
+        } catch (e: PrinterCancelled) {
+            throw CancellationException(e.message, e)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (cancelFlags.isRequested(activeRowId)) {
-                throw CancellationException(e.message, e)
-            }
+            val uncertain = printer?.jobCreationAttempted == true && printer?.remoteJobSettled != true
             val message = e.message ?: e.toString()
+            if (uncertain) _pauseReason.value = message
             catalog.recordPrint(
                 photoId,
                 PrintRecord(
@@ -553,15 +624,18 @@ class PrintQueue @Inject constructor(
                 ),
             )
             tracker.fail(message)
-            emit(photoId, "error", jobId = jobId.takeIf { it != 0 }, error = message)
+            emit(photoId, if (uncertain) "outcome_unknown" else "error", jobId = jobId.takeIf { it != 0 }, error = message)
             activityLog.record("spp", "print failed", status = "error", error = message)
+            if (uncertain) throw PrinterOutcomeUnknown(message).also { it.initCause(e) }
             throw e
         } finally {
+            val lastReading = _printerState.value
             try {
                 printer?.disconnect()
             } catch (_: Exception) {
             }
             activePrinter = null
+            _printerState.value = lastReading.copy(busy = false, controlPhase = null, allowResume = false)
             printTracker = null
             tickJob?.cancel()
             tickJob = null
@@ -570,6 +644,7 @@ class PrintQueue @Inject constructor(
 
     private suspend fun drain() {
         while (true) {
+            if (_pauseReason.value != null) return
             val running = takeNextQueued() ?: return
             supervisorScope {
                 val work = launch { runQueued(running) }
@@ -619,11 +694,17 @@ class PrintQueue @Inject constructor(
                     cancellation = true,
                     cancelRequested = cancelFlags.isRequested(row.id),
                     message = e.message,
+                    remoteJobCreated = db.printJobDao().get(row.id)?.let {
+                        it.printerJobId != null || restoreRunningPrintJob(it.phase) == PrintRestoreAction.FailInterrupted
+                    } == true,
+                    cancelConfirmed = e.cause is PrinterCancelled,
                 )
+                if (outcome.state == STATE_FAILED) _pauseReason.value = outcome.error
                 patchRow(row.id) {
                     if (it.state == STATE_RUNNING) {
                         it.copy(
                             state = outcome.state,
+                            phase = if (outcome.state == STATE_FAILED) "outcome_unknown" else it.phase,
                             error = outcome.error,
                             finishedAt = System.currentTimeMillis(),
                         )
@@ -636,14 +717,15 @@ class PrintQueue @Inject constructor(
             val message = e.message ?: e.toString()
             val outcome = mapPrintWorkerFailure(
                 cancellation = false,
-                cancelRequested = cancelFlags.isRequested(row.id),
+                cancelRequested = false, // Intent does not prove that the printer canceled a remote job.
                 message = message,
+                remoteJobCreated = e is PrinterOutcomeUnknown,
             )
             withContext(NonCancellable) {
                 patchRow(row.id) {
                     it.copy(
                         state = outcome.state,
-                        phase = if (outcome.state == STATE_CANCELLED) it.phase else "error",
+                        phase = if (e is PrinterOutcomeUnknown) "outcome_unknown" else "error",
                         error = outcome.error,
                         finishedAt = System.currentTimeMillis(),
                     )
@@ -662,6 +744,10 @@ class PrintQueue @Inject constructor(
     }
 
     private suspend fun takeNextQueued(): PrintJobEntity? = rowMutex.withLock {
+        if (db.printJobDao().observeAll().first().any { it.phase == "outcome_unknown" }) {
+            _pauseReason.value = "Unconfirmed printer outcome; inspect the printer before continuing"
+            return@withLock null
+        }
         val next = db.printJobDao().nextQueued() ?: return@withLock null
         val running = next.copy(state = STATE_RUNNING, startedAt = System.currentTimeMillis())
         db.printJobDao().upsert(running)
@@ -680,13 +766,16 @@ class PrintQueue @Inject constructor(
                 }
                 STATE_RUNNING -> {
                     cancelFlags.request(jobId)
-                    activePrinter?.requestCancel(row.printerJobId ?: 0)
+                    activePrinter?.takeIf { activeRowId == jobId }?.requestCancel()
                     true
                 }
                 else -> false
             }
         }
-        if (running && currentJobId == jobId) currentWork?.cancel()
+        // Cancel coroutine-only work before opening a printer session. During IO, the
+        // session owns the request and must be allowed to send/reconcile cancel_job.
+        if (running && currentJobId == jobId && activePrinter == null &&
+            _runningProgress.value?.phase == "editing") currentWork?.cancel()
     }
 
     private fun kick() {
@@ -749,7 +838,7 @@ class PrintQueue @Inject constructor(
         lastPersistedJobState = jobState
         appScope.launch {
             patchRow(rowId) {
-                it.copy(
+                if (it.state != STATE_RUNNING) it else it.copy(
                     phase = phase,
                     printerJobId = jobId ?: it.printerJobId,
                     jobState = jobState ?: it.jobState,

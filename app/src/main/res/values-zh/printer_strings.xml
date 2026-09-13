@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_unknown">未知</string>
+    <string name="pro_status_title">打印机状态</string>
+    <string name="pro_battery">设备上报电量：%1$s</string>
+    <string name="pro_battery_note">显示 battery-level 上报的百分比候选值；缺失时保留未知，不用电量档位换算。</string>
+    <string name="pro_charge_state">充电状态：%1$s</string>
+    <string name="pro_charging">充电中</string>
+    <string name="pro_not_charging">未充电</string>
+    <string name="pro_usb">USB 已连接：%1$s</string>
+    <string name="pro_yes">是</string>
+    <string name="pro_no">否</string>
+    <string name="pro_observed">最后成功查询：%1$s</string>
+    <string name="pro_cover">请关闭纸盒盖。盖子关闭不代表已放入相纸。</string>
+    <string name="pro_paper">未检测到相纸：请补纸或重新放置，再点击已处理继续原任务。</string>
+    <string name="pro_paper_jam">卡纸或取纸异常：请关机重启，等待自动吐纸；不要重复新建打印任务。</string>
+    <string name="pro_remove_photo">请取走已打印照片，再继续。</string>
+    <string name="pro_reload_paper">请检查并重新整理放入相纸，再继续。</string>
+    <string name="pro_ribbon_end">色带用尽：请更换新色带并检查相纸，再继续。</string>
+    <string name="pro_ribbon_install">色带异常：请安装或重新插拔色带，再继续原任务。</string>
+    <string name="pro_ribbon_restart">色带卡住或异常：请重启并重新插拔，仍异常时更换色带。</string>
+    <string name="pro_temperature">温度过高或过低：请等待自动恢复，或取消任务。</string>
+    <string name="pro_battery_low">电量低：请连接电源；不要根据此警告换算百分比。</string>
+    <string name="pro_unknown_fault">未识别的打印机异常：请检查官方 App；不会自动发送恢复指令。</string>
+    <string name="pro_fault_code">设备错误码：%1$s</string>
+    <string name="pro_resume">已处理，继续打印</string>
+    <string name="pro_canceling">取消中，等待打印机确认</string>
+    <string name="pro_resuming">正在恢复原打印任务</string>
+    <string name="pro_waiting">等待打印机恢复或手动处理</string>
+    <string name="pro_queue_paused">队列已暂停：有任务的设备结果未确认，请勿直接重试或删除。</string>
+    <string name="pro_review">确认打印机实际结果</string>
+    <string name="pro_review_warning">请先检查打印机和已打出的照片。确认后会查询设备是否空闲并继续队列，但不会重试或标记旧任务成功。重试旧任务可能造成重复打印。</string>
+    <string name="pro_review_confirm">已检查，查询并继续队列</string>
+    <string name="pro_refresh">读取打印机状态</string>
+    <string name="pro_print_y">正在打印黄色层</string>
+    <string name="pro_print_m">正在打印品红层</string>
+    <string name="pro_print_c">正在打印青色层</string>
+    <string name="pro_print_oc">正在覆膜</string>
+    <string name="pro_feed">正在进纸</string>
+    <string name="pro_cooling">正在冷却</string>
+</resources>

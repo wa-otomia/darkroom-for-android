@@ -73,7 +73,7 @@ class ProtocolTest {
         val dec = decryptEcb(key, parseFrame(fr).body, stripZeros = true)
         val text = String(dec, Charsets.UTF_8)
         assertTrue(text.contains("\"method\":\"print_job\""))
-        assertTrue(text.contains("\"channel\":576"))
+        assertTrue(text.contains("\"channel\":64"))
     }
 
     @Test
@@ -113,31 +113,16 @@ class ProtocolTest {
 
     @Test
     fun jobStateHelpers() {
-        assertTrue(isActive("downloading"))
-        assertTrue(isActive("printing"))
-        assertFalse(isActive(""))
-        assertFalse(isTerminal(""))
-        assertFalse(isTerminal("downloading"))
-        assertTrue(isTerminal("finished"))
-        assertTrue(isTerminal("error"))
-        assertTrue(isSuccessState("done"))
-        assertTrue(isErrorState("failed"))
-        assertTrue(isErrorState("aborted"))
-        assertTrue(isErrorState("pending"))
-        assertTrue(isNoPaperState("pending"))
-        assertTrue(isTerminal("pending"))
-        assertEquals(NO_PAPER_MESSAGE, detectJobFailure(mapOf("job_state" to "pending")))
-        assertNull(detectJobFailure(mapOf("job_state" to "printing")))
-        assertTrue(isNoPaperRpcError(mapOf("error" to mapOf("code" to RPC_NO_PAPER))))
-        assertEquals(NO_PAPER_MESSAGE, formatPrintJobError(mapOf("error" to mapOf("code" to RPC_NO_PAPER), "id" to 3)))
-        assertEquals(
-            NO_PAPER_MESSAGE,
-            detectNoPaperJobs(mapOf("result" to listOf(mapOf("job_id" to 1, "job_state" to "pending")))),
-        )
-        assertEquals(NO_PAPER_MESSAGE, noPaperFromRpc(mapOf("error" to mapOf("code" to RPC_NO_PAPER))))
-        assertTrue(detectJobFailure(mapOf("job_state" to "aborted"))!!.contains("被中断"))
-        assertEquals(NO_PAPER_MESSAGE, formatPrintJobError(mapOf("error" to mapOf("code" to -6002), "id" to 3)))
+        assertTrue(isActive("pending"))
+        assertFalse(isTerminal("pending"))
+        assertFalse(isNoPaperState("pending"))
+        assertNull(detectJobFailure(mapOf("job_state" to "pending")))
+        assertNull(detectNoPaperJobs(mapOf("result" to listOf(mapOf("job_state" to "pending")))))
+        assertTrue(isSuccessState("finished"))
+        assertTrue(isTerminal("canceled"))
+        assertFalse(isSuccessState("canceled"))
+        assertFalse(isNoPaperRpcError(mapOf("error" to mapOf("code" to -6002))))
+        assertTrue(formatPrintJobError(mapOf("error" to mapOf("code" to -6002))).contains("-6002"))
         assertTrue(jobIdMatches(mapOf("job_id" to 47), 47))
-        assertTrue(jobIdMatches(mapOf("job_id" to "47"), 47))
     }
 }

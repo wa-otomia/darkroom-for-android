@@ -26,6 +26,10 @@ private val GENERATE_PHASES: Map<String, Int> = mapOf(
 )
 
 private val PRINT_PHASES: Map<String, Int> = mapOf(
+    "waiting_for_user" to R.string.pro_waiting,
+    "resuming" to R.string.pro_resuming,
+    "canceling" to R.string.pro_canceling,
+    "outcome_unknown" to R.string.pro_queue_paused,
     "queued" to R.string.job_state_queued,
     "editing" to R.string.phase_print_editing,
     "preparing" to R.string.phase_print_preparing,
@@ -47,6 +51,13 @@ private val TRANSFER_PHASES: Map<String, Int> = mapOf(
 )
 
 private val JOB_STATES: Map<String, Int> = mapOf(
+    "canceled" to R.string.job_state_cancelled,
+    "printing_y" to R.string.pro_print_y,
+    "printing_m" to R.string.pro_print_m,
+    "printing_c" to R.string.pro_print_c,
+    "printing_oc" to R.string.pro_print_oc,
+    "home_feed" to R.string.pro_feed,
+    "cool_down" to R.string.pro_cooling,
     "downloading" to R.string.job_state_downloading,
     "printing" to R.string.job_state_printing,
     "queued" to R.string.job_state_queued,

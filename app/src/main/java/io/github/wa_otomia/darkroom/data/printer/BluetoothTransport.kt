@@ -17,7 +17,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.IOException
-import java.io.InputStream
 import java.lang.reflect.InvocationTargetException
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -38,36 +37,10 @@ val PRINTER_NAME_RE = Regex("xiaomi|mi\\s|米家|printer|ricott|kdr|照片打印
 fun isPrinterLike(name: String): Boolean = PRINTER_NAME_RE.containsMatchIn(name)
 
 class BluetoothBytePipe(private val socket: BluetoothSocket) : BytePipe {
-    private val input: InputStream = socket.inputStream
-    private val output = socket.outputStream
-
-    override fun write(data: ByteArray) {
-        output.write(data)
-        output.flush()
-    }
-
-    override fun readExact(n: Int, timeoutMs: Int): ByteArray {
-        val buf = ByteArray(n)
-        var off = 0
-        val start = System.currentTimeMillis()
-        while (off < n) {
-            if (System.currentTimeMillis() - start > timeoutMs) error("read timeout")
-            val read = input.read(buf, off, n - off)
-            if (read < 0) {
-                Thread.sleep(15)
-                continue
-            }
-            off += read
-        }
-        return buf
-    }
-
-    override fun close() {
-        try {
-            socket.close()
-        } catch (_: Exception) {
-        }
-    }
+    private val stream = StreamBytePipe(socket.inputStream, socket.outputStream) { socket.close() }
+    override fun write(data: ByteArray) = stream.write(data)
+    override fun readExact(n: Int, timeoutMs: Int): ByteArray = stream.readExact(n, timeoutMs)
+    override fun close() = stream.close()
 }
 
 @Singleton

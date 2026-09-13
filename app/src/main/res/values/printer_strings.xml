@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_unknown">Unknown</string>
+    <string name="pro_status_title">Printer status</string>
+    <string name="pro_battery">Reported battery: %1$s</string>
+    <string name="pro_battery_note">A valid battery-level is shown as a percentage. Missing data stays unknown; battery bars are not converted.</string>
+    <string name="pro_charge_state">Charging state: %1$s</string>
+    <string name="pro_charging">Charging</string>
+    <string name="pro_not_charging">Not charging</string>
+    <string name="pro_usb">USB connected: %1$s</string>
+    <string name="pro_yes">Yes</string>
+    <string name="pro_no">No</string>
+    <string name="pro_observed">Last successful query: %1$s</string>
+    <string name="pro_cover">Close the paper tray cover. This does not indicate whether paper is present.</string>
+    <string name="pro_paper">No photo paper detected. Load or reseat the paper, then resume this job.</string>
+    <string name="pro_paper_jam">Paper jam or pickup fault. Power the printer off and on, and wait for automatic ejection. Do not create another job.</string>
+    <string name="pro_remove_photo">Remove the printed photo, then resume.</string>
+    <string name="pro_reload_paper">Check and reseat the photo paper, then resume.</string>
+    <string name="pro_ribbon_end">Ribbon exhausted. Replace the ribbon and check the paper supply, then resume.</string>
+    <string name="pro_ribbon_install">Install or reseat the ribbon, then resume the existing job.</string>
+    <string name="pro_ribbon_restart">Ribbon stuck or abnormal. Restart and reseat the ribbon; replace it if the fault persists.</string>
+    <string name="pro_temperature">Temperature outside the operating range. Wait for automatic recovery or cancel.</string>
+    <string name="pro_battery_low">Battery is low. Connect external power; do not infer a percentage from this warning.</string>
+    <string name="pro_unknown_fault">Unrecognized printer fault. Check the official app; automatic recovery is disabled.</string>
+    <string name="pro_fault_code">Device error code: %1$s</string>
+    <string name="pro_resume">Handled - continue printing</string>
+    <string name="pro_canceling">Canceling - awaiting printer confirmation</string>
+    <string name="pro_resuming">Resuming the existing job</string>
+    <string name="pro_waiting">Waiting for printer / user action</string>
+    <string name="pro_queue_paused">Queue paused: a printer outcome is unconfirmed. Do not blindly retry or remove this job.</string>
+    <string name="pro_review">Review printer outcome</string>
+    <string name="pro_review_warning">Inspect the printer and any printed sheet first. This checks that the printer is idle and releases queued jobs, but does NOT retry or mark the uncertain job successful. Retrying that old job may print a duplicate.</string>
+    <string name="pro_review_confirm">I checked - query and continue queue</string>
+    <string name="pro_refresh">Read printer status</string>
+    <string name="pro_print_y">Printing yellow</string>
+    <string name="pro_print_m">Printing magenta</string>
+    <string name="pro_print_c">Printing cyan</string>
+    <string name="pro_print_oc">Applying overcoat</string>
+    <string name="pro_feed">Feeding paper</string>
+    <string name="pro_cooling">Cooling down</string>
+</resources>

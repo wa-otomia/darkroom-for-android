@@ -79,4 +79,17 @@ class PrintQueueRestoreTest {
         assertEquals(true, isCancelledPrintMessage("cancelled"))
         assertEquals(false, isCancelledPrintMessage("无法连接蓝牙设备"))
     }
+    @Test
+    fun remoteCancellationRequiresConfirmationNotAnIntent() {
+        assertEquals("failed", mapPrintWorkerFailure(false, true, "socket error", remoteJobCreated = true).state)
+        assertEquals("failed", mapPrintWorkerFailure(true, true, "worker stopped", remoteJobCreated = true).state)
+        assertEquals("cancelled", mapPrintWorkerFailure(false, true, null, remoteJobCreated = true, cancelConfirmed = true).state)
+    }
+    @Test
+    fun recoveryAndUncertainPhasesAreNeverAutoReprinted() {
+        for (phase in listOf("waiting_for_user", "resuming", "canceling", "outcome_unknown")) {
+            assertEquals(PrintRestoreAction.FailInterrupted, restoreRunningPrintJob(phase))
+        }
+        assertEquals(PrintRestoreAction.FailInterrupted, restoreRunningPrintJob(null, remoteJobCreated = true))
+    }
 }

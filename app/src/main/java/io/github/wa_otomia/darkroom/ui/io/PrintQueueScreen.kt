@@ -48,6 +48,7 @@ import io.github.wa_otomia.darkroom.data.progress.ProgressUi
 import io.github.wa_otomia.darkroom.data.progress.indeterminateUi
 import io.github.wa_otomia.darkroom.data.progress.toUi
 import io.github.wa_otomia.darkroom.ui.components.AmberProgressBar
+import io.github.wa_otomia.darkroom.ui.components.ProPrinterPanel
 import io.github.wa_otomia.darkroom.ui.components.GhostButton
 import io.github.wa_otomia.darkroom.ui.jobFieldKey
 import io.github.wa_otomia.darkroom.ui.localizedPrintPhase
@@ -79,7 +80,7 @@ fun PrintQueueScreen(
     val queuedIds = remember(visible) {
         visible.filter { jobFieldKey(it.state) == "queued" }.map { it.id }
     }
-    val canClear = visible.any { jobFieldKey(it.state) in FINISHED_STATES }
+    val canClear = visible.any { jobFieldKey(it.state) in FINISHED_STATES && it.phase != "outcome_unknown" }
     val byPhoto = remember(photos) { photos.associateBy { it.id } }
 
     Scaffold(
@@ -114,6 +115,9 @@ fun PrintQueueScreen(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item {
+                ProPrinterPanel(printQueue, visible.firstOrNull { jobFieldKey(it.state) == "running" }?.id)
+            }
             item {
                 GhostButton(
                     stringResource(R.string.print_queue_clear_failed),
@@ -261,8 +265,8 @@ private fun PrintJobRow(
                     Modifier.padding(top = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    GhostButton(stringResource(R.string.print_queue_retry), fillMaxWidth = false, onClick = onRetry)
-                    GhostButton(stringResource(R.string.print_queue_remove), fillMaxWidth = false, onClick = onRemove)
+                    GhostButton(stringResource(R.string.print_queue_retry), fillMaxWidth = false, enabled = job.phase != "outcome_unknown", onClick = onRetry)
+                    GhostButton(stringResource(R.string.print_queue_remove), fillMaxWidth = false, enabled = job.phase != "outcome_unknown", onClick = onRemove)
                 }
             }
         }

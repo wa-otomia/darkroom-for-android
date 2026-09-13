@@ -27,32 +27,25 @@ const val MULTI_PACKET = 8192
 
 const val CHUNK_BYTES = 988
 const val PHOTO_PRINT_JOB = 0
-const val DEFAULT_FILE_CHANNEL = 576
+// JSON platform/source channel. Not the binary frame channel (3/4).
+const val DEFAULT_FILE_CHANNEL = 64
 const val SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB"
 const val RFCOMM_CHANNEL = 1
 
-val ACTIVE_STATES = setOf("downloading", "printing", "queued", "waiting")
-val SUCCESS_STATES = setOf("done", "success", "finished")
-val NO_PAPER_STATES = setOf(
-    "pending",
-    "no_paper",
-    "out_of_paper",
-    "paper_empty",
-    "paper_out",
-    "lack_paper",
-    "load_paper",
+// Pro job states: only a reported "finished" is success. Pending is NOT no-paper.
+val ACTIVE_STATES = setOf(
+    "pending", "downloading", "printing", "queued", "waiting", "printing_Y",
+    "printing_M", "printing_C", "printing_OC", "home_feed", "cool_down",
 )
-val ERROR_STATES = setOf(
-    "error",
-    "failed",
-    "cancelled",
-    "cancel",
-    "aborted",
-) + NO_PAPER_STATES
+val SUCCESS_STATES = setOf("finished")
+val NO_PAPER_STATES = setOf("no_paper", "out_of_paper", "paper_empty", "paper_out", "lack_paper", "load_paper")
+val ERROR_STATES = setOf("aborted", "canceled")
 val TERMINAL_STATES = SUCCESS_STATES + ERROR_STATES
 
+// Kept as a source-compatible constant; -6002 is a generic RPC system error.
+@Deprecated("RPC -6002 does not mean no paper; use mixed_status.result.error")
 const val RPC_NO_PAPER = -6002
-const val NO_PAPER_MESSAGE = "打印机缺纸，请装入相纸后重试"
+const val NO_PAPER_MESSAGE = "Printer has no paper; load paper and resume the existing job"
 
 data class Frame(
     val channelId: Int,
@@ -125,6 +118,8 @@ fun buildFrame(
     pkgNum: Int = 0,
 ): ByteArray {
     val n = body.size
+    require(n <= 1023) { "Frame body exceeds the 10-bit length field" }
+    require(pkgTotal in 0..65535 && pkgNum in 0..65535) { "Invalid package numbering" }
     val frame = ByteArray(22 + n)
     frame[0] = FRAME_HEAD.toByte()
     frame[1] = VERSION.toByte()
@@ -152,6 +147,9 @@ fun parseFrame(frame: ByteArray): Frame {
     }
     val msgAttr = readU16LE(frame, 18)
     val n = bodyLengthFromAttr(msgAttr)
+    require(frame[1].toInt() and 0xFF == VERSION) { "Unsupported frame version" }
+    require(frame.size == 22 + n) { "Frame length mismatch" }
+    require(verifyChecksum(frame)) { "Frame checksum mismatch" }
     return Frame(
         channelId = frame[3].toInt() and 0xFF,
         interactive = frame[4].toInt() and 0xFF,
@@ -175,16 +173,38 @@ fun buildHello(msgSn: Int = 1): ByteArray = buildFrame(
     body = "hello".toByteArray(Charsets.UTF_8),
 )
 
-fun encodeRpc(method: String, id: Int, params: Map<String, Any>): ByteArray {
-    val paramJson = params.entries.joinToString(",") { (k, v) ->
-        val value = when (v) {
-            is String -> "\"$v\""
-            is Number, is Boolean -> v.toString()
-            else -> "\"$v\""
+/** Params may be an object OR an array. Never stringify arrays as an object field. */
+fun encodeRpc(method: String, id: Int, params: Any): ByteArray {
+    require(params is Map<*, *> || params is List<*>) { "RPC params must be an object or array" }
+    return jsonValue(linkedMapOf("method" to method, "id" to id, "params" to params))
+        .toByteArray(Charsets.UTF_8)
+}
+
+private fun jsonValue(value: Any?): String = when (value) {
+    null -> "null"
+    is String -> buildString {
+        append('"')
+        for (c in value) when (c) {
+            '"' -> append("\\\"")
+            '\\' -> append("\\\\")
+            '\n' -> append("\\n")
+            '\r' -> append("\\r")
+            '\t' -> append("\\t")
+            else -> if (c.code < 32) append("\\u" + c.code.toString(16).padStart(4, '0')) else append(c)
         }
-        "\"$k\":$value"
+        append('"')
     }
-    return """{"method":"$method","id":$id,"params":{$paramJson}}""".toByteArray(Charsets.UTF_8)
+    is Boolean -> value.toString()
+    is Number -> {
+        require(value.toDouble().isFinite()) { "Non-finite JSON number" }
+        value.toString()
+    }
+    is List<*> -> value.joinToString(",", "[", "]") { jsonValue(it) }
+    is Map<*, *> -> value.entries.joinToString(",", "{", "}") {
+        require(it.key is String) { "JSON object keys must be strings" }
+        jsonValue(it.key) + ":" + jsonValue(it.value)
+    }
+    else -> error("Unsupported JSON value: ${value.javaClass.name}")
 }
 
 fun printJobParams(fileSize: Int, copies: Int = 1, jobType: Int = PHOTO_PRINT_JOB): Map<String, Any> = mapOf(
@@ -212,16 +232,6 @@ fun isNoPaperState(state: String?): Boolean {
     return s.isNotEmpty() && NO_PAPER_STATES.contains(s)
 }
 
-private val PAPER_HINT = Regex("paper|缺纸|相纸|load\\s*paper|out\\s*of\\s*paper", RegexOption.IGNORE_CASE)
-
-private val JOB_STATE_USER_MESSAGE = mapOf(
-    "aborted" to "打印任务被中断（传输完成后打印机中止了任务：常见原因是缺纸、蓝牙断开或服务重启；请确认已装相纸且打印机空闲后再试）",
-    "cancelled" to "打印已取消",
-    "cancel" to "打印已取消",
-    "failed" to "打印机报告任务失败，请检查相纸与电量后重试",
-    "error" to "打印机报告错误，请检查相纸与电量后重试",
-)
-
 fun rpcErrorCode(res: Map<String, Any?>): Int? {
     val err = res["error"]
     if (err is Number) return err.toInt()
@@ -232,39 +242,24 @@ fun rpcErrorCode(res: Map<String, Any?>): Int? {
     return null
 }
 
-fun isNoPaperRpcError(res: Map<String, Any?>): Boolean = rpcErrorCode(res) == RPC_NO_PAPER
+fun isNoPaperRpcError(@Suppress("UNUSED_PARAMETER") res: Map<String, Any?>): Boolean = false
 
 fun noPaperFromRpc(res: Map<String, Any?>): String? =
     if (isNoPaperRpcError(res)) NO_PAPER_MESSAGE else null
 
 fun formatPrintJobError(res: Map<String, Any?>): String {
     val code = rpcErrorCode(res)
-    if (code == RPC_NO_PAPER) return NO_PAPER_MESSAGE
     if (code != null) return "无法创建打印任务（错误码 $code）"
     return "print_job failed: $res"
 }
 
-fun jobErrorMessage(state: String?, job: Map<String, Any?>? = null): String {
-    val s = state ?: ""
-    if (isNoPaperState(s)) return NO_PAPER_MESSAGE
-    if (job != null) {
-        for (key in listOf("error", "err_msg", "error_msg", "message", "reason", "desc")) {
-            val value = job[key]
-            if (value is String && PAPER_HINT.containsMatchIn(value)) return NO_PAPER_MESSAGE
-        }
-    }
-    JOB_STATE_USER_MESSAGE[s]?.let { return it }
-    if (isErrorState(s)) return "打印失败：$s"
-    return "打印失败：${s.ifEmpty { "unknown" }}"
-}
+fun jobErrorMessage(state: String?, @Suppress("UNUSED_PARAMETER") job: Map<String, Any?>? = null): String =
+    "Printer job state: ${state ?: "unknown"}; inspect mixed_status for device faults"
 
-fun detectJobFailure(job: Map<String, Any?>): String? {
-    val state = job["job_state"]?.toString().orEmpty()
-    val message = jobErrorMessage(state, job)
-    if (isNoPaperState(state)) return message
-    if (message.contains("缺纸")) return message
-    if (isErrorState(state)) return message
-    return null
+fun detectJobFailure(job: Map<String, Any?>): String? = when (job["job_state"]) {
+    "aborted" -> "Printer aborted the job; query mixed_status for the device fault"
+    "canceled" -> "Printer confirmed cancellation"
+    else -> null
 }
 
 fun normalizeJobList(result: Any?): List<Map<String, Any?>> {

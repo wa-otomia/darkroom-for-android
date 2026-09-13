@@ -1,136 +1,99 @@
 package io.github.wa_otomia.darkroom.data.printer
 
-import io.github.wa_otomia.darkroom.core.CHANNEL_AUTH
-import io.github.wa_otomia.darkroom.core.CHANNEL_DATA_ENC
-import io.github.wa_otomia.darkroom.core.CHANNEL_FILE_ENC
-import io.github.wa_otomia.darkroom.core.CHUNK_BYTES
-import io.github.wa_otomia.darkroom.core.ENCODING_HEX
-import io.github.wa_otomia.darkroom.core.ENCODING_JSON
-import io.github.wa_otomia.darkroom.core.ENCRYPT_ECB_OFFSET
-import io.github.wa_otomia.darkroom.core.FRAME_HEAD
-import io.github.wa_otomia.darkroom.core.INTERACTIVE_CLIENT_CONFIRM
-import io.github.wa_otomia.darkroom.core.INTERACTIVE_REQUEST
-import io.github.wa_otomia.darkroom.core.INTERACTIVE_SERVER_CONFIRM
-import io.github.wa_otomia.darkroom.core.INTERACTIVE_SERVER_HELLO
-import io.github.wa_otomia.darkroom.core.NO_PAPER_MESSAGE
-import io.github.wa_otomia.darkroom.core.PHOTO_PRINT_JOB
-import io.github.wa_otomia.darkroom.core.VERSION
-import io.github.wa_otomia.darkroom.core.bodyLengthFromAttr
-import io.github.wa_otomia.darkroom.core.buildFrame
-import io.github.wa_otomia.darkroom.core.buildHello
-import io.github.wa_otomia.darkroom.core.decryptEcb
-import io.github.wa_otomia.darkroom.core.deriveSession
-import io.github.wa_otomia.darkroom.core.detectJobFailure
-import io.github.wa_otomia.darkroom.core.detectNoPaperJobs
-import io.github.wa_otomia.darkroom.core.encodeRpc
-import io.github.wa_otomia.darkroom.core.encryptEcb
-import io.github.wa_otomia.darkroom.core.formatPrintJobError
-import io.github.wa_otomia.darkroom.core.isActive
-import io.github.wa_otomia.darkroom.core.isNoPaperRpcError
-import io.github.wa_otomia.darkroom.core.isNoPaperState
-import io.github.wa_otomia.darkroom.core.isSuccessState
-import io.github.wa_otomia.darkroom.core.isTerminal
-import io.github.wa_otomia.darkroom.core.jobErrorMessage
-import io.github.wa_otomia.darkroom.core.jobIdMatches
-import io.github.wa_otomia.darkroom.core.noPaperFromRpc
-import io.github.wa_otomia.darkroom.core.normalizeJobList
-import io.github.wa_otomia.darkroom.core.parseFrame
-import io.github.wa_otomia.darkroom.core.printJobParams
-import io.github.wa_otomia.darkroom.core.readU16LE
-import io.github.wa_otomia.darkroom.core.writeU32LE
+import io.github.wa_otomia.darkroom.core.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.SocketTimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 
 open class PrinterError(message: String) : Exception(message)
 class HandshakeError(message: String) : PrinterError(message)
 class NoPaperError(message: String = NO_PAPER_MESSAGE) : PrinterError(message) {
     val code: String = "NO_PAPER"
 }
+/** Only local-before-creation or a device-reported canceled job produces this exception. */
+class PrinterCancelled : PrinterError("\u5df2\u53d6\u6d88")
+class PrinterOutcomeUnknown(message: String) : PrinterError(message)
 
-/** Throughput of the last [XiaomiPrinter.printJpeg] upload, for logs and the activity feed. */
 data class SendStats(val bytes: Int, val frames: Int, val writes: Int, val elapsedMs: Long) {
     val kbPerSec: Double get() = if (elapsedMs <= 0L) 0.0 else bytes / 1024.0 / (elapsedMs / 1000.0)
-    override fun toString(): String = "%d B in %d frames / %d writes, %d ms, %.1f KB/s".format(bytes, frames, writes, elapsedMs, kbPerSec)
+    override fun toString(): String = "%d B in %d frames / %d writes, %d ms, %.1f KB/s"
+        .format(bytes, frames, writes, elapsedMs, kbPerSec)
 }
 
-/**
- * @param interWritePaceMs sleep after each coalesced write. The official app (and the
- *   reference Python client) write back-to-back and let RFCOMM credit flow control throttle;
- *   the old 65 ms came from the Pi's pyserial tty and cost ~10 s per photo on Android.
- *   Left as a knob in case a firmware turns out to need breathing room.
- */
+/** One synchronous IO owner. UI threads enqueue control intents; they never read the socket.
+ * Wire contract: official plugin com.hannto.printer 1.1.15 (69), module 12407.
+ * DH and image framing remain compatible with the existing working implementation. */
 class XiaomiPrinter(
     private val pipe: BytePipe,
     private val readTimeout: Int = 8_000,
     private val interWritePaceMs: Long = 0L,
     private val framesPerWrite: Int = MAX_FRAMES_PER_WRITE,
     private val log: (String) -> Unit = { android.util.Log.i(LOG_TAG, it) },
+    private val onStatus: (ProPrinterStatus?, String?) -> Unit = { _, _ -> },
+    private val nowMs: () -> Long = { System.nanoTime() / 1_000_000 },
+    private val sleep: (Long) -> Unit = { Thread.sleep(it) },
 ) {
     var key: ByteArray? = null
         private set
-
-    /** Test seam: skip the DH handshake and use [k] as the AES session key. */
-    internal fun useSessionKey(k: ByteArray) {
-        key = k
-    }
+    internal fun useSessionKey(k: ByteArray) { key = k.copyOf() }
+    private val reader = PrinterFrameReader(pipe)
     private var sn = 0
-    @Volatile
-    private var pendingCancelJobId: Int? = null
-
-    /** Set after each successful upload. */
-    @Volatile
-    var lastSendStats: SendStats? = null
+    private val cancelRequested = AtomicBoolean(false)
+    private val resumeRequested = AtomicBoolean(false)
+    @Volatile var currentJobId: Int? = null
         private set
+    @Volatile var jobCreationAttempted = false
+        private set
+    @Volatile var remoteJobSettled = false
+        private set
+    @Volatile var lastStatus: ProPrinterStatus? = null
+        private set
+    @Volatile var controlPhase: String? = null
+        private set
+    @Volatile var lastSendStats: SendStats? = null
+        private set
+    private var cancelSent = false
+    private var settledJob: Map<String, Any?>? = null
+    private var resumedError: Int? = null
+    private var resumeSentAt: Long? = null
+    // Bounded diagnostic inbox: events/late replies must not fulfill unrelated RPCs.
+    private val unclaimed = ArrayDeque<Map<String, Any?>>()
 
-    fun requestCancel(jobId: Int) {
-        pendingCancelJobId = jobId
+    init { require(framesPerWrite in 1..32 && readTimeout > 0 && interWritePaceMs >= 0) }
+
+    fun requestCancel(jobId: Int? = null): Boolean {
+        if (jobId != null && jobId != currentJobId) return false
+        cancelRequested.set(true)
+        return true
     }
 
-    private fun throwIfCancelled() {
-        if (pendingCancelJobId != null) error("已取消")
+    fun requestResume(): Boolean {
+        val status = lastStatus ?: return false
+        if (cancelRequested.get() || controlPhase != "waiting_for_user" || !canResumeSnapshot(status)) return false
+        return resumeRequested.compareAndSet(false, true)
     }
 
-    fun connect() {
-        handshake()
-    }
-
+    @Synchronized fun connect() { handshake() }
     fun disconnect() {
-        try {
-            pipe.close()
-        } finally {
+        try { pipe.close() } finally {
             key = null
+            lastStatus = null
+            onStatus(null, null)
         }
     }
-
     private fun nextSn(): Int {
-        sn += 1
-        return sn
+        check(sn < Int.MAX_VALUE) { "Reconnect before sequence number exhaustion" }
+        return ++sn
     }
-
-    private fun readFrame(): io.github.wa_otomia.darkroom.core.Frame {
-        val deadline = System.currentTimeMillis() + readTimeout
-        while (System.currentTimeMillis() < deadline) {
-            val b = pipe.readExact(1, (deadline - System.currentTimeMillis()).toInt().coerceAtLeast(1))
-            if ((b[0].toInt() and 0xFF) != FRAME_HEAD) continue
-            val nb = pipe.readExact(1, (deadline - System.currentTimeMillis()).toInt().coerceAtLeast(1))
-            if ((nb[0].toInt() and 0xFF) != VERSION) continue
-            val headerRest = pipe.readExact(18, (deadline - System.currentTimeMillis()).toInt().coerceAtLeast(1))
-            val header = b + nb + headerRest
-            val msgAttr = readU16LE(header, 18)
-            val bodyLen = bodyLengthFromAttr(msgAttr)
-            val rest = pipe.readExact(bodyLen + 2, (deadline - System.currentTimeMillis()).toInt().coerceAtLeast(1))
-            return parseFrame(header + rest)
-        }
-        error("read timeout")
-    }
-
-    private fun readUntil(channelId: Int, interactive: Int, timeoutMs: Int = 10_000): io.github.wa_otomia.darkroom.core.Frame {
-        val t0 = System.currentTimeMillis()
-        while (System.currentTimeMillis() - t0 < timeoutMs) {
-            val f = readFrame()
+    private fun readFrame(timeoutMs: Int = readTimeout): Frame = reader.read(timeoutMs)
+    private fun readUntil(channelId: Int, interactive: Int, timeoutMs: Int = 10_000): Frame {
+        val deadline = nowMs() + timeoutMs
+        while (nowMs() < deadline) {
+            val f = readFrame((deadline - nowMs()).toInt().coerceAtLeast(1))
             if (f.channelId == channelId && f.interactive == interactive) return f
         }
-        error("expected frame not received")
+        throw SocketTimeoutException("Expected handshake frame not received")
     }
 
     private fun handshake(timeoutMs: Int = 12_000) {
@@ -156,214 +119,277 @@ class XiaomiPrinter(
         if (!msg.startsWith("ok")) throw HandshakeError("printer rejected handshake: $msg")
     }
 
-    fun command(method: String, params: Map<String, Any>, timeoutMs: Int = 15_000): Map<String, Any?> {
-        val sessionKey = key ?: throw PrinterError("not connected (call connect())")
+
+    @Synchronized
+    fun command(method: String, params: Any, timeoutMs: Int = 15_000): Map<String, Any?> {
+        val sessionKey = key ?: throw PrinterError("Printer is not connected")
         val id = nextSn()
-        val payload = encodeRpc(method, id, params)
-        val enc = encryptEcb(sessionKey, payload)
-        pipe.write(
-            buildFrame(
-                channelId = CHANNEL_DATA_ENC,
-                interactive = INTERACTIVE_REQUEST,
-                encoding = ENCODING_JSON,
-                arcMsgSn = id,
-                msgSn = id,
-                encryptOffset = ENCRYPT_ECB_OFFSET,
-                body = enc,
-            ),
-        )
-        val t0 = System.currentTimeMillis()
-        while (System.currentTimeMillis() - t0 < timeoutMs) {
-            val f = readFrame()
-            if (f.channelId != CHANNEL_DATA_ENC) continue
-            val dec = decryptEcb(sessionKey, f.body, stripZeros = true)
-            val res = parseLooseJson(String(dec, Charsets.UTF_8)) ?: continue
-            val rid = res["id"]
-            if (rid == null || (rid is Number && rid.toInt() == id) || rid.toString() == id.toString()) return res
+        pipe.write(buildFrame(CHANNEL_DATA_ENC, INTERACTIVE_REQUEST, ENCODING_JSON,
+            id, id, ENCRYPT_ECB_OFFSET, encryptEcb(sessionKey, encodeRpc(method, id, params))))
+        val deadline = nowMs() + timeoutMs
+        while (nowMs() < deadline) {
+            val f = readFrame((deadline - nowMs()).toInt().coerceAtLeast(1))
+            if (f.channelId != CHANNEL_DATA_ENC || f.encoding != ENCODING_JSON ||
+                f.body.isEmpty() || f.body.size % 16 != 0 ||
+                ((f.msgAttr ushr 10) and 7) != 5) continue
+            val res = parseLooseJson(String(decryptEcb(sessionKey, f.body, stripZeros = true), Charsets.UTF_8)) ?: continue
+            if (isRpcReply(f, res, id)) return res
+            if (unclaimed.size == 32) unclaimed.removeFirst()
+            unclaimed.add(res)
+            // Do not log raw JSON, MAC addresses, keys or image data.
+            log("Unclaimed printer message on channel ${f.channelId}, interactive ${f.interactive}")
         }
-        error("no response to $method")
+        throw SocketTimeoutException("No response to $method")
     }
 
-    fun jobInfo(jobId: Int, timeoutMs: Int = 20_000) = command("job_info", mapOf("job_id" to jobId), timeoutMs)
-
-    fun checkPaperReady(timeoutMs: Int = 8_000) {
-        val info = jobInfo(0, timeoutMs)
-        val blocked = detectNoPaperJobs(info)
-        if (blocked != null) throw NoPaperError(blocked)
+    @Synchronized fun diagnosticMessages(): List<Map<String, Any?>> = unclaimed.toList()
+    fun jobInfo(jobId: Int, timeoutMs: Int = 8_000): Map<String, Any?> {
+        require(jobId >= 0)
+        return command("job_info", listOf(jobId), timeoutMs)
     }
+    fun deviceInfo(timeoutMs: Int = 8_000) = command("get_prop", listOf("device_info"), timeoutMs)
 
-    fun cancelJob(jobId: Int, timeoutMs: Int = 5_000): Pair<Boolean, String> {
-        return try {
-            val res = command("cancel_job", mapOf("job_id" to jobId), timeoutMs)
-            noPaperFromRpc(res)?.let { return false to it }
-            if (res["error"] != null) {
-                val err = res["error"]
-                val code = (err as? Map<*, *>)?.get("code") as? Number
-                false to if (code != null) "无法取消（错误码 ${code.toInt()}）" else "无法取消"
-            } else {
-                true to "已请求取消"
-            }
+    @Synchronized fun mixedStatus(timeoutMs: Int = 8_000): ProPrinterStatus {
+        try {
+            val response = command("mixed_status", emptyMap<String, Any>(), timeoutMs)
+            requireSuccess("mixed_status", response)
+            val status = ProPrinterStatus.fromResponse(response)
+            lastStatus = status
+            onStatus(status, controlPhase)
+            return status
         } catch (e: Exception) {
-            val message = e.message ?: e.toString()
-            if (message.contains("timeout", true) || message.contains("no response", true)) {
-                false to "无法取消（打印机无响应）"
-            } else {
-                false to "无法取消（$message）"
+            lastStatus = null // Never expose a stale ready state/percentage as a fresh reading.
+            onStatus(null, controlPhase)
+            throw e
+        }
+    }
+
+    /** Preflight never creates a job. Faults stay actionable; new work cannot bypass another job. */
+    @Synchronized fun checkPaperReady(timeoutMs: Int = 8_000) {
+        val status = mixedStatus(timeoutMs)
+        if (status.hasFault) throw PrinterError("Printer fault ${status.errorCode ?: "unknown"}")
+        if (!status.readyForNewJob) throw PrinterError("Printer is not ready: ${status.category ?: "unknown"}")
+    }
+
+    @Synchronized fun awaitReady(timeoutMs: Int = 900_000, pollMs: Long = 2_000) {
+        val deadline = nowMs() + timeoutMs
+        while (nowMs() < deadline) {
+            if (cancelRequested.get()) throw PrinterCancelled()
+            val status = mixedStatus()
+            if (status.readyForNewJob) { phase(null); return }
+            phase(if (resumeSentAt != null && status.errorCode == resumedError) "resuming" else "waiting_for_user")
+            handleResume(status)
+            sleep(pollMs)
+        }
+        throw PrinterError("Timed out waiting for printer readiness")
+    }
+
+    private fun phase(value: String?) {
+        controlPhase = value
+        onStatus(lastStatus, value)
+    }
+
+    private fun requireSuccess(method: String, res: Map<String, Any?>) {
+        if (hasRpcError(res)) throw PrinterError("$method rejected (RPC ${rpcErrorCode(res) ?: "unknown"})")
+        if (!res.containsKey("result")) throw PrinterError("$method has no result")
+    }
+
+    /** A response acknowledges the command, NOT the eventual canceled/finished state. */
+    @Synchronized fun cancelJob(jobId: Int, timeoutMs: Int = 5_000): Pair<Boolean, String> {
+        require(jobId > 0)
+        return try {
+            requireSuccess("cancel_job", command("cancel_job", listOf(jobId), timeoutMs))
+            true to "Cancellation requested; awaiting device confirmation"
+        } catch (e: Exception) {
+            false to (e.message ?: "Cancellation outcome unknown")
+        }
+    }
+
+    private fun canResumeSnapshot(status: ProPrinterStatus): Boolean = status.canResume &&
+        (!status.raw.containsKey("job_id") || (status.jobId != null && status.jobId == currentJobId))
+
+    /** Only the IO worker invokes this, after checking a fresh snapshot and current job. */
+    private fun handleResume(status: ProPrinterStatus) {
+        if (!status.hasFault) {
+            resumedError = null
+            resumeSentAt = null
+            resumeRequested.set(false)
+            return
+        }
+        if (resumeSentAt != null && status.errorCode != resumedError) {
+            resumedError = null
+            resumeSentAt = null
+        }
+        if (resumeSentAt != null && status.errorCode == resumedError && nowMs() - resumeSentAt!! > 15_000) {
+            // Do not replay a side-effect command after a timeout. Require reconciliation.
+            throw PrinterOutcomeUnknown("Recovery not confirmed; check the printer before retrying")
+        }
+        if (!resumeRequested.getAndSet(false) || cancelRequested.get()) return
+        if (!canResumeSnapshot(status)) return
+        if (resumeSentAt != null && status.errorCode == resumedError) return
+        phase("resuming")
+        resumedError = status.errorCode
+        resumeSentAt = nowMs()
+        try {
+            requireSuccess("resume_printer", command("resume_printer", emptyMap<String, Any>(), 5_000))
+        } catch (_: SocketTimeoutException) {
+            // Poll the original job/snapshot; never blindly send resume a second time.
+        }
+    }
+
+    private fun findJob(jobId: Int): Map<String, Any?>? {
+        val response = jobInfo(jobId)
+        requireSuccess("job_info", response)
+        val result = response["result"] as? List<*> ?: throw PrinterError("job_info.result must be an array")
+        @Suppress("UNCHECKED_CAST")
+        return result.filterIsInstance<Map<String, Any?>>().find { strictInt(it["job_id"]) == jobId }
+    }
+
+    private fun terminal(job: Map<String, Any?>): Map<String, Any?>? = when (job["job_state"]) {
+        "finished" -> { remoteJobSettled = true; settledJob = job; job }
+        "canceled" -> { remoteJobSettled = true; throw PrinterCancelled() }
+        "aborted" -> {
+            remoteJobSettled = true
+            val fault = runCatching { mixedStatus().errorCode }.getOrNull()
+            throw PrinterError("Printer aborted job ${currentJobId ?: "unknown"}; device error ${fault ?: "unknown"}")
+        }
+        else -> null
+    }
+
+    /** Stop producing file batches, send once, and reconcile. A late finished wins over intent. */
+    private fun handleCancel(): Boolean {
+        if (!cancelRequested.get()) return false
+        val jobId = currentJobId ?: throw PrinterCancelled()
+        phase("canceling")
+        if (!cancelSent) {
+            cancelSent = true
+            try {
+                requireSuccess("cancel_job", command("cancel_job", listOf(jobId), 5_000))
+            } catch (_: SocketTimeoutException) {
+                // It may have been accepted. Read-only reconciliation is safe.
             }
         }
-    }
-
-    fun printJpeg(jpeg: ByteArray, copies: Int = 1, onProgress: ((Int, Int) -> Unit)? = null): Int {
-        val sessionKey = key ?: throw PrinterError("not connected")
-        val res = command("print_job", printJobParams(jpeg.size, copies, PHOTO_PRINT_JOB))
-        noPaperFromRpc(res)?.let { throw NoPaperError(it) }
-        val result = res["result"] as? Map<*, *>
-        val jobId = (result?.get("job_id") as? Number)?.toInt()
-        if (jobId == null) {
-            val msg = formatPrintJobError(res)
-            if (isNoPaperRpcError(res) || msg.contains("缺纸")) throw NoPaperError(NO_PAPER_MESSAGE)
-            throw PrinterError(msg)
+        val deadline = nowMs() + 15_000
+        while (nowMs() < deadline) {
+            val job = try { findJob(jobId) } catch (_: SocketTimeoutException) { null }
+            if (job != null && terminal(job) != null) return true
+            sleep(250)
         }
-        sendFile(sessionKey, jpeg, jobId, onProgress)
-        return jobId
+        throw PrinterOutcomeUnknown("Cancellation not confirmed for job $jobId; no automatic reprint")
     }
 
+    @Synchronized
+    fun printJpeg(
+        jpeg: ByteArray,
+        copies: Int = 1,
+        onJobCreated: ((Int) -> Unit)? = null,
+        onProgress: ((Int, Int) -> Unit)? = null,
+    ): Int {
+        require(jpeg.isNotEmpty() && copies in 1..9)
+        require((jpeg.size.toLong() + CHUNK_BYTES - 1) / CHUNK_BYTES <= 65535)
+        check(!jobCreationAttempted) { "Use a new session for each new print task" }
+        if (cancelRequested.get()) throw PrinterCancelled()
+        val sessionKey = key ?: throw PrinterError("Printer is not connected")
+        jobCreationAttempted = true // A lost creation reply must NOT cause an automatic duplicate.
+        val res = command("print_job", printJobParams(jpeg.size, copies, PHOTO_PRINT_JOB))
+        val rejection = (res["error"] as? Map<*, *>)?.get("code") ?: res["error"]
+        if (strictInt(rejection)?.let { it != 0 } == true) {
+            // An explicit creation rejection has no accepted remote job to reconcile.
+            remoteJobSettled = true
+        }
+        requireSuccess("print_job", res)
+        val id = strictInt((res["result"] as? Map<*, *>)?.get("job_id"))?.takeIf { it > 0 }
+            ?: throw PrinterOutcomeUnknown("print_job did not supply a valid job id")
+        currentJobId = id
+        onJobCreated?.invoke(id) // Persist before any image bytes, not after upload completion.
+        if (!handleCancel()) sendFile(sessionKey, jpeg, id, onProgress)
+        return id
+    }
+
+    @Synchronized
     fun waitUntilDone(
         jobId: Int,
         timeoutMs: Int = 180_000,
-        pollMs: Long = 2000,
+        pollMs: Long = 2_000,
         onState: ((String, Map<String, Any?>, Long) -> Unit)? = null,
     ): Map<String, Any?> {
-        val t0 = System.currentTimeMillis()
-        var last: Map<String, Any?> = emptyMap()
-        var polled = false
-        while (System.currentTimeMillis() - t0 < timeoutMs) {
-            val cancelId = pendingCancelJobId
-            if (cancelId != null) {
-                val (ok, msg) = cancelJob(cancelId)
-                pendingCancelJobId = null
-                if (!ok) throw PrinterError(msg)
-                throw PrinterError("已取消")
-            }
-            if (!polled) {
-                polled = true
-                Thread.sleep(400)
-            }
-            val info = try {
-                jobInfo(jobId, 25_000)
-            } catch (e: Exception) {
-                val message = e.message ?: ""
-                if (message.contains("timeout", true) || message.contains("EIO", true)) {
-                    Thread.sleep(pollMs)
-                    continue
+        require(jobId > 0)
+        if (currentJobId == null) currentJobId = jobId
+        require(currentJobId == jobId)
+        settledJob?.let { return it }
+        val start = nowMs()
+        var activeMs = 0L
+        var lastTick = start
+        var wasFaulted = false
+        var lastState = "unknown"
+        var missedPolls = 0
+        while (nowMs() - start < timeoutMs + 900_000L) {
+            if (handleCancel()) return settledJob!!
+            val status: ProPrinterStatus
+            try {
+                val job = findJob(jobId)
+                if (job != null) {
+                    val state = job["job_state"] as? String ?: "unknown"
+                    lastState = state
+                    onState?.invoke(state, job, nowMs() - start)
+                    terminal(job)?.let { phase(null); return it }
                 }
-                throw e
+                status = mixedStatus()
+                missedPolls = 0
+            } catch (e: SocketTimeoutException) {
+                lastStatus = null
+                onStatus(null, controlPhase)
+                if (++missedPolls >= 3) throw PrinterOutcomeUnknown("Status polling timed out; printer outcome unknown")
+                sleep(pollMs)
+                continue
             }
-            val jobs = normalizeJobList(info["result"])
-            val job = jobs.find { jobIdMatches(it, jobId) }
-            if (job != null) {
-                last = job
-                val state = job["job_state"]?.toString().orEmpty()
-                if (state.isNotEmpty()) onState?.invoke(state, job, System.currentTimeMillis() - t0)
-                val failure = detectJobFailure(job)
-                if (failure != null) {
-                    if (failure.contains("缺纸")) throw NoPaperError(failure)
-                    if (job["job_state"]?.toString() == "aborted") rethrowIfNoPaperAfterAborted()
-                    throw PrinterError(failure)
-                }
-                if (isTerminal(state)) {
-                    if (isSuccessState(state)) return job
-                    if (isNoPaperState(state)) throw NoPaperError(jobErrorMessage(state, job))
-                    throw PrinterError(jobErrorMessage(state, job))
-                }
-            }
-            Thread.sleep(pollMs)
+            val now = nowMs()
+            if (!wasFaulted) activeMs += now - lastTick
+            lastTick = now
+            wasFaulted = status.hasFault
+            if (status.hasFault) {
+                phase(if (resumeSentAt != null && status.errorCode == resumedError) "resuming" else "waiting_for_user")
+            } else phase(null)
+            handleResume(status)
+            if (activeMs >= timeoutMs) break
+            sleep(pollMs)
         }
-        val state = last["job_state"]?.toString().orEmpty()
-        val failure = if (last["job_id"] != null) detectJobFailure(last) else null
-        if (failure != null) {
-            if (failure.contains("缺纸")) throw NoPaperError(failure)
-            if (state == "aborted") rethrowIfNoPaperAfterAborted()
-            throw PrinterError(failure)
-        }
-        if (isSuccessState(state)) return last
-        if (isNoPaperState(state)) throw NoPaperError(jobErrorMessage(state, last))
-        throw PrinterError("打印超时（${(System.currentTimeMillis() - t0) / 1000}s，最后状态：${state.ifEmpty { "unknown" }}）")
+        throw PrinterOutcomeUnknown("Job $jobId timed out (last state: $lastState); no automatic reprint")
     }
 
-    private fun rethrowIfNoPaperAfterAborted() {
-        try {
-            val gate = jobInfo(0, 6_000)
-            val blocked = detectNoPaperJobs(gate)
-            if (blocked != null) throw NoPaperError(blocked)
-        } catch (e: NoPaperError) {
-            throw e
-        } catch (_: Exception) {
-        }
-    }
-
-    /**
-     * Streams the JPEG on channel 4: `AES-ECB(K, int32_le(job_id) || chunk)` per 988-byte
-     * chunk, [framesPerWrite] frames coalesced per socket write (as the official app does).
-     * Writes block on RFCOMM credits, so no artificial pacing is needed; a failed write is
-     * retried twice after a short pause before the job is abandoned.
-     */
-    private fun sendFile(sessionKey: ByteArray, fileBytes: ByteArray, jobId: Int, onProgress: ((Int, Int) -> Unit)?) {
-        val total = (fileBytes.size + CHUNK_BYTES - 1) / CHUNK_BYTES
-        val batch = java.io.ByteArrayOutputStream(framesPerWrite * (CHUNK_BYTES + 4 + 22 + 16))
+    private fun sendFile(sessionKey: ByteArray, bytes: ByteArray, jobId: Int, onProgress: ((Int, Int) -> Unit)?) {
+        val total = (bytes.size + CHUNK_BYTES - 1) / CHUNK_BYTES
+        val batch = java.io.ByteArrayOutputStream()
         var saved = 0
         var writes = 0
-        val t0 = System.currentTimeMillis()
+        val started = nowMs()
         for (j in 0 until total) {
-            throwIfCancelled()
+            if (cancelRequested.get()) {
+                batch.reset() // Unsent full frames are discarded; an in-progress write finishes first.
+                handleCancel()
+                return
+            }
             val from = j * CHUNK_BYTES
-            val to = minOf(from + CHUNK_BYTES, fileBytes.size)
-            val body = ByteArray(4 + (to - from))
+            val to = minOf(from + CHUNK_BYTES, bytes.size)
+            val body = ByteArray(4 + to - from)
             writeU32LE(body, 0, jobId)
-            System.arraycopy(fileBytes, from, body, 4, to - from)
-            val enc = encryptEcb(sessionKey, body)
-            batch.write(
-                buildFrame(
-                    channelId = CHANNEL_FILE_ENC,
-                    interactive = INTERACTIVE_REQUEST,
-                    encoding = ENCODING_HEX,
-                    arcMsgSn = nextSn(),
-                    msgSn = sn,
-                    encryptOffset = ENCRYPT_ECB_OFFSET,
-                    body = enc,
-                    pkgTotal = total,
-                    pkgNum = j + 1,
-                ),
-            )
-            saved += 1
-            if (saved >= framesPerWrite || j == total - 1) {
-                writeWithRetry(batch.toByteArray())
+            System.arraycopy(bytes, from, body, 4, to - from)
+            val seq = nextSn()
+            batch.write(buildFrame(CHANNEL_FILE_ENC, INTERACTIVE_REQUEST, ENCODING_HEX,
+                seq, seq, ENCRYPT_ECB_OFFSET, encryptEcb(sessionKey, body), total, j + 1))
+            saved++
+            if (saved == framesPerWrite || j == total - 1) {
+                if (cancelRequested.get()) { batch.reset(); handleCancel(); return }
+                pipe.write(batch.toByteArray()) // IOException may mean partial delivery: never replay.
                 batch.reset()
                 saved = 0
-                writes += 1
-                if (interWritePaceMs > 0L && j < total - 1) Thread.sleep(interWritePaceMs)
-            }
-            if (onProgress != null && (j == 0 || (j + 1) % 5 == 0)) onProgress(j + 1, total)
-        }
-        val stats = SendStats(fileBytes.size, total, writes, System.currentTimeMillis() - t0)
-        lastSendStats = stats
-        log("upload job $jobId: $stats")
-        onProgress?.invoke(total, total)
-    }
-
-    private fun writeWithRetry(data: ByteArray, retries: Int = 2) {
-        var attempt = 0
-        while (true) {
-            try {
-                pipe.write(data)
-                return
-            } catch (e: java.io.IOException) {
-                if (attempt >= retries) throw e
-                attempt += 1
-                log("write failed (${e.message}), retry $attempt/$retries")
-                Thread.sleep(250)
+                writes++
+                onProgress?.invoke(j + 1, total)
+                if (interWritePaceMs > 0 && j < total - 1) sleep(interWritePaceMs)
             }
         }
+        lastSendStats = SendStats(bytes.size, total, writes, nowMs() - started)
+        log("upload job $jobId: $lastSendStats")
     }
 
     companion object {

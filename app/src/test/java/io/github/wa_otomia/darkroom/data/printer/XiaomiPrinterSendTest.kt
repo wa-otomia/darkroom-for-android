@@ -133,14 +133,12 @@ class XiaomiPrinterSendTest {
         assertTrue("gap ${gaps[0]} ms", gaps[0] >= 35L)
     }
 
-    @Test
-    fun transientWriteFailureIsRetried() {
+    @Test(expected = IOException::class)
+    fun ambiguousPartialWriteIsNeverRetried() {
         val jpeg = ByteArray(CHUNK_BYTES * 3)
         // Attempt 1 = print_job RPC, attempt 2 = first upload write → fail once, then succeed.
         val pipe = FakePipe(key, failWritesAt = setOf(2))
         printer(pipe).printJpeg(jpeg)
-        assertEquals(2, pipe.writes.size)
-        assertEquals(3, splitFrames(pipe.writes[1]).size)
     }
 
     @Test(expected = IOException::class)
