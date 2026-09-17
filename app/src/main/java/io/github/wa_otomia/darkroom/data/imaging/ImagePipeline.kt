@@ -251,17 +251,19 @@ object ImagePipeline {
         } else {
             bmp
         }
-        val sheet = rotateBitmap(cut, rotateQuarters + sheetQuarterTurns(landscape, sheetForPrinter))
-        val out = preparePrintBitmap(
-            sheet,
+        val framedImage = rotateBitmap(cut, rotateQuarters)
+        val framedSheet = preparePrintBitmap(
+            framedImage,
             if (framedCrop != null) PrintFit.COVER else fit,
             outputScale,
-            landscape = landscape && !sheetForPrinter,
+            landscape = landscape,
         )
-        applyWatermark(out, watermark, photo, out.width, out.height, context)
+        applyWatermark(framedSheet, watermark, photo, framedSheet.width, framedSheet.height, context)
+        val out = rotateBitmap(framedSheet, sheetQuarterTurns(landscape, sheetForPrinter))
         return encodeJpeg(out, quality).also {
-            if (out !== sheet) out.recycle()
-            if (sheet !== cut) sheet.recycle()
+            if (out !== framedSheet) out.recycle()
+            framedSheet.recycle()
+            if (framedImage !== cut) framedImage.recycle()
             if (cut !== bmp) cut.recycle()
             bmp.recycle()
         }
