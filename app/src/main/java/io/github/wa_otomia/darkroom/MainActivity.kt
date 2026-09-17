@@ -1,5 +1,6 @@
 package io.github.wa_otomia.darkroom
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -15,6 +16,9 @@ import androidx.core.view.WindowCompat
 import io.github.wa_otomia.darkroom.data.automation.Automation
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
 import io.github.wa_otomia.darkroom.core.AiProvider
+import io.github.wa_otomia.darkroom.core.MAX_SHARED_IMAGES
+import io.github.wa_otomia.darkroom.core.MAX_SHARED_IMAGE_BYTES
+import io.github.wa_otomia.darkroom.core.readSharedImageBytes
 import io.github.wa_otomia.darkroom.data.ai.AiImageClient
 import io.github.wa_otomia.darkroom.data.jobs.AiJobs
 import io.github.wa_otomia.darkroom.data.printer.PrintQueue
@@ -36,6 +40,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -140,20 +145,34 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleShare(intent: Intent?) {
+        if (intent?.type != "image/jpeg") return
         val uris = mutableListOf<Uri>()
         when (intent?.action) {
             Intent.ACTION_SEND -> shareUri(intent)?.let { uris += it }
             Intent.ACTION_SEND_MULTIPLE -> shareUris(intent)?.let { uris += it }
         }
-        if (uris.isEmpty()) return
+        if (uris.isEmpty() || uris.size > MAX_SHARED_IMAGES) return
+        if (uris.any { !isAllowedShare(it) }) return
+
+        AlertDialog.Builder(this)
+            .setTitle("Import shared photos?")
+            .setMessage("Import ${uris.size} shared ${if (uris.size == 1) "photo" else "photos"} into Darkroom?")
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton("Import") { _, _ -> ingestSharedImages(uris) }
+            .show()
+    }
+
+    private fun ingestSharedImages(uris: List<Uri>) {
         scope.launch {
             uris.forEachIndexed { index, uri ->
                 val name = shareDisplayName(uri)
                 val size = shareSize(uri)
                 val row = transferRegistry.beginLocalIngest(name, size, JobKind.Share)
                 runCatching {
-                    val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                        ?: error("unreadable")
+                    val bytes = withTimeout(SHARE_READ_TIMEOUT_MS) {
+                        contentResolver.openInputStream(uri)?.use { it.readSharedImageBytes() }
+                            ?: error("unreadable")
+                    }
                     transferRegistry.receiveFinished(row.id, bytes.size.toLong())
                     val photo = catalog.ingestBytes(
                         bytes,
@@ -168,8 +187,8 @@ class MainActivity : ComponentActivity() {
                         },
                     )
                     transferRegistry.done(row.id)
-                    runCatching { automation.onIngested(photo.id, "share") }
-                        .onFailure { activityLog.record("automation", "onIngested failed", "error", it.message) }
+                    // A share is externally supplied input. Keep it out of unattended AI and
+                    // printing automation even after the user explicitly accepts the import.
                     if (index == uris.lastIndex) openedId.value = photo.id
                 }.onFailure {
                     transferRegistry.failed(row.id, it.message ?: it.toString())
@@ -188,6 +207,12 @@ class MainActivity : ComponentActivity() {
             ?: uri.lastPathSegment?.substringAfterLast('/')
             ?: "share.jpg"
     }
+
+    private fun isAllowedShare(uri: Uri): Boolean = runCatching {
+        uri.scheme == "content" &&
+            contentResolver.getType(uri) == "image/jpeg" &&
+            (shareSize(uri)?.let { it <= MAX_SHARED_IMAGE_BYTES } != false)
+    }.getOrDefault(false)
 
     private fun shareSize(uri: Uri): Long? = runCatching {
         contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
@@ -210,5 +235,9 @@ class MainActivity : ComponentActivity() {
             @Suppress("DEPRECATION")
             intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
         }
+    }
+
+    private companion object {
+        const val SHARE_READ_TIMEOUT_MS = 15_000L
     }
 }
