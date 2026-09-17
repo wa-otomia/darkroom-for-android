@@ -25,6 +25,12 @@
     <string name="gallery_take_photo">Take photo</string>
     <string name="gallery_no_camera_app">No camera app found</string>
     <string name="importing">Importing…</string>
+    <string name="share_import_title">Import shared photos?</string>
+    <plurals name="share_import_message">
+        <item quantity="one">Import %d shared photo into Darkroom?</item>
+        <item quantity="other">Import %d shared photos into Darkroom?</item>
+    </plurals>
+    <string name="share_import">Import</string>
     <string name="generated_prefix">"Generated · "</string>
     <string name="empty_title">The darkroom is empty</string>
     <string name="empty_desc">Point the camera FTP at this phone (default port 2121, user camera, JPG only), or import a photo manually.</string>

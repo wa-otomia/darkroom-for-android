@@ -1,5 +1,6 @@
 package io.github.wa_otomia.darkroom
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -15,6 +16,10 @@ import androidx.core.view.WindowCompat
 import io.github.wa_otomia.darkroom.data.automation.Automation
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
 import io.github.wa_otomia.darkroom.core.AiProvider
+import io.github.wa_otomia.darkroom.core.MAX_SHARED_IMAGES
+import io.github.wa_otomia.darkroom.core.MAX_SHARED_IMAGE_BYTES
+import io.github.wa_otomia.darkroom.core.isAcceptedShareMime
+import io.github.wa_otomia.darkroom.core.readSharedImageBytes
 import io.github.wa_otomia.darkroom.data.ai.AiImageClient
 import io.github.wa_otomia.darkroom.data.jobs.AiJobs
 import io.github.wa_otomia.darkroom.data.printer.PrintQueue
@@ -36,6 +41,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -140,20 +146,54 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleShare(intent: Intent?) {
+        if (intent == null) return
+        when (intent.action) {
+            Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE -> Unit
+            else -> return
+        }
+        if (!isAcceptedShareMime(intent.type)) {
+            rejectShare("unexpected type ${intent.type}")
+            return
+        }
         val uris = mutableListOf<Uri>()
-        when (intent?.action) {
+        when (intent.action) {
             Intent.ACTION_SEND -> shareUri(intent)?.let { uris += it }
             Intent.ACTION_SEND_MULTIPLE -> shareUris(intent)?.let { uris += it }
         }
-        if (uris.isEmpty()) return
+        when {
+            uris.isEmpty() -> {
+                rejectShare("no stream")
+                return
+            }
+            uris.size > MAX_SHARED_IMAGES -> {
+                rejectShare("too many items (${uris.size})")
+                return
+            }
+            uris.any { !isAllowedShare(it) } -> {
+                rejectShare("uri not allowed")
+                return
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.share_import_title)
+            .setMessage(resources.getQuantityString(R.plurals.share_import_message, uris.size, uris.size))
+            .setNegativeButton(R.string.common_cancel, null)
+            .setPositiveButton(R.string.share_import) { _, _ -> ingestSharedImages(uris) }
+            .show()
+    }
+
+    private fun ingestSharedImages(uris: List<Uri>) {
         scope.launch {
             uris.forEachIndexed { index, uri ->
                 val name = shareDisplayName(uri)
                 val size = shareSize(uri)
                 val row = transferRegistry.beginLocalIngest(name, size, JobKind.Share)
                 runCatching {
-                    val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                        ?: error("unreadable")
+                    val bytes = withTimeout(SHARE_READ_TIMEOUT_MS) {
+                        contentResolver.openInputStream(uri)?.use { it.readSharedImageBytes() }
+                            ?: error("unreadable")
+                    }
                     transferRegistry.receiveFinished(row.id, bytes.size.toLong())
                     val photo = catalog.ingestBytes(
                         bytes,
@@ -189,6 +229,16 @@ class MainActivity : ComponentActivity() {
             ?: "share.jpg"
     }
 
+    private fun isAllowedShare(uri: Uri): Boolean = runCatching {
+        uri.scheme == "content" &&
+            isAcceptedShareMime(contentResolver.getType(uri)) &&
+            (shareSize(uri)?.let { it <= MAX_SHARED_IMAGE_BYTES } != false)
+    }.getOrDefault(false)
+
+    private fun rejectShare(reason: String) {
+        activityLog.record("share", "rejected $reason", "error")
+    }
+
     private fun shareSize(uri: Uri): Long? = runCatching {
         contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
             ?.use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0).takeIf { it > 0L } else null }
@@ -210,5 +260,9 @@ class MainActivity : ComponentActivity() {
             @Suppress("DEPRECATION")
             intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
         }
+    }
+
+    private companion object {
+        const val SHARE_READ_TIMEOUT_MS = 15_000L
     }
 }

@@ -32,6 +32,11 @@
     <string name="gallery_take_photo">拍照</string>
     <string name="gallery_no_camera_app">没有可用的相机应用</string>
     <string name="importing">导入中…</string>
+    <string name="share_import_title">导入分享的照片？</string>
+    <plurals name="share_import_message">
+        <item quantity="other">将 %d 张分享的照片导入暗房？</item>
+    </plurals>
+    <string name="share_import">导入</string>
     <string name="generated_prefix">"生成 · "</string>
     <string name="empty_title">暗房中还没有照片</string>
     <string name="empty_desc">请将相机的 FTP 目标设置为本机（默认端口 2121，用户名 camera，仅支持 JPG），也可以先手动导入一张照片。</string>
