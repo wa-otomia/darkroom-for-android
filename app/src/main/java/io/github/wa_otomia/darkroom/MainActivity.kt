@@ -18,6 +18,7 @@ import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
 import io.github.wa_otomia.darkroom.core.AiProvider
 import io.github.wa_otomia.darkroom.core.MAX_SHARED_IMAGES
 import io.github.wa_otomia.darkroom.core.MAX_SHARED_IMAGE_BYTES
+import io.github.wa_otomia.darkroom.core.isAcceptedShareMime
 import io.github.wa_otomia.darkroom.core.readSharedImageBytes
 import io.github.wa_otomia.darkroom.data.ai.AiImageClient
 import io.github.wa_otomia.darkroom.data.jobs.AiJobs
@@ -145,20 +146,40 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleShare(intent: Intent?) {
-        if (intent?.type != "image/jpeg") return
+        if (intent == null) return
+        when (intent.action) {
+            Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE -> Unit
+            else -> return
+        }
+        if (!isAcceptedShareMime(intent.type)) {
+            rejectShare("unexpected type ${intent.type}")
+            return
+        }
         val uris = mutableListOf<Uri>()
-        when (intent?.action) {
+        when (intent.action) {
             Intent.ACTION_SEND -> shareUri(intent)?.let { uris += it }
             Intent.ACTION_SEND_MULTIPLE -> shareUris(intent)?.let { uris += it }
         }
-        if (uris.isEmpty() || uris.size > MAX_SHARED_IMAGES) return
-        if (uris.any { !isAllowedShare(it) }) return
+        when {
+            uris.isEmpty() -> {
+                rejectShare("no stream")
+                return
+            }
+            uris.size > MAX_SHARED_IMAGES -> {
+                rejectShare("too many items (${uris.size})")
+                return
+            }
+            uris.any { !isAllowedShare(it) } -> {
+                rejectShare("uri not allowed")
+                return
+            }
+        }
 
         AlertDialog.Builder(this)
-            .setTitle("Import shared photos?")
-            .setMessage("Import ${uris.size} shared ${if (uris.size == 1) "photo" else "photos"} into Darkroom?")
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton("Import") { _, _ -> ingestSharedImages(uris) }
+            .setTitle(R.string.share_import_title)
+            .setMessage(resources.getQuantityString(R.plurals.share_import_message, uris.size, uris.size))
+            .setNegativeButton(R.string.common_cancel, null)
+            .setPositiveButton(R.string.share_import) { _, _ -> ingestSharedImages(uris) }
             .show()
     }
 
@@ -187,8 +208,8 @@ class MainActivity : ComponentActivity() {
                         },
                     )
                     transferRegistry.done(row.id)
-                    // A share is externally supplied input. Keep it out of unattended AI and
-                    // printing automation even after the user explicitly accepts the import.
+                    runCatching { automation.onIngested(photo.id, "share") }
+                        .onFailure { activityLog.record("automation", "onIngested failed", "error", it.message) }
                     if (index == uris.lastIndex) openedId.value = photo.id
                 }.onFailure {
                     transferRegistry.failed(row.id, it.message ?: it.toString())
@@ -210,9 +231,13 @@ class MainActivity : ComponentActivity() {
 
     private fun isAllowedShare(uri: Uri): Boolean = runCatching {
         uri.scheme == "content" &&
-            contentResolver.getType(uri) == "image/jpeg" &&
+            isAcceptedShareMime(contentResolver.getType(uri)) &&
             (shareSize(uri)?.let { it <= MAX_SHARED_IMAGE_BYTES } != false)
     }.getOrDefault(false)
+
+    private fun rejectShare(reason: String) {
+        activityLog.record("share", "rejected $reason", "error")
+    }
 
     private fun shareSize(uri: Uri): Long? = runCatching {
         contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)

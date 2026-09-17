@@ -32,6 +32,11 @@
     <string name="gallery_take_photo">撮影</string>
     <string name="gallery_no_camera_app">カメラアプリが見つかりません</string>
     <string name="importing">インポート中…</string>
+    <string name="share_import_title">共有された写真をインポートしますか？</string>
+    <plurals name="share_import_message">
+        <item quantity="other">共有された写真 %d 枚を暗房にインポートしますか？</item>
+    </plurals>
+    <string name="share_import">インポート</string>
     <string name="generated_prefix">"生成 · "</string>
     <string name="empty_title">暗房にまだ写真がありません</string>
     <string name="empty_desc">カメラの FTP 送信先をこの端末に設定してください（既定ポート 2121、ユーザー camera、JPG のみ）。先に手動で 1 枚インポートしても構いません。</string>
