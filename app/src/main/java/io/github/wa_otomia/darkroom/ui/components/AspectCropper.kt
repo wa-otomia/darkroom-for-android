@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.wa_otomia.darkroom.core.MAX_PRINT_ZOOM
 import io.github.wa_otomia.darkroom.core.MIN_PRINT_ZOOM
+import io.github.wa_otomia.darkroom.core.PREVIEW_MAX_EDGE
 import io.github.wa_otomia.darkroom.core.PRINT_ASPECT
 import io.github.wa_otomia.darkroom.core.PixelCrop
 import io.github.wa_otomia.darkroom.core.SNAP_POSITION_DP
@@ -50,6 +51,7 @@ import io.github.wa_otomia.darkroom.core.largestFrameSize
 import io.github.wa_otomia.darkroom.core.normalizeQuarterTurns
 import io.github.wa_otomia.darkroom.core.normalizeRotationDegrees
 import io.github.wa_otomia.darkroom.core.panSnapGuides
+import io.github.wa_otomia.darkroom.core.previewDecodeSize
 import io.github.wa_otomia.darkroom.core.rotatePan
 import io.github.wa_otomia.darkroom.core.safeInset
 import io.github.wa_otomia.darkroom.core.viewportCrop
@@ -61,6 +63,8 @@ import io.github.wa_otomia.darkroom.ui.theme.Paper
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
+import coil.size.Precision
+import coil.size.Scale
 import coil.size.Size
 
 /**
@@ -132,11 +136,17 @@ fun AspectCropper(
     val clampRotationState = rememberUpdatedState(clampRotation)
     val snapHolder = rememberUpdatedState(snap)
     val hapticHolder = rememberUpdatedState(haptic)
-    var decoding by remember(model) { mutableStateOf(true) }
-    val request = remember(model) {
+    // rawWidth/rawHeight are EXIF-corrected and not yet quarter-turned: Coil's decode space.
+    // Size.ORIGINAL decodes the full raster; a portrait A7CR software bitmap exceeds 100 MiB.
+    val preview = previewDecodeSize(rawWidth, rawHeight, PREVIEW_MAX_EDGE)
+    var decoding by remember(model, preview.width, preview.height) { mutableStateOf(true) }
+    val request = remember(model, preview.width, preview.height) {
         ImageRequest.Builder(context)
             .data(model)
-            .size(Size.ORIGINAL)
+            .size(Size(preview.width, preview.height))
+            .precision(Precision.EXACT)
+            .scale(Scale.FIT)
+            .memoryCacheKey("${model}:${preview.width}x${preview.height}")
             .crossfade(true)
             .build()
     }
