@@ -23,6 +23,10 @@ Android ネイティブの暗室アプリ。カメラが端末内の FTP 受信�
 
 API キーと FTP パスワードは `EncryptedSharedPreferences` に保存されます。
 
+## 機能仕様と開発手順
+
+開発規約は [AGENTS.md](AGENTS.md) を参照し、`CLAUDE.md` も同じ規約を読み込みます。内部の製品仕様は OpenSpec でローカル管理し、公開リポジトリには含めません。公開の変更では確認可能な動作と検証結果を説明し、内部仕様との整合はメンテナーが別途確認します。
+
 ## ビルド
 
 JDK 17 と Android SDK が必要です。minSdk 29、target/compileSdk 37、アプリケーション ID `io.github.wa_otomia.darkroom`。

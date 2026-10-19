@@ -23,6 +23,10 @@ Bluetooth Classic SPP. No Mi Home cloud.
 
 API keys and the FTP password are kept in `EncryptedSharedPreferences`.
 
+## Specification and contribution workflow
+
+Development conventions are in [AGENTS.md](AGENTS.md); `CLAUDE.md` references the same instructions. Internal product specifications are maintained locally with OpenSpec and are not included in the public repository. Public contributions should explain observable behavior and include relevant validation; maintainers reconcile internal specifications separately.
+
 ## Build
 
 JDK 17 and the Android SDK. minSdk 29, target/compileSdk 37, application ID `io.github.wa_otomia.darkroom`.

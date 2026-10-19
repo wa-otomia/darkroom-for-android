@@ -16,3 +16,9 @@ local.properties
 *.log
 .DS_Store
 google-services.json
+
+# Local-only product specifications and planning (not a backup).
+/SPEC.md
+/openspec/
+/docs/spec/
+/docs/changes/

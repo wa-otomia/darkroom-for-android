@@ -22,6 +22,10 @@
 
 API key 与 FTP 密码存在 `EncryptedSharedPreferences`。
 
+## 功能规格与协作
+
+开发协作规则见 [AGENTS.md](AGENTS.md)，`CLAUDE.md` 引用同一份规范。内部产品规格通过 OpenSpec 在本地维护，暂不纳入公开仓库。公开贡献应说明可观察行为及相关验证，由维护者另行同步内部规格。
+
 ## 构建
 
 需要 JDK 17 和 Android SDK。minSdk 29，target/compileSdk 37，应用 ID `io.github.wa_otomia.darkroom`。
