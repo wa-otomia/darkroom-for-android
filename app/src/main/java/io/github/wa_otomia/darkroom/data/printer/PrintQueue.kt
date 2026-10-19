@@ -1,18 +1,22 @@
 package io.github.wa_otomia.darkroom.data.printer
 
 import android.content.Context
+import io.github.wa_otomia.darkroom.core.Framing
 import io.github.wa_otomia.darkroom.core.OrientedSize
 import io.github.wa_otomia.darkroom.core.PhotoMeta
 import io.github.wa_otomia.darkroom.core.PixelCrop
-import io.github.wa_otomia.darkroom.core.PrintFit
 import io.github.wa_otomia.darkroom.core.PrintRecord
 import io.github.wa_otomia.darkroom.core.PrintRestoreAction
 import io.github.wa_otomia.darkroom.core.ViewportPlacement
+import io.github.wa_otomia.darkroom.core.alignedEditFraming
 import io.github.wa_otomia.darkroom.core.combineGeneratePrompt
 import io.github.wa_otomia.darkroom.core.exactQuarterTurns
 import io.github.wa_otomia.darkroom.core.framingFor
+import io.github.wa_otomia.darkroom.core.persistableFraming
 import io.github.wa_otomia.darkroom.core.PrintJobCancelFlags
+import io.github.wa_otomia.darkroom.core.resolveExecutionPose
 import io.github.wa_otomia.darkroom.core.resolveQueuedPose
+import io.github.wa_otomia.darkroom.core.toPlacement
 import io.github.wa_otomia.darkroom.core.mapPrintWorkerFailure
 import io.github.wa_otomia.darkroom.core.printImageSize
 import io.github.wa_otomia.darkroom.core.resolvePrintLandscape
@@ -243,23 +247,28 @@ class PrintQueue @Inject constructor(
         rotationDegrees: Float = rotateQuarters * 90f,
         placement: ViewportPlacement? = null,
         watermark: Boolean = false,
+        framing: Framing? = null,
     ) {
-        enqueue(
-            photoId = photoId,
-            source = source,
-            crop = crop,
-            copies = copies,
-            presetId = presetId,
-            prompt = prompt,
-            cropImageWidth = cropImageWidth,
-            cropImageHeight = cropImageHeight,
-            rotateQuarters = rotateQuarters,
-            landscape = landscape,
-            rotationDegrees = rotationDegrees,
-            placement = placement,
-            origin = ORIGIN_MANUAL,
-            watermark = watermark,
-        )
+        appScope.launch {
+            // Null clears the slot (default pose). The row is written only after this returns.
+            catalog.saveFraming(photoId, source, framing)
+            enqueueRow(
+                photoId = photoId,
+                source = source,
+                crop = crop,
+                copies = copies,
+                presetId = presetId,
+                prompt = prompt,
+                cropImageWidth = cropImageWidth,
+                cropImageHeight = cropImageHeight,
+                rotateQuarters = rotateQuarters,
+                landscape = landscape,
+                rotationDegrees = rotationDegrees,
+                placement = placement,
+                origin = ORIGIN_MANUAL,
+                watermark = watermark,
+            )
+        }
     }
 
     fun enqueue(
@@ -279,44 +288,78 @@ class PrintQueue @Inject constructor(
         watermark: Boolean = false,
     ) {
         appScope.launch {
-            val copiesN = (copies ?: settings.readSettings().defaultCopies).coerceIn(1, 9)
-            val photo = catalog.get(photoId)
-            val pose = resolveQueuedPose(
-                saved = photo?.framingFor(source),
-                explicitLandscape = landscape,
-                explicitRotationDegrees = rotationDegrees,
-                explicitPlacement = placement,
+            enqueueRow(
+                photoId = photoId,
+                source = source,
+                crop = crop,
+                copies = copies,
+                presetId = presetId,
+                prompt = prompt,
+                cropImageWidth = cropImageWidth,
+                cropImageHeight = cropImageHeight,
+                rotateQuarters = rotateQuarters,
+                landscape = landscape,
+                rotationDegrees = rotationDegrees,
+                placement = placement,
+                origin = origin,
+                watermark = watermark,
             )
-            val resolvedLandscape = pose.landscape ?: resolveEnqueueLandscape(photoId, source, null)
-            persist(
-                PrintJobEntity(
-                    id = UUID.randomUUID().toString(),
-                    photoId = photoId,
-                    source = source,
-                    cropJson = crop?.let { json.encodeToString(PixelCrop.serializer(), it) },
-                    copies = copiesN,
-                    presetId = presetId,
-                    prompt = prompt,
-                    cropImageWidth = cropImageWidth,
-                    cropImageHeight = cropImageHeight,
-                    rotateQuarters = exactQuarterTurns(pose.rotationDegrees) ?: rotateQuarters,
-                    landscape = resolvedLandscape,
-                    rotationDegrees = pose.rotationDegrees,
-                    placementJson = pose.placement?.let { encodePlacement(json, it) },
-                    origin = origin,
-                    watermark = watermark,
-                    state = STATE_QUEUED,
-                    phase = null,
-                    createdAt = System.currentTimeMillis(),
-                    startedAt = null,
-                    finishedAt = null,
-                    printerJobId = null,
-                    jobState = null,
-                    error = null,
-                ),
-            )
-            kick()
         }
+    }
+
+    private suspend fun enqueueRow(
+        photoId: String,
+        source: String,
+        crop: PixelCrop?,
+        copies: Int?,
+        presetId: String?,
+        prompt: String,
+        cropImageWidth: Int?,
+        cropImageHeight: Int?,
+        rotateQuarters: Int,
+        landscape: Boolean?,
+        rotationDegrees: Float,
+        placement: ViewportPlacement?,
+        origin: String,
+        watermark: Boolean,
+    ) {
+        val copiesN = (copies ?: settings.readSettings().defaultCopies).coerceIn(1, 9)
+        val photo = catalog.get(photoId)
+        val pose = resolveQueuedPose(
+            saved = photo?.framingFor(source),
+            explicitLandscape = landscape,
+            explicitRotationDegrees = rotationDegrees,
+            explicitPlacement = placement,
+        )
+        val resolvedLandscape = pose.landscape ?: resolveEnqueueLandscape(photoId, source, null)
+        persist(
+            PrintJobEntity(
+                id = UUID.randomUUID().toString(),
+                photoId = photoId,
+                source = source,
+                cropJson = crop?.let { json.encodeToString(PixelCrop.serializer(), it) },
+                copies = copiesN,
+                presetId = presetId,
+                prompt = prompt,
+                cropImageWidth = cropImageWidth,
+                cropImageHeight = cropImageHeight,
+                rotateQuarters = exactQuarterTurns(pose.rotationDegrees) ?: rotateQuarters,
+                landscape = resolvedLandscape,
+                rotationDegrees = pose.rotationDegrees,
+                placementJson = pose.placement?.let { encodePlacement(json, it) },
+                origin = origin,
+                watermark = watermark,
+                state = STATE_QUEUED,
+                phase = null,
+                createdAt = System.currentTimeMillis(),
+                startedAt = null,
+                finishedAt = null,
+                printerJobId = null,
+                jobState = null,
+                error = null,
+            ),
+        )
+        kick()
     }
 
     @Deprecated("Use AiJobs.enqueueGenerate")
@@ -431,6 +474,7 @@ class PrintQueue @Inject constructor(
         rotationDegrees: Float = rotateQuarters * 90f,
         placement: ViewportPlacement? = null,
         watermark: Boolean = false,
+        origin: String = ORIGIN_MANUAL,
     ): Pair<Int, String> = mutex.withLock {
         val t0 = System.currentTimeMillis()
         var usedSource = source
@@ -448,6 +492,22 @@ class PrintQueue @Inject constructor(
         ensureTicker(tracker)
         try {
             throwIfCancelled()
+            // Freeze the version's latest saved framing before any image use.
+            // Enqueue pose arguments stay on the row as a record and are not rendered.
+            val savedFraming = catalog.get(photoId)?.framingFor(source)
+            val autoLandscape = resolveEnqueueLandscape(photoId, source, null)
+            val execution = resolveExecutionPose(
+                saved = savedFraming,
+                manual = origin == ORIGIN_MANUAL,
+                autoLandscape = autoLandscape,
+            )
+            throwIfCancelled()
+            val executionLandscape = execution.landscape ?: autoLandscape
+            val executionRotation = execution.rotationDegrees
+            val executionPlacement = execution.placement
+            var renderLandscape = executionLandscape
+            var renderRotation = executionRotation
+            var renderPlacement = executionPlacement
             if (usedPreset) {
                 tracker.startPhase("editing")
                 emit(photoId, "editing")
@@ -459,13 +519,11 @@ class PrintQueue @Inject constructor(
                 val srcBytes = catalog.sourceFile(photoId, source).readBytes()
                 val cropped = ImagePipeline.cropToJpeg(
                     srcBytes,
-                    crop,
-                    cropImageWidth,
-                    cropImageHeight,
-                    rotateQuarters = rotateQuarters,
-                    landscape = landscape,
-                    rotationDegrees = rotationDegrees,
-                    placement = placement,
+                    crop = null,
+                    rotateQuarters = exactQuarterTurns(executionRotation) ?: 0,
+                    landscape = executionLandscape,
+                    rotationDegrees = executionRotation,
+                    placement = executionPlacement,
                 )
                 throwIfCancelled()
                 val nest = JobProgressTracker("$photoId-edit", JobKind.Ai, aiPhases(stats), stats)
@@ -473,7 +531,7 @@ class PrintQueue @Inject constructor(
                     tracker.setNestedFraction(snap.fraction)
                     emit(photoId, "editing")
                 }
-                val jpeg = try {
+                val edited = try {
                     grok.edit(cropped, combined, photoId, "edit") { grokProgress ->
                         applyAiProgress(nest, grokProgress)
                         tracker.setNestedFraction(nest.snapshot().fraction)
@@ -482,13 +540,23 @@ class PrintQueue @Inject constructor(
                 } finally {
                     nestTicks.cancel()
                 }
-                usedSource = catalog.saveEdit(
+                val edit = catalog.saveEdit(
                     photoId,
                     combined,
-                    jpeg,
+                    edited,
                     presetId = presetId.orEmpty(),
                     presetTitle = preset?.title.orEmpty(),
-                ).id
+                )
+                usedSource = edit.id
+                val aligned = alignedEditFraming(edit.width, edit.height, executionLandscape)
+                catalog.saveFraming(
+                    photoId,
+                    edit.id,
+                    persistableFraming(aligned, edit.width, edit.height),
+                )
+                renderLandscape = aligned.landscape
+                renderRotation = aligned.rotationDegrees
+                renderPlacement = aligned.toPlacement()
                 tracker.completePhase()
             }
             throwIfCancelled()
@@ -498,32 +566,18 @@ class PrintQueue @Inject constructor(
             val bytes = catalog.sourceFile(photoId, usedSource).readBytes()
             val mark = if (watermark) settings.readWatermark() else null
             val photoMeta = catalog.get(photoId)
-            val jpeg = if (usedPreset) {
-                ImagePipeline.renderPrintJpeg(
-                    bytes,
-                    crop = null,
-                    PrintFit.COVER,
-                    landscape = landscape,
-                    watermark = mark,
-                    photo = photoMeta,
-                    context = context,
-                )
-            } else {
-                ImagePipeline.renderPrintJpeg(
-                    bytes,
-                    crop,
-                    cfg.printFit,
-                    cropImageWidth = cropImageWidth,
-                    cropImageHeight = cropImageHeight,
-                    rotateQuarters = rotateQuarters,
-                    landscape = landscape,
-                    rotationDegrees = rotationDegrees,
-                    placement = placement,
-                    watermark = mark,
-                    photo = photoMeta,
-                    context = context,
-                )
-            }
+            val jpeg = ImagePipeline.renderPrintJpeg(
+                bytes,
+                crop = null,
+                cfg.printFit,
+                rotateQuarters = exactQuarterTurns(renderRotation) ?: 0,
+                landscape = renderLandscape,
+                rotationDegrees = renderRotation,
+                placement = renderPlacement,
+                watermark = mark,
+                photo = photoMeta,
+                context = context,
+            )
             throwIfCancelled()
             tracker.startPhase("connecting")
             emit(photoId, "connecting")
@@ -595,7 +649,7 @@ class PrintQueue @Inject constructor(
                     jobId = jobId,
                     jobState = jobState,
                     source = usedSource,
-                    crop = if (usedPreset) null else crop,
+                    crop = null,
                     copies = copiesN,
                 ),
             )
@@ -618,7 +672,7 @@ class PrintQueue @Inject constructor(
                     at = Instant.now().toString(),
                     jobId = jobId.takeIf { it != 0 },
                     source = usedSource,
-                    crop = if (usedPreset) null else crop,
+                    crop = null,
                     copies = copies ?: cfg.defaultCopies,
                     error = message,
                 ),
@@ -679,6 +733,7 @@ class PrintQueue @Inject constructor(
                 rotationDegrees = row.rotationDegrees,
                 placement = decodePlacement(json, row.placementJson),
                 watermark = row.watermark,
+                origin = row.origin,
             )
             val doneAt = System.currentTimeMillis()
             patchRow(row.id) { it.copy(state = STATE_DONE, phase = "done", finishedAt = doneAt, error = null) }

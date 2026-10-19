@@ -503,6 +503,7 @@ fun StudioScreen(
             rotationDegrees = rotationDegrees,
             placement = placement,
             watermark = watermarkArmed,
+            framing = framingToPersist,
         )
         scope.launch { snackbar.showSnackbar(printQueuedText) }
     }
@@ -865,7 +866,8 @@ fun StudioScreen(
                 onRotationChange = { rotationDegrees = it },
                 onPlacement = { placement = it },
                 // Lock only while a visible AI job is running. A queued print
-                // must not freeze framing — the crop was already captured at enqueue.
+                // must not freeze framing — execution reads the latest saved pose,
+                // and enqueue saves the on-screen pose before the row can run.
                 enabled = !cropLocked,
                 snapState = snapState,
             )
