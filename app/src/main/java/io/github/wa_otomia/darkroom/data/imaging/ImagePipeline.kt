@@ -10,6 +10,8 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Rect
 import androidx.exifinterface.media.ExifInterface
+import io.github.wa_otomia.darkroom.core.AI_UPLOAD_MAX_EDGE
+import io.github.wa_otomia.darkroom.core.Affine2x3
 import io.github.wa_otomia.darkroom.core.DEFAULT_PRINT_QUALITY
 import io.github.wa_otomia.darkroom.core.OrientedSize
 import io.github.wa_otomia.darkroom.core.PRINT_HEIGHT
@@ -23,17 +25,23 @@ import io.github.wa_otomia.darkroom.core.WatermarkSettings
 import io.github.wa_otomia.darkroom.core.centeredAspectCrop
 import io.github.wa_otomia.darkroom.core.clampCrop
 import io.github.wa_otomia.darkroom.core.clampZoom
+import io.github.wa_otomia.darkroom.core.containSampleSize
+import io.github.wa_otomia.darkroom.core.coverSampleSize
 import io.github.wa_otomia.darkroom.core.coverScale
 import io.github.wa_otomia.darkroom.core.cropAspect
 import io.github.wa_otomia.darkroom.core.cropInSourceSpace
+import io.github.wa_otomia.darkroom.core.exifOrientationTransform
 import io.github.wa_otomia.darkroom.core.exportSheetSize
+import io.github.wa_otomia.darkroom.core.longEdgeSampleSize
 import io.github.wa_otomia.darkroom.core.sheetQuarterTurns
 import io.github.wa_otomia.darkroom.core.ensureJpegBytes
 import io.github.wa_otomia.darkroom.core.exactQuarterTurns
 import io.github.wa_otomia.darkroom.core.normalizeQuarterTurns
 import io.github.wa_otomia.darkroom.core.orientedDimensions
 import io.github.wa_otomia.darkroom.core.resolveCropOnBitmap
+import io.github.wa_otomia.darkroom.core.rotateCrop
 import io.github.wa_otomia.darkroom.core.rotatedSize
+import io.github.wa_otomia.darkroom.core.widthSampleSize
 import kotlinx.coroutines.CancellationException
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -134,6 +142,11 @@ object ImagePipeline {
         return ImageInfo(size.width, size.height, orientation)
     }
 
+    /**
+     * Full-size EXIF correction, kept so the 5/7 mapping stays the reference
+     * [exifOrientationTransform] was locked to. The bounded JPEG entry points do not call this:
+     * they fold that same affine into the output draw and never allocate a second source-sized copy.
+     */
     fun decodeRotated(bytes: ByteArray): Bitmap {
         val raw = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
             ?: error("无法解码 JPEG")
@@ -159,38 +172,48 @@ object ImagePipeline {
         }
     }
 
-    fun thumbnailJpeg(bytes: ByteArray, quality: Int = 72): ByteArray {
-        val bmp = decodeRotated(bytes)
-        val w = bmp.width.coerceAtMost(THUMB_WIDTH)
-        val h = if (bmp.width == 0) bmp.height else (bmp.height * w) / bmp.width
-        val scaled = if (w == bmp.width) bmp else Bitmap.createScaledBitmap(bmp, w.coerceAtLeast(1), h.coerceAtLeast(1), true)
-        return encodeJpeg(scaled, quality).also {
-            if (scaled != bmp) scaled.recycle()
-            bmp.recycle()
+    fun thumbnailJpeg(bytes: ByteArray, quality: Int = 72): ByteArray = reportingDecodeFailure {
+        val source = inspectJpeg(bytes)
+        val raw = decodeSampled(bytes, widthSampleSize(source.oriented.width, THUMB_WIDTH))
+        try {
+            val outW = source.oriented.width.coerceAtMost(THUMB_WIDTH)
+            val outH = if (source.oriented.width == 0) {
+                source.oriented.height
+            } else {
+                (source.oriented.height * outW) / source.oriented.width
+            }
+            encodeScaled(raw, source.orientation, outW.coerceAtLeast(1), outH.coerceAtLeast(1), quality)
+        } finally {
+            recycle(raw)
         }
     }
 
-    fun grokUploadJpeg(bytes: ByteArray): ByteArray {
-        val bmp = decodeRotated(bytes)
-        val max = 1536
-        val scale = minOf(1f, max.toFloat() / maxOf(bmp.width, bmp.height))
-        val w = (bmp.width * scale).toInt().coerceAtLeast(1)
-        val h = (bmp.height * scale).toInt().coerceAtLeast(1)
-        val scaled = if (w == bmp.width && h == bmp.height) bmp else Bitmap.createScaledBitmap(bmp, w, h, true)
-        return encodeJpeg(scaled, 85).also {
-            if (scaled != bmp) scaled.recycle()
-            bmp.recycle()
+    fun grokUploadJpeg(bytes: ByteArray): ByteArray = reportingDecodeFailure {
+        val source = inspectJpeg(bytes)
+        val sample = longEdgeSampleSize(
+            source.oriented.width,
+            source.oriented.height,
+            AI_UPLOAD_MAX_EDGE,
+        )
+        val raw = decodeSampled(bytes, sample)
+        try {
+            val (outW, outH) = uploadSize(source.oriented)
+            encodeScaled(raw, source.orientation, outW, outH, 85)
+        } finally {
+            recycle(raw)
         }
     }
 
     /**
-     * [crop] is expressed on the photo as the user framed it: EXIF applied by [decodeRotated],
-     * then turned [rotateQuarters] quarters clockwise. The rect is mapped back onto the decoded
-     * pixels so only the cut has to be turned, and [landscape] adds the extra quarter that lays a
-     * 3:2 frame onto the portrait sheet.
+     * [crop] is expressed on the photo as the user framed it: EXIF-corrected, then turned
+     * [rotateQuarters] quarters clockwise. When [cropImageWidth] or [cropImageHeight] is omitted,
+     * that record space is the full-size oriented frame, not the subsampled bitmap. The rect is
+     * mapped onto the sampled frame and drawn with one matrix (output ∘ quarter-turn ∘ EXIF).
      *
      * When [placement] is set (or [rotationDegrees] is not a right angle), the source is drawn
-     * onto the white sheet at that zoom/pan/angle so letterbox margins are kept.
+     * onto the white sheet at that zoom/pan/angle so letterbox margins are kept. Cover scale uses
+     * the orientation-corrected size of the sampled bitmap; the rest of the placement formula is
+     * unchanged.
      *
      * [watermark] is painted after the photo and only on this print/export path.
      * [cropToJpeg] and [grokUploadJpeg] never accept a watermark. [outputScale] multiplies
@@ -199,6 +222,7 @@ object ImagePipeline {
      *
      * [sheetForPrinter] (default true) quarter-turns a landscape frame onto the portrait
      * printer sheet. Export passes false so 横幅 stays 3120×2080 and 竖幅 stays 2080×3120.
+     * That turn is applied to the finished sheet (watermark included), never to a source-sized copy.
      */
     fun renderPrintJpeg(
         bytes: ByteArray,
@@ -216,62 +240,86 @@ object ImagePipeline {
         outputScale: Int = 1,
         context: Context? = null,
         sheetForPrinter: Boolean = true,
-    ): ByteArray {
-        val bmp = decodeRotated(bytes)
-        if (placement != null || exactQuarterTurns(rotationDegrees) == null) {
-            val placed = placement ?: implicitPlacement(bmp, rotationDegrees, landscape)
-            val sheet = renderPlacementSheet(
-                bmp,
-                placed,
-                landscape,
-                ontoPortraitSheet = sheetForPrinter,
-                outputScale = outputScale,
-                watermark = watermark,
-                photo = photo,
-                context = context,
+    ): ByteArray = reportingDecodeFailure {
+        val source = inspectJpeg(bytes)
+        val placementPath = placement != null || exactQuarterTurns(rotationDegrees) == null
+        val sample = if (placementPath) {
+            val dest = exportSheetSize(landscape, outputScale)
+            coverSampleSize(
+                source.oriented.width,
+                source.oriented.height,
+                dest.width,
+                dest.height,
+                placement?.zoom ?: 1f,
             )
-            return encodeJpeg(sheet, quality).also {
-                if (sheet !== bmp) sheet.recycle()
-                bmp.recycle()
-            }
-        }
-        val framed = rotatedSize(bmp.width, bmp.height, rotateQuarters)
-        val resolved = resolveCropOnBitmap(
-            crop,
-            cropImageWidth ?: framed.width,
-            cropImageHeight ?: framed.height,
-            framed.width,
-            framed.height,
-        )
-        val framedCrop = resolved
-            ?: if (fit == PrintFit.COVER) centeredAspectCrop(framed.width, framed.height, cropAspect(landscape)) else null
-        val cut = if (framedCrop != null) {
-            val c = sourceCut(framedCrop, framed, bmp.width, bmp.height, rotateQuarters)
-            Bitmap.createBitmap(bmp, c.x, c.y, c.width, c.height)
         } else {
-            bmp
+            quarterSheetSampleSize(
+                source,
+                crop,
+                cropImageWidth,
+                cropImageHeight,
+                rotateQuarters,
+                landscape,
+                fit,
+                outputScale,
+            )
         }
-        val framedImage = rotateBitmap(cut, rotateQuarters)
-        val framedSheet = preparePrintBitmap(
-            framedImage,
-            if (framedCrop != null) PrintFit.COVER else fit,
-            outputScale,
-            landscape = landscape,
-        )
-        applyWatermark(framedSheet, watermark, photo, framedSheet.width, framedSheet.height, context)
-        val out = rotateBitmap(framedSheet, sheetQuarterTurns(landscape, sheetForPrinter))
-        return encodeJpeg(out, quality).also {
-            if (out !== framedSheet) out.recycle()
-            framedSheet.recycle()
-            if (framedImage !== cut) framedImage.recycle()
-            if (cut !== bmp) cut.recycle()
-            bmp.recycle()
+        val raw = decodeSampled(bytes, sample)
+        try {
+            val exif = exifOrientationTransform(source.orientation, raw.width, raw.height)
+            val sheet = if (placementPath) {
+                val placed = placement ?: implicitPlacement(
+                    exif.outputWidth,
+                    exif.outputHeight,
+                    rotationDegrees,
+                    landscape,
+                )
+                renderPlacementSheet(
+                    raw,
+                    exif,
+                    placed,
+                    landscape,
+                    ontoPortraitSheet = sheetForPrinter,
+                    outputScale = outputScale,
+                    watermark = watermark,
+                    photo = photo,
+                    context = context,
+                )
+            } else {
+                renderQuarterSheet(
+                    raw,
+                    exif,
+                    source.oriented,
+                    crop,
+                    cropImageWidth,
+                    cropImageHeight,
+                    rotateQuarters,
+                    landscape,
+                    fit,
+                    outputScale,
+                    watermark,
+                    photo,
+                    context,
+                    sheetForPrinter,
+                )
+            }
+            try {
+                encodeJpeg(sheet, quality)
+            } finally {
+                recycle(sheet)
+            }
+        } finally {
+            recycle(raw)
         }
     }
 
     /**
      * Cuts what the user framed and leaves it upright; the sheet turn happens at print time.
      * Never accepts or draws a watermark — AI upload must stay unmarked.
+     *
+     * A placement (or a non-right-angle) is drawn onto the frame-sized sheet. A right-angle crop
+     * is emitted at the sampled crop size, decoded so the oriented long edge is about
+     * [AI_UPLOAD_MAX_EDGE]. The crop record space follows [renderPrintJpeg].
      */
     fun cropToJpeg(
         bytes: ByteArray,
@@ -283,31 +331,56 @@ object ImagePipeline {
         landscape: Boolean = false,
         rotationDegrees: Float = rotateQuarters * 90f,
         placement: ViewportPlacement? = null,
-    ): ByteArray {
-        val bmp = decodeRotated(bytes)
-        if (placement != null || exactQuarterTurns(rotationDegrees) == null) {
-            val placed = placement ?: implicitPlacement(bmp, rotationDegrees, landscape)
-            val framed = renderPlacementSheet(bmp, placed, landscape, ontoPortraitSheet = false)
-            return encodeJpeg(framed, quality).also {
-                if (framed !== bmp) framed.recycle()
-                bmp.recycle()
-            }
+    ): ByteArray = reportingDecodeFailure {
+        val source = inspectJpeg(bytes)
+        val placementPath = placement != null || exactQuarterTurns(rotationDegrees) == null
+        val sample = if (placementPath) {
+            val dest = exportSheetSize(landscape, outputScale = 1)
+            coverSampleSize(
+                source.oriented.width,
+                source.oriented.height,
+                dest.width,
+                dest.height,
+                placement?.zoom ?: 1f,
+            )
+        } else {
+            longEdgeSampleSize(source.oriented.width, source.oriented.height, AI_UPLOAD_MAX_EDGE)
         }
-        val framed = rotatedSize(bmp.width, bmp.height, rotateQuarters)
-        val framedCrop = resolveCropOnBitmap(
-            crop,
-            cropImageWidth ?: framed.width,
-            cropImageHeight ?: framed.height,
-            framed.width,
-            framed.height,
-        ) ?: centeredAspectCrop(framed.width, framed.height, cropAspect(landscape))
-        val c = sourceCut(framedCrop, framed, bmp.width, bmp.height, rotateQuarters)
-        val cut = Bitmap.createBitmap(bmp, c.x, c.y, c.width, c.height)
-        val turned = rotateBitmap(cut, rotateQuarters)
-        return encodeJpeg(turned, quality).also {
-            if (turned !== cut) turned.recycle()
-            if (cut !== bmp) cut.recycle()
-            bmp.recycle()
+        val raw = decodeSampled(bytes, sample)
+        try {
+            val exif = exifOrientationTransform(source.orientation, raw.width, raw.height)
+            if (placementPath) {
+                val placed = placement ?: implicitPlacement(
+                    exif.outputWidth,
+                    exif.outputHeight,
+                    rotationDegrees,
+                    landscape,
+                )
+                val framed = renderPlacementSheet(raw, exif, placed, landscape, ontoPortraitSheet = false)
+                try {
+                    encodeJpeg(framed, quality)
+                } finally {
+                    recycle(framed)
+                }
+            } else {
+                val cut = renderCropBitmap(
+                    raw,
+                    exif,
+                    source.oriented,
+                    crop,
+                    cropImageWidth,
+                    cropImageHeight,
+                    rotateQuarters,
+                    landscape,
+                )
+                try {
+                    encodeJpeg(cut, quality)
+                } finally {
+                    recycle(cut)
+                }
+            }
+        } finally {
+            recycle(raw)
         }
     }
 
@@ -323,7 +396,12 @@ object ImagePipeline {
         return clampCrop(inSource, bitmapWidth, bitmapHeight)
     }
 
-    private fun implicitPlacement(bmp: Bitmap, rotationDegrees: Float, landscape: Boolean): ViewportPlacement {
+    private fun implicitPlacement(
+        imageWidth: Int,
+        imageHeight: Int,
+        rotationDegrees: Float,
+        landscape: Boolean,
+    ): ViewportPlacement {
         val destW = if (landscape) PRINT_HEIGHT else PRINT_WIDTH
         val destH = if (landscape) PRINT_WIDTH else PRINT_HEIGHT
         return ViewportPlacement(
@@ -333,17 +411,21 @@ object ImagePipeline {
             rotationDegrees = rotationDegrees,
             frameWidth = destW.toFloat(),
             frameHeight = destH.toFloat(),
-            imageWidth = bmp.width,
-            imageHeight = bmp.height,
+            imageWidth = imageWidth,
+            imageHeight = imageHeight,
         )
     }
 
     /**
      * Draws [placement] onto a white frame-sized bitmap. [preparePrintBitmap] is not used:
      * a second cover-fit would erase letterbox margins.
+     *
+     * [source] is the unrotated sample. [exif] maps it into the oriented space the placement
+     * formula was written against; cover uses that oriented size, not the storage size.
      */
     private fun renderPlacementSheet(
         source: Bitmap,
+        exif: Affine2x3,
         placement: ViewportPlacement,
         landscape: Boolean,
         ontoPortraitSheet: Boolean,
@@ -353,17 +435,18 @@ object ImagePipeline {
         context: Context? = null,
     ): Bitmap {
         val dest = exportSheetSize(landscape, outputScale)
-        val destW = dest.width
-        val destH = dest.height
-        val framed = Bitmap.createBitmap(destW, destH, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(framed)
-        canvas.drawColor(Color.WHITE)
-        drawPlacement(canvas, source, placement, destW, destH)
-        applyWatermark(framed, watermark, photo, destW, destH, context)
-        if (sheetQuarterTurns(landscape, ontoPortraitSheet) == 0) return framed
-        val sheet = rotateBitmap(framed, sheetQuarterTurns(landscape, ontoPortraitSheet))
-        if (sheet !== framed) framed.recycle()
-        return sheet
+        val framed = Bitmap.createBitmap(dest.width, dest.height, Bitmap.Config.ARGB_8888)
+        var handedOff = false
+        try {
+            val canvas = Canvas(framed)
+            canvas.drawColor(Color.WHITE)
+            drawPlacement(canvas, source, exif, placement, dest.width, dest.height)
+            val sheet = finishSheet(framed, landscape, ontoPortraitSheet, watermark, photo, context)
+            handedOff = true
+            return sheet
+        } finally {
+            if (!handedOff) recycle(framed)
+        }
     }
 
     private fun applyWatermark(
@@ -379,20 +462,33 @@ object ImagePipeline {
         WatermarkRenderer.apply(sheet, watermark, photo, frameW, frameH, context)
     }
 
-    private fun drawPlacement(canvas: Canvas, source: Bitmap, placement: ViewportPlacement, destW: Int, destH: Int) {
-        val cover = coverScale(destW.toFloat(), destH.toFloat(), source.width, source.height)
+    /**
+     * Same placement formula as before, with [exif] applied first so the sample does not need
+     * an oriented copy. Cover is computed from the EXIF output size of [source].
+     */
+    private fun drawPlacement(
+        canvas: Canvas,
+        source: Bitmap,
+        exif: Affine2x3,
+        placement: ViewportPlacement,
+        destW: Int,
+        destH: Int,
+    ) {
+        val orientedW = exif.outputWidth
+        val orientedH = exif.outputHeight
+        val cover = coverScale(destW.toFloat(), destH.toFloat(), orientedW, orientedH)
         val scale = cover * clampZoom(placement.zoom)
         val frameW = placement.frameWidth.takeIf { it > 0f } ?: destW.toFloat()
         val frameH = placement.frameHeight.takeIf { it > 0f } ?: destH.toFloat()
         val panX = placement.offsetX * destW / frameW
         val panY = placement.offsetY * destH / frameH
         val matrix = Matrix()
-        matrix.postTranslate(-source.width / 2f, -source.height / 2f)
+        matrix.setValues(exif.matrixValues())
+        matrix.postTranslate(-orientedW / 2f, -orientedH / 2f)
         matrix.postScale(scale, scale)
         matrix.postRotate(placement.rotationDegrees)
         matrix.postTranslate(destW / 2f + panX, destH / 2f + panY)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-        canvas.drawBitmap(source, matrix, paint)
+        canvas.drawBitmap(source, matrix, bitmapPaint())
     }
 
     private fun rotateBitmap(source: Bitmap, quarterTurns: Int): Bitmap {
@@ -465,5 +561,375 @@ object ImagePipeline {
         val x = (dw - w) / 2
         val y = (dh - h) / 2
         return Rect(x, y, x + w, y + h)
+    }
+
+    /**
+     * Storage size plus EXIF, before any pixels are allocated. Crop baselines live in this
+     * oriented space (and the quarter-turned frame derived from it), never in the sample.
+     */
+    private data class JpegBounds(
+        val orientation: Int,
+        val oriented: OrientedSize,
+    )
+
+    private fun inspectJpeg(bytes: ByteArray): JpegBounds {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) error("无法解码 JPEG")
+        val orientation = readOrientation(bytes)
+        return JpegBounds(
+            orientation,
+            orientedDimensions(bounds.outWidth, bounds.outHeight, orientation),
+        )
+    }
+
+    /** Unrotated sample. [sampleSize] comes from DecodeBudget and is at least 1. */
+    private fun decodeSampled(bytes: ByteArray, sampleSize: Int): Bitmap {
+        val opts = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize.coerceAtLeast(1)
+            inJustDecodeBounds = false
+        }
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+            ?: error("无法解码 JPEG")
+        if (bitmap.width <= 0 || bitmap.height <= 0) {
+            recycle(bitmap)
+            error("无法解码 JPEG")
+        }
+        return bitmap
+    }
+
+    private fun uploadSize(oriented: OrientedSize): Pair<Int, Int> {
+        val longEdge = maxOf(oriented.width, oriented.height)
+        val scale = if (longEdge <= 0) 1f else minOf(1f, AI_UPLOAD_MAX_EDGE.toFloat() / longEdge)
+        return (oriented.width * scale).toInt().coerceAtLeast(1) to
+            (oriented.height * scale).toInt().coerceAtLeast(1)
+    }
+
+    /**
+     * Scale the oriented sample to [outW]×[outH]. An identity EXIF at the same size encodes
+     * the sample directly, matching the old "already the right size" path.
+     */
+    private fun encodeScaled(raw: Bitmap, orientation: Int, outW: Int, outH: Int, quality: Int): ByteArray {
+        val exif = exifOrientationTransform(orientation, raw.width, raw.height)
+        if (exif.isIdentity() && outW == raw.width && outH == raw.height) {
+            return encodeJpeg(raw, quality)
+        }
+        val out = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
+        try {
+            val canvas = Canvas(out)
+            val matrix = Matrix()
+            matrix.setValues(exif.matrixValues())
+            matrix.postConcat(mapRectMatrix(0f, 0f, exif.outputWidth.toFloat(), exif.outputHeight.toFloat(), Rect(0, 0, outW, outH)))
+            canvas.drawBitmap(raw, matrix, bitmapPaint())
+            return encodeJpeg(out, quality)
+        } finally {
+            recycle(out)
+        }
+    }
+
+    private fun quarterSheetSampleSize(
+        source: JpegBounds,
+        crop: PixelCrop?,
+        cropImageWidth: Int?,
+        cropImageHeight: Int?,
+        rotateQuarters: Int,
+        landscape: Boolean,
+        fit: PrintFit,
+        outputScale: Int,
+    ): Int {
+        val fullFramed = rotatedSize(source.oriented.width, source.oriented.height, rotateQuarters)
+        val recordW = cropImageWidth ?: fullFramed.width
+        val recordH = cropImageHeight ?: fullFramed.height
+        val region = if (crop != null) {
+            resolveCropOnBitmap(crop, recordW, recordH, fullFramed.width, fullFramed.height)
+        } else if (fit == PrintFit.COVER) {
+            centeredAspectCrop(fullFramed.width, fullFramed.height, cropAspect(landscape))
+        } else {
+            null
+        }
+        val dest = exportSheetSize(landscape, outputScale)
+        return if (region != null) {
+            coverSampleSize(region.width, region.height, dest.width, dest.height)
+        } else {
+            containSampleSize(fullFramed.width, fullFramed.height, dest.width, dest.height)
+        }
+    }
+
+    /**
+     * Right-angle print/export sheet. The crop is resolved in full-size framed space (or the
+     * caller's record size), then mapped onto the sample. One draw applies EXIF, the user
+     * quarter-turn and the cover/letterbox rect. The printer turn, if any, is [finishSheet].
+     */
+    private fun renderQuarterSheet(
+        raw: Bitmap,
+        exif: Affine2x3,
+        fullOriented: OrientedSize,
+        crop: PixelCrop?,
+        cropImageWidth: Int?,
+        cropImageHeight: Int?,
+        rotateQuarters: Int,
+        landscape: Boolean,
+        fit: PrintFit,
+        outputScale: Int,
+        watermark: WatermarkSettings?,
+        photo: PhotoMeta?,
+        context: Context?,
+        sheetForPrinter: Boolean,
+    ): Bitmap {
+        val dest = exportSheetSize(landscape, outputScale)
+        val framed = Bitmap.createBitmap(dest.width, dest.height, Bitmap.Config.ARGB_8888)
+        var handedOff = false
+        try {
+            val canvas = Canvas(framed)
+            canvas.drawColor(Color.WHITE)
+            drawQuarterCrop(
+                canvas,
+                raw,
+                exif,
+                fullOriented,
+                crop,
+                cropImageWidth,
+                cropImageHeight,
+                rotateQuarters,
+                landscape,
+                fit,
+                dest.width,
+                dest.height,
+            )
+            val sheet = finishSheet(framed, landscape, sheetForPrinter, watermark, photo, context)
+            handedOff = true
+            return sheet
+        } finally {
+            if (!handedOff) recycle(framed)
+        }
+    }
+
+    /** Crop-sized output for [cropToJpeg]. No sheet, no watermark. */
+    private fun renderCropBitmap(
+        raw: Bitmap,
+        exif: Affine2x3,
+        fullOriented: OrientedSize,
+        crop: PixelCrop?,
+        cropImageWidth: Int?,
+        cropImageHeight: Int?,
+        rotateQuarters: Int,
+        landscape: Boolean,
+    ): Bitmap {
+        val content = sampledContentRect(
+            exif,
+            fullOriented,
+            crop,
+            cropImageWidth,
+            cropImageHeight,
+            rotateQuarters,
+            landscape,
+            fallbackCover = true,
+        )
+        val out = Bitmap.createBitmap(
+            content.width.coerceAtLeast(1),
+            content.height.coerceAtLeast(1),
+            Bitmap.Config.ARGB_8888,
+        )
+        try {
+            val canvas = Canvas(out)
+            drawContent(canvas, raw, exif, content, Rect(0, 0, out.width, out.height), rotateQuarters)
+            return out
+        } catch (t: Throwable) {
+            recycle(out)
+            throw t
+        }
+    }
+
+    private fun drawQuarterCrop(
+        canvas: Canvas,
+        raw: Bitmap,
+        exif: Affine2x3,
+        fullOriented: OrientedSize,
+        crop: PixelCrop?,
+        cropImageWidth: Int?,
+        cropImageHeight: Int?,
+        rotateQuarters: Int,
+        landscape: Boolean,
+        fit: PrintFit,
+        destW: Int,
+        destH: Int,
+    ) {
+        val content = sampledContentRect(
+            exif,
+            fullOriented,
+            crop,
+            cropImageWidth,
+            cropImageHeight,
+            rotateQuarters,
+            landscape,
+            fallbackCover = fit == PrintFit.COVER,
+        )
+        val usedFit = if (content.fromCrop) PrintFit.COVER else fit
+        val dst = if (usedFit == PrintFit.CONTAIN) {
+            letterbox(content.width, content.height, destW, destH)
+        } else {
+            coverRect(content.width, content.height, destW, destH)
+        }
+        drawContent(canvas, raw, exif, content, dst, rotateQuarters)
+    }
+
+    /**
+     * Pixel rect of what [preparePrintBitmap] used to receive, expressed in sampled framed space.
+     * [fromCrop] is false only for a contain of the whole frame (no centred cover crop).
+     */
+    private data class SampledContent(
+        val x: Int,
+        val y: Int,
+        val width: Int,
+        val height: Int,
+        val fromCrop: Boolean,
+    )
+
+    private fun sampledContentRect(
+        exif: Affine2x3,
+        fullOriented: OrientedSize,
+        crop: PixelCrop?,
+        cropImageWidth: Int?,
+        cropImageHeight: Int?,
+        rotateQuarters: Int,
+        landscape: Boolean,
+        fallbackCover: Boolean,
+    ): SampledContent {
+        val fullFramed = rotatedSize(fullOriented.width, fullOriented.height, rotateQuarters)
+        val sampledOriented = OrientedSize(exif.outputWidth, exif.outputHeight)
+        val sampledFramed = rotatedSize(sampledOriented.width, sampledOriented.height, rotateQuarters)
+        val recordW = cropImageWidth ?: fullFramed.width
+        val recordH = cropImageHeight ?: fullFramed.height
+        val mapped = if (crop != null) {
+            resolveCropOnBitmap(crop, recordW, recordH, sampledFramed.width, sampledFramed.height)
+        } else if (fallbackCover) {
+            val centered = centeredAspectCrop(fullFramed.width, fullFramed.height, cropAspect(landscape))
+            resolveCropOnBitmap(
+                centered,
+                fullFramed.width,
+                fullFramed.height,
+                sampledFramed.width,
+                sampledFramed.height,
+            )
+        } else {
+            null
+        }
+        if (mapped == null) {
+            return SampledContent(0, 0, sampledFramed.width.coerceAtLeast(1), sampledFramed.height.coerceAtLeast(1), false)
+        }
+        val cut = sourceCut(mapped, sampledFramed, sampledOriented.width, sampledOriented.height, rotateQuarters)
+        val framedCut = rotateCrop(cut, sampledOriented.width, sampledOriented.height, rotateQuarters)
+        return SampledContent(
+            framedCut.x,
+            framedCut.y,
+            framedCut.width.coerceAtLeast(1),
+            framedCut.height.coerceAtLeast(1),
+            true,
+        )
+    }
+
+    /**
+     * One matrix: rect map ∘ user quarter-turn ∘ EXIF. The quarter-turn coefficients are the
+     * EXIF 6/3/8 affines, which are the [decodeRotated] / [rotateBitmap] rotations plus the
+     * origin translation. Clip to [dst] so pixels outside the crop cannot paint the margins.
+     */
+    private fun drawContent(
+        canvas: Canvas,
+        raw: Bitmap,
+        exif: Affine2x3,
+        content: SampledContent,
+        dst: Rect,
+        rotateQuarters: Int,
+    ) {
+        val matrix = Matrix()
+        matrix.setValues(exif.matrixValues())
+        matrix.postConcat(
+            quarterTurnMatrix(rotateQuarters, exif.outputWidth, exif.outputHeight),
+        )
+        matrix.postConcat(
+            mapRectMatrix(
+                content.x.toFloat(),
+                content.y.toFloat(),
+                content.width.toFloat(),
+                content.height.toFloat(),
+                dst,
+            ),
+        )
+        canvas.save()
+        try {
+            canvas.clipRect(dst)
+            canvas.drawBitmap(raw, matrix, bitmapPaint())
+        } finally {
+            canvas.restore()
+        }
+    }
+
+    /**
+     * Watermark stays in frame space. A landscape printer sheet is then turned as an
+     * output-sized bitmap — never as a second copy of the source.
+     */
+    private fun finishSheet(
+        framed: Bitmap,
+        landscape: Boolean,
+        ontoPortraitSheet: Boolean,
+        watermark: WatermarkSettings?,
+        photo: PhotoMeta?,
+        context: Context?,
+    ): Bitmap {
+        applyWatermark(framed, watermark, photo, framed.width, framed.height, context)
+        val turns = sheetQuarterTurns(landscape, ontoPortraitSheet)
+        if (turns == 0) return framed
+        val sheet = rotateBitmap(framed, turns)
+        if (sheet !== framed) recycle(framed)
+        return sheet
+    }
+
+    /** User quarter-turn on an already EXIF-corrected raster, matching [rotateBitmap]. */
+    private fun quarterTurnMatrix(quarterTurns: Int, width: Int, height: Int): Matrix {
+        val orientation = when (normalizeQuarterTurns(quarterTurns)) {
+            1 -> ExifInterface.ORIENTATION_ROTATE_90
+            2 -> ExifInterface.ORIENTATION_ROTATE_180
+            3 -> ExifInterface.ORIENTATION_ROTATE_270
+            else -> ExifInterface.ORIENTATION_NORMAL
+        }
+        val matrix = Matrix()
+        matrix.setValues(exifOrientationTransform(orientation, width, height).matrixValues())
+        return matrix
+    }
+
+    /** Maps a source rect onto [dst] the way [Canvas.drawBitmap] does for a src/dst pair. */
+    private fun mapRectMatrix(srcLeft: Float, srcTop: Float, srcWidth: Float, srcHeight: Float, dst: Rect): Matrix {
+        val matrix = Matrix()
+        val sx = if (srcWidth == 0f) 1f else dst.width().toFloat() / srcWidth
+        val sy = if (srcHeight == 0f) 1f else dst.height().toFloat() / srcHeight
+        matrix.postTranslate(-srcLeft, -srcTop)
+        matrix.postScale(sx, sy)
+        matrix.postTranslate(dst.left.toFloat(), dst.top.toFloat())
+        return matrix
+    }
+
+    private fun Affine2x3.isIdentity(): Boolean =
+        scaleX == 1f && skewX == 0f && transX == 0f &&
+            skewY == 0f && scaleY == 1f && transY == 0f
+
+    private fun bitmapPaint(): Paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+
+    private fun recycle(bitmap: Bitmap) {
+        if (!bitmap.isRecycled) bitmap.recycle()
+    }
+
+    /**
+     * Decode, allocate and draw can throw [OutOfMemoryError]. Callers only catch [Exception];
+     * this message is what UserErrors maps to the localised decode failure. Cancellation is
+     * not an allocation failure and must keep propagating.
+     */
+    private inline fun <T> reportingDecodeFailure(block: () -> T): T {
+        try {
+            return block()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (oom: OutOfMemoryError) {
+            throw IllegalStateException("无法解码 JPEG", oom)
+        }
     }
 }
