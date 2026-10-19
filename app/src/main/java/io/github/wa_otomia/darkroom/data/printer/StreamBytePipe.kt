@@ -1,5 +1,6 @@
 package io.github.wa_otomia.darkroom.data.printer
 
+import io.github.wa_otomia.darkroom.core.PRINTER_NO_PROGRESS_MS
 import java.io.EOFException
 import java.io.IOException
 import java.io.InputStream
@@ -9,30 +10,35 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.withLock
 import kotlin.concurrent.thread
+import kotlin.concurrent.withLock
 
 /** A single bounded reader owns InputStream. Timeouts never discard partial bytes.
- * Bluetooth InputStream.read has no timeout; checking a clock before it is not enough. */
+ * A read of -1 or 0 is idle, not disconnect. Read failures are visible only to readers.
+ * Bluetooth InputStream.read has no timeout; a watchdog closes a write that exceeds [writeTimeoutMs]. */
 internal class StreamBytePipe(
     private val input: InputStream,
     private val output: OutputStream,
-    private val writeTimeoutMs: Long = 15_000,
+    internal val writeTimeoutMs: Long = PRINTER_NO_PROGRESS_MS,
     private val closeTransport: () -> Unit,
 ) : BytePipe {
     private val lock = ReentrantLock()
     private val changed = lock.newCondition()
     private val bytes = ArrayDeque<Byte>()
-    private var failure: IOException? = null
+    private var readFailure: IOException? = null
     private var closed = false
     init { require(writeTimeoutMs > 0) }
     private val reader = thread(start = true, isDaemon = true, name = "Darkroom-SPP-reader") {
+        val buf = ByteArray(4096)
         try {
-            val buf = ByteArray(4096)
             while (true) {
+                if (lock.withLock { closed }) return@thread
                 val count = input.read(buf)
-                if (count < 0) throw EOFException("Printer disconnected")
-                if (count == 0) continue
+                if (count <= 0) {
+                    if (lock.withLock { closed }) return@thread
+                    if (!idleBackoff()) return@thread
+                    continue
+                }
                 lock.withLock {
                     if (closed) return@thread
                     if (bytes.size + count > 1024 * 1024) throw IOException("Printer receive buffer overflow")
@@ -41,10 +47,24 @@ internal class StreamBytePipe(
                 }
             }
         } catch (e: Exception) {
-            lock.withLock {
-                failure = if (e is IOException) e else IOException("Printer reader failed", e)
-                changed.signalAll()
-            }
+            latchReadFailure(if (e is IOException) e else IOException("Printer reader failed", e))
+        }
+    }
+
+    /** About 15 ms, matching the pre-regression idle retry. Close signals and interrupts this wait. */
+    private fun idleBackoff(): Boolean = lock.withLock {
+        if (closed) return@withLock false
+        try {
+            changed.await(IDLE_BACKOFF_MS, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+        }
+        !closed
+    }
+
+    private fun latchReadFailure(error: IOException) {
+        lock.withLock {
+            if (!closed && readFailure == null) readFailure = error
+            changed.signalAll()
         }
     }
 
@@ -52,7 +72,6 @@ internal class StreamBytePipe(
     override fun write(data: ByteArray) {
         lock.withLock {
             if (closed) throw IOException("Printer connection closed")
-            failure?.let { throw it }
         }
         // Closing BluetoothSocket interrupts blocked IO. No ambiguous write is replayed.
         val timedOut = AtomicBoolean(false)
@@ -74,7 +93,8 @@ internal class StreamBytePipe(
         return lock.withLock {
             var remaining = timeoutMs.toLong() * 1_000_000
             while (bytes.size < n) {
-                failure?.let { throw it }
+                // Already-buffered bytes are returned above. A read-side failure does not discard them.
+                readFailure?.let { throw it }
                 if (closed) throw EOFException("Printer connection closed")
                 if (remaining <= 0) throw SocketTimeoutException("Printer read timeout")
                 remaining = changed.awaitNanos(remaining)
@@ -84,6 +104,7 @@ internal class StreamBytePipe(
     }
 
     companion object {
+        private const val IDLE_BACKOFF_MS = 15L
         private val timeouts = Executors.newSingleThreadScheduledExecutor { task ->
             Thread(task, "Darkroom-SPP-timeouts").apply { isDaemon = true }
         }

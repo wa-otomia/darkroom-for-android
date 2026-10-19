@@ -73,9 +73,10 @@ fun main() {
         rejects<IllegalArgumentException> { encodeRpc("x", 1, listOf(Double.NaN)) }
         rejects<IllegalArgumentException> { encodeRpc("x", 1, mapOf(3 to 7)) }
     }
-    verify("RPC/Android-origin-is-64-not-frame-channel") {
-        check(printJobParams(2000, 2) == mapOf("file_size" to 2000, "copies" to 2, "job_type" to 0, "channel" to 64))
+    verify("RPC/Android-origin-is-576-not-frame-channel") {
+        check(printJobParams(2000, 2) == mapOf("file_size" to 2000, "copies" to 2, "job_type" to 0, "channel" to 576))
         check(CHANNEL_DATA_ENC == 3 && CHANNEL_FILE_ENC == 4)
+        check(PRINTER_NO_PROGRESS_MS == 60_000L)
     }
     verify("frame/all-supported-body-lengths") {
         for (n in 0..1023) {
@@ -217,12 +218,25 @@ fun main() {
             check(pipe.readExact(2, 1000).contentEquals(byteArrayOf(0x7e, 0x64)))
         } finally { pipe.close() }
     }
-    verify("IO/EOF-is-bounded") {
-        val input = ByteArrayInputStream(byteArrayOf(1))
-        val pipe = StreamBytePipe(input, ByteArrayOutputStream()) { input.close() }
+    verify("IO/negative-read-is-not-disconnect") {
+        var delivered = false
+        var closed = false
+        val input = object : InputStream() {
+            override fun read(): Int = -1
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (!delivered) {
+                    delivered = true
+                    b[off] = 1
+                    return 1
+                }
+                return -1
+            }
+        }
+        val pipe = StreamBytePipe(input, ByteArrayOutputStream()) { closed = true }
         try {
             check(pipe.readExact(1, 1000).contentEquals(byteArrayOf(1)))
-            rejects<EOFException> { pipe.readExact(1, 1000) }
+            rejects<SocketTimeoutException> { pipe.readExact(1, 40) }
+            check(!closed)
         } finally { pipe.close() }
     }
     verify("IO/close-unblocks-reader") {

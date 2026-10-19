@@ -50,12 +50,28 @@ class ProPrinterGoldenVectorTest {
         check(body.contentEquals(hex("8b52a48308217b3d9017e666027669de1a7c45ed50befba96646b382deb71c6eedb7e5c57a9d2bdd2f826d330c4ef6a6")))
         check(buildFrame(3, 6, 3, 101, 101, 5120, body).contentEquals(hex("7e640003060365000000650000000000000030148b52a48308217b3d9017e666027669de1a7c45ed50befba96646b382deb71c6eedb7e5c57a9d2bdd2f826d330c4ef6a6437e")))
     }
-    @Test fun printJob2() {
+    @Test fun iosPrintJobChannel64Sample() {
+        // Unmodified iOS vector. Ciphertext and frame bytes stay channel 64; Android production is 576.
         val raw = encodeRpc("print_job", 101, linkedMapOf<String, Any>("file_size" to 2000,"copies" to 2,"job_type" to 0,"channel" to 64))
         check(String(raw) == "{\"method\":\"print_job\",\"id\":101,\"params\":{\"file_size\":2000,\"copies\":2,\"job_type\":0,\"channel\":64}}")
         val body = encryptEcb(hex("30313233343536373839414243444546"), raw)
         check(body.contentEquals(hex("db7bea5ba6c51c4ba3159761a69af569ef0690bebc27aa4223d65b9738d3f9d6423bb185a5e4f8d53200e6b7b68f663d77ddd8a653272bbe6abc5490fef1432e2ba0b722ec776a66173a8ed52e622863a48d038e39f86fb7368d0db32c506550")))
         check(buildFrame(3, 6, 3, 101, 101, 5120, body).contentEquals(hex("7e64000306036500000065000000000000006014db7bea5ba6c51c4ba3159761a69af569ef0690bebc27aa4223d65b9738d3f9d6423bb185a5e4f8d53200e6b7b68f663d77ddd8a653272bbe6abc5490fef1432e2ba0b722ec776a66173a8ed52e622863a48d038e39f86fb7368d0db32c506550127e")))
+    }
+    @Test fun androidPrintJobChannel576RoundTrip() {
+        val params = printJobParams(2000, 2)
+        check(params == mapOf("file_size" to 2000, "copies" to 2, "job_type" to 0, "channel" to 576))
+        check(DEFAULT_FILE_CHANNEL == 576)
+        val raw = encodeRpc("print_job", 101, params)
+        check(String(raw) == "{\"method\":\"print_job\",\"id\":101,\"params\":{\"file_size\":2000,\"copies\":2,\"job_type\":0,\"channel\":576}}")
+        check(!String(raw).contains("\"channel\":64"))
+        val key = hex("30313233343536373839414243444546")
+        val body = encryptEcb(key, raw)
+        val frame = buildFrame(CHANNEL_DATA_ENC, INTERACTIVE_REQUEST, ENCODING_JSON, 101, 101, ENCRYPT_ECB_OFFSET, body)
+        val parsed = parseFrame(frame)
+        check(parsed.channelId == 3 && parsed.channelId == CHANNEL_DATA_ENC)
+        check(CHANNEL_FILE_ENC == 4)
+        check(decryptEcb(key, parsed.body, stripZeros = true).contentEquals(raw))
     }
     @Test fun file_frame_1() {
         val data = hex("41")
