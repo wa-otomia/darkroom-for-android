@@ -11,12 +11,14 @@ import io.github.wa_otomia.darkroom.core.AiProvider
 import io.github.wa_otomia.darkroom.core.AiSettings
 import io.github.wa_otomia.darkroom.core.DEFAULT_OPENAI_BASE_URL
 import io.github.wa_otomia.darkroom.core.DEFAULT_XAI_BASE_URL
+import io.github.wa_otomia.darkroom.core.FgsPause
 import io.github.wa_otomia.darkroom.core.PrintFit
 import io.github.wa_otomia.darkroom.core.ProviderSettings
 import io.github.wa_otomia.darkroom.core.PublicAiSettings
 import io.github.wa_otomia.darkroom.core.WatermarkSettings
 import io.github.wa_otomia.darkroom.core.defaultProviderSettings
 import io.github.wa_otomia.darkroom.core.mergeBuiltinPresets
+import io.github.wa_otomia.darkroom.core.mergeFgsPause
 import io.github.wa_otomia.darkroom.core.mergeProviderSettings
 import io.github.wa_otomia.darkroom.core.newPresetId
 import io.github.wa_otomia.darkroom.core.normalizeAiBaseUrl
@@ -136,6 +138,41 @@ class SettingsRepository @Inject constructor(
             .apply()
         _settings.value = readSettings()
     }
+
+    /**
+     * Null when the pause timestamp is absent, including upgrades that never paused.
+     * Does not read or write the FTP password.
+     */
+    @Synchronized
+    fun readForegroundPause(): FgsPause? {
+        if (!prefs.contains(KEY_FGS_PAUSED_AT)) return null
+        return FgsPause(
+            pausedAt = prefs.getLong(KEY_FGS_PAUSED_AT, 0L),
+            ftpWasListening = prefs.getBoolean(KEY_FGS_PAUSED_FTP_LISTENING, false),
+        )
+    }
+
+    /**
+     * Merges under this instance lock and commits only the two pause keys.
+     * Synchronous because the process may be killed shortly after a timeout.
+     * @return false when the commit fails.
+     */
+    @Synchronized
+    fun recordForegroundPause(now: Long, ftpWasListening: Boolean): Boolean {
+        val merged = mergeFgsPause(readForegroundPause(), now, ftpWasListening)
+        return prefs.edit()
+            .putLong(KEY_FGS_PAUSED_AT, merged.pausedAt)
+            .putBoolean(KEY_FGS_PAUSED_FTP_LISTENING, merged.ftpWasListening)
+            .commit()
+    }
+
+    /** Removes only the two pause keys and commits. @return false when the commit fails. */
+    @Synchronized
+    fun clearForegroundPause(): Boolean =
+        prefs.edit()
+            .remove(KEY_FGS_PAUSED_AT)
+            .remove(KEY_FGS_PAUSED_FTP_LISTENING)
+            .commit()
 
     fun readAi(): AiSettings {
         val grok = mergeProviderSettings(
@@ -350,6 +387,9 @@ class SettingsRepository @Inject constructor(
         private const val KEY_PASV_MAX = "pasv_max"
         private const val KEY_FTP_AUTO_START = "ftp_auto_start"
         private const val KEY_KEEP_ALIVE = "keep_alive"
+        // Not part of AppSettings. Only the foreground-pause functions above may touch these.
+        private const val KEY_FGS_PAUSED_AT = "fgs_paused_at"
+        private const val KEY_FGS_PAUSED_FTP_LISTENING = "fgs_paused_ftp_listening"
         // No language key: the UI locale lives in AppCompatDelegate /
         // LocaleManager only. Keeping a copy here would be a second source of
         // truth that the Android 13+ system language picker never writes to,
