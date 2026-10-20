@@ -25,7 +25,9 @@ import java.security.MessageDigest
 import java.util.Collections
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
@@ -90,6 +92,8 @@ class CameraFtpServer(
     private val running = AtomicBoolean(false)
     private val serverSockets = mutableListOf<ServerSocket>()
     private val pool = Executors.newCachedThreadPool()
+    private val sessions = ConcurrentHashMap.newKeySet<Session>()
+    @Volatile private var admitInterface: (String?) -> Boolean = ::isAllowedFtpInterface
     @Volatile var status: FtpListenStatus = FtpListenStatus(false, bind, port, inbox.absolutePath)
         private set
 
@@ -129,6 +133,7 @@ class CameraFtpServer(
 
     fun stop() {
         running.set(false)
+        sessions.forEach { it.abortForStop() }
         serverSockets.forEach { sock ->
             try {
                 sock.close()
@@ -141,13 +146,22 @@ class CameraFtpServer(
         log("stop $port")
     }
 
+    /**
+     * Test-only. Production admits wlan0/wlan1 only; host JVM tests have neither.
+     * Refuses to widen admission after [start].
+     */
+    internal fun admitInterfaceForTest(predicate: (String?) -> Boolean) {
+        check(!running.get()) { "interface admission is fixed once listening" }
+        admitInterface = predicate
+    }
+
     private fun admitSocket(socket: Socket): Boolean {
         val iface = try {
             NetworkInterface.getByInetAddress(socket.localAddress)?.name
         } catch (_: Exception) {
             null
         }
-        if (isAllowedFtpInterface(iface)) return true
+        if (admitInterface(iface)) return true
         val remote = socket.inetAddress?.hostAddress ?: "unknown"
         log("rejected $remote via ${iface ?: "unknown"}")
         try {
@@ -166,36 +180,46 @@ class CameraFtpServer(
         private var cwd = "/"
         private var renameFrom: File? = null
         private var typeImage = true
-        private var pasvServer: ServerSocket? = null
-        private var dataSocket: Socket? = null
+        @Volatile private var pasvServer: ServerSocket? = null
+        @Volatile private var dataSocket: Socket? = null
         private var utf8 = true
         private var expectedSize: Long? = null
         private var lastTransferId: String? = null
         private val abortRequested = AtomicBoolean(false)
 
         fun run() {
-            val remote = socket.inetAddress?.hostAddress
-                ?: socket.remoteSocketAddress?.toString()
-                ?: "unknown"
-            hooks.sessionOpened(sessionId, remote)
+            sessions.add(this)
             try {
-                applyIdleTimeout()
-                reply(220, "darkroom ready")
-                while (running.get()) {
-                    val line = readLine() ?: break
-                    if (line.isBlank()) continue
-                    handle(line)
-                }
-            } catch (_: Exception) {
-            } finally {
-                abortRequested.set(true)
-                hooks.sessionClosed(sessionId)
-                closeData()
+                val remote = socket.inetAddress?.hostAddress
+                    ?: socket.remoteSocketAddress?.toString()
+                    ?: "unknown"
+                hooks.sessionOpened(sessionId, remote)
                 try {
-                    socket.close()
+                    applyIdleTimeout()
+                    reply(220, "darkroom ready")
+                    while (running.get()) {
+                        val line = readLine() ?: break
+                        if (line.isBlank()) continue
+                        handle(line)
+                    }
                 } catch (_: Exception) {
+                } finally {
+                    abortRequested.set(true)
+                    hooks.sessionClosed(sessionId)
+                    closeData()
+                    try {
+                        socket.close()
+                    } catch (_: Exception) {
+                    }
                 }
+            } finally {
+                sessions.remove(this)
             }
+        }
+
+        fun abortForStop() {
+            abortRequested.set(true)
+            closeData()
         }
 
         private fun applyIdleTimeout() {
@@ -372,6 +396,11 @@ class CameraFtpServer(
                 val s = ss.accept()
                 if (!admitSocket(s)) return null
                 dataSocket = s
+                // ABOR and incomplete STOR leave abortRequested set. stop() clears running first.
+                if (!running.get()) {
+                    closeData()
+                    return null
+                }
                 s
             } catch (_: SocketTimeoutException) {
                 null
@@ -467,36 +496,46 @@ class CameraFtpServer(
                 ""
             }
             lastTransferId = transferId.takeIf { it.isNotEmpty() }
+            if (!running.get()) {
+                failStor(dest, transferId)
+                return
+            }
             val received = AtomicLong(0)
-            val copy = pool.submit {
-                try {
-                    FileOutputStream(dest, append).use { out ->
-                        val dataIn = data.getInputStream()
-                        val buf = ByteArray(STOR_CHUNK)
-                        var lastAt = 0L
-                        var lastBytes = 0L
-                        while (!abortRequested.get()) {
-                            val n = dataIn.read(buf)
-                            if (n < 0) break
-                            if (n == 0) continue
-                            out.write(buf, 0, n)
-                            val got = received.addAndGet(n.toLong())
-                            val now = System.currentTimeMillis()
-                            if (now - lastAt >= PROGRESS_MIN_MS || got - lastBytes >= PROGRESS_MIN_BYTES) {
-                                hooks.sessionActivity(sessionId, dest.name, got)
-                                if (transferId.isNotEmpty()) hooks.transferProgress(transferId, got, total)
-                                lastAt = now
-                                lastBytes = got
+            val copy = try {
+                pool.submit {
+                    try {
+                        if (!running.get() || abortRequested.get()) return@submit
+                        FileOutputStream(dest, append).use { out ->
+                            val dataIn = data.getInputStream()
+                            val buf = ByteArray(STOR_CHUNK)
+                            var lastAt = 0L
+                            var lastBytes = 0L
+                            while (running.get() && !abortRequested.get()) {
+                                val n = dataIn.read(buf)
+                                if (n < 0) break
+                                if (n == 0) continue
+                                out.write(buf, 0, n)
+                                val got = received.addAndGet(n.toLong())
+                                val now = System.currentTimeMillis()
+                                if (now - lastAt >= PROGRESS_MIN_MS || got - lastBytes >= PROGRESS_MIN_BYTES) {
+                                    hooks.sessionActivity(sessionId, dest.name, got)
+                                    if (transferId.isNotEmpty()) hooks.transferProgress(transferId, got, total)
+                                    lastAt = now
+                                    lastBytes = got
+                                }
                             }
                         }
+                    } finally {
+                        try {
+                            data.close()
+                        } catch (_: Exception) {
+                        }
+                        dataSocket = null
                     }
-                } finally {
-                    try {
-                        data.close()
-                    } catch (_: Exception) {
-                    }
-                    dataSocket = null
                 }
+            } catch (_: RejectedExecutionException) {
+                failStor(dest, transferId)
+                return
             }
             val previousTimeout = socket.soTimeout
             socket.soTimeout = STOR_WATCH_MS
@@ -519,17 +558,26 @@ class CameraFtpServer(
                     } catch (_: SocketTimeoutException) {
                     }
                 }
+            } catch (e: Exception) {
+                val stopped = Thread.currentThread().isInterrupted ||
+                    e is InterruptedException ||
+                    e is java.io.InterruptedIOException
+                if (!stopped) throw e
+                Thread.interrupted()
+                abortRequested.set(true)
+                closeData()
             } finally {
                 socket.soTimeout = previousTimeout
             }
             try {
                 copy.get()
             } catch (_: Exception) {
+                Thread.interrupted()
                 abortRequested.set(true)
             }
             val got = received.get()
             hooks.sessionActivity(sessionId, dest.name, got)
-            val incomplete = abortRequested.get() || (total != null && got != total)
+            val incomplete = !running.get() || abortRequested.get() || (total != null && got != total)
             if (incomplete) {
                 failStor(dest, transferId)
                 return
@@ -544,10 +592,14 @@ class CameraFtpServer(
         }
 
         private fun failStor(dest: File, transferId: String) {
+            abortRequested.set(true)
+            closeData()
             lastTransferId = null
             dest.delete()
-            if (transferId.isNotEmpty()) hooks.transferFailed(transferId, "文件不完整")
-            log("STOR ${dest.name} failed: incomplete")
+            val serverRunning = running.get()
+            val reason = storFailureReason(serverRunning)
+            if (transferId.isNotEmpty()) hooks.transferFailed(transferId, reason)
+            log("STOR ${dest.name} failed: ${if (serverRunning) "incomplete" else "interrupted"}")
             reply(426, "transfer aborted")
         }
 
@@ -699,3 +751,7 @@ class CameraFtpServer(
         }
     }
 }
+
+/** Running STOR fails as incomplete; a stopped server fails as an interrupted transfer. */
+fun storFailureReason(serverRunning: Boolean): String =
+    if (serverRunning) "文件不完整" else "传输中断"
