@@ -84,6 +84,9 @@
     <string name="ftp_starting">FTP を開始しています…</string>
     <string name="ftp_listening_fmt">FTP %1$s:%2$d</string>
     <string name="ftp_channel">カメラ FTP</string>
+    <string name="ftp_paused_channel">FTP 一時停止</string>
+    <string name="ftp_paused_title">FTP を一時停止しました</string>
+    <string name="ftp_paused_text">システムの時間制限により FTP を一時停止しました。タップすると再度開始できます。</string>
     <string name="ftp_port21_hint">Android では root 権限がないとポート 21 を使用できません。カメラ側でポートを変更できる場合は 2121 を使用してください。</string>
     <string name="back_gallery">ギャラリー</string>
     <string name="not_found">写真が見つかりません</string>

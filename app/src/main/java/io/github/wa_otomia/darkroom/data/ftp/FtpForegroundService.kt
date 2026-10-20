@@ -18,18 +18,31 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import io.github.wa_otomia.darkroom.MainActivity
 import io.github.wa_otomia.darkroom.R
+import io.github.wa_otomia.darkroom.core.FgsService
+import io.github.wa_otomia.darkroom.core.FgsStartOrigin
+import io.github.wa_otomia.darkroom.core.FgsStopPlan
+import io.github.wa_otomia.darkroom.core.FgsStopStep
+import io.github.wa_otomia.darkroom.core.FtpAutoStartSkip
+import io.github.wa_otomia.darkroom.core.fgsRejectedPlan
+import io.github.wa_otomia.darkroom.core.fgsStartAllowed
+import io.github.wa_otomia.darkroom.core.fgsTimeoutPlan
+import io.github.wa_otomia.darkroom.core.ftpAutoStartSkip
 import io.github.wa_otomia.darkroom.core.hasLocalNetworkPermission
 import io.github.wa_otomia.darkroom.data.automation.Automation
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
 import io.github.wa_otomia.darkroom.data.settings.ActivityLog
+import io.github.wa_otomia.darkroom.data.settings.FgsPauseCause
+import io.github.wa_otomia.darkroom.data.settings.ForegroundPause
 import io.github.wa_otomia.darkroom.data.settings.SettingsRepository
+import io.github.wa_otomia.darkroom.data.settings.foregroundPause
+import io.github.wa_otomia.darkroom.data.settings.isForegroundStartNotAllowed
 import io.github.wa_otomia.darkroom.data.transfer.TransferRegistry
 import io.github.wa_otomia.darkroom.data.transfer.TransferState
+import io.github.wa_otomia.darkroom.di.ApplicationScope
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -42,29 +55,40 @@ class FtpForegroundService : Service() {
     @Inject lateinit var automation: Automation
     @Inject lateinit var activityLog: ActivityLog
     @Inject lateinit var registry: TransferRegistry
+    @Inject lateinit var foregroundPause: ForegroundPause
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Inject
+    @ApplicationScope
+    lateinit var appScope: CoroutineScope
+
     private var server: CameraFtpServer? = null
     private var wifiLock: WifiManager.WifiLock? = null
+    private var inForeground = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         createChannel()
-        startFtpForeground(notification(getString(R.string.ftp_starting)))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            stopSelfServer()
+            removeForeground()
+            stopSelf()
+            listening.value = false
+            localNetworkBlocked.value = false
+            return START_NOT_STICKY
+        }
+        // Null intent is a sticky restart. It has no foreground obligation while paused.
+        if (intent == null && !fgsStartAllowed(FgsStartOrigin.StickyRestart, isPaused())) {
+            logStickyRestartSkipped()
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        if (!enterForeground()) return START_NOT_STICKY
         when (intent?.action) {
-            ACTION_STOP -> {
-                stopSelfServer()
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
-                listening.value = false
-                localNetworkBlocked.value = false
-                return START_NOT_STICKY
-            }
             ACTION_RESTART -> {
                 stopSelfServer()
                 if (!startServer()) return START_NOT_STICKY
@@ -74,13 +98,61 @@ class FtpForegroundService : Service() {
         return START_STICKY
     }
 
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        // Read listening before stop. The plan does not join sessions or ingest.
+        applyPlan(fgsTimeoutPlan(FgsService.Ftp, server != null), FgsPauseCause.Timeout)
+    }
+
+    private fun isPaused(): Boolean = foregroundPause.current() != null
+
+    /** Returns false when the system rejected foreground start and the plan has stopped this instance. */
+    private fun enterForeground(): Boolean {
+        if (inForeground) return true
+        return try {
+            startFtpForeground(notification(getString(R.string.ftp_starting)))
+            inForeground = true
+            true
+        } catch (e: Exception) {
+            if (!e.isForegroundStartNotAllowed()) throw e
+            applyPlan(fgsRejectedPlan(FgsService.Ftp, inService = true), FgsPauseCause.StartRejected)
+            false
+        }
+    }
+
+    private fun applyPlan(plan: FgsStopPlan, cause: FgsPauseCause) {
+        for (step in plan.steps) {
+            when (step) {
+                FgsStopStep.StopListening -> stopSelfServer()
+                FgsStopStep.RemoveForeground -> removeForeground()
+                FgsStopStep.StopSelf -> stopSelf()
+                FgsStopStep.RecordPause -> foregroundPause.record(
+                    FgsService.Ftp,
+                    cause,
+                    plan.ftpWasListening,
+                )
+                FgsStopStep.NotifyFtpPaused -> FtpPausedNotification.show(this)
+            }
+        }
+    }
+
+    private fun logStickyRestartSkipped() {
+        try {
+            activityLog.record("ftp", "sticky restart skipped: paused by system time limit")
+        } catch (_: Exception) {
+            // Stopping still has to happen. A log failure must not keep this instance up.
+        }
+    }
+
     private fun startServer(): Boolean {
-        if (server != null) return true
+        if (server != null) {
+            FtpPausedNotification.cancel(this)
+            return true
+        }
         if (!hasLocalNetworkPermission(this)) {
             activityLog.record("ftp", "local network permission missing", "error")
             localNetworkBlocked.value = true
             listening.value = false
-            stopForeground(STOP_FOREGROUND_REMOVE)
+            removeForeground()
             stopSelf()
             return false
         }
@@ -127,8 +199,12 @@ class FtpForegroundService : Service() {
             inbox = inbox,
             hooks = hooks,
             onUploaded = { file, transferId ->
-                scope.launch {
+                appScope.launch(Dispatchers.IO) {
                     try {
+                        if (registry.isInterrupted(transferId)) {
+                            file.delete()
+                            return@launch
+                        }
                         val photoId = registry.transfers.value.find { it.id == transferId }?.photoId
                             ?: UUID.randomUUID().toString()
                         registry.receiveFinished(transferId, file.length())
@@ -146,6 +222,8 @@ class FtpForegroundService : Service() {
                         registry.done(transferId)
                         runCatching { automation.onIngested(photo.id, "ftp") }
                             .onFailure { activityLog.record("automation", "onIngested failed", "error", it.message) }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         file.delete()
                         registry.failed(transferId, e.message ?: e.toString())
@@ -164,6 +242,7 @@ class FtpForegroundService : Service() {
             listenPassword.value = cfg.ftpPassword
             listenPasvMin.value = cfg.ftpPasvMin
             listenPasvMax.value = cfg.ftpPasvMax
+            FtpPausedNotification.cancel(this)
             val ip = CameraFtpServer.wlanHostOneLine().ifBlank { "0.0.0.0" }
             updateFtpNotification(notification(getString(R.string.ftp_listening_fmt, ip, cfg.ftpPort)))
             return true
@@ -181,6 +260,7 @@ class FtpForegroundService : Service() {
         } catch (_: Exception) {
         }
         server = null
+        registry.interruptReceiving()
         if (wifiLock?.isHeld == true) wifiLock?.release()
         wifiLock = null
         listening.value = false
@@ -188,7 +268,6 @@ class FtpForegroundService : Service() {
 
     override fun onDestroy() {
         stopSelfServer()
-        scope.cancel()
         super.onDestroy()
     }
 
@@ -206,6 +285,11 @@ class FtpForegroundService : Service() {
             notification,
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
         )
+    }
+
+    private fun removeForeground() {
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        inForeground = false
     }
 
     private fun updateFtpNotification(notification: Notification) {
@@ -249,21 +333,21 @@ class FtpForegroundService : Service() {
         val listenPasvMax = MutableStateFlow(50010)
 
         fun start(context: Context) {
-            context.startForegroundService(Intent(context, FtpForegroundService::class.java))
+            launchService(context, Intent(context, FtpForegroundService::class.java))
         }
 
         /** Same permission gates as the Transfer-screen start action, without UI prompts. */
         fun startIfPermitted(context: Context, activityLog: ActivityLog): Boolean {
-            if (!hasLocalNetworkPermission(context)) {
-                activityLog.record("ftp", "auto-start skipped: local network permission missing")
-                return false
-            }
-            if (Build.VERSION.SDK_INT >= 33 &&
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED
-            ) {
-                activityLog.record("ftp", "auto-start skipped: notifications permission missing")
-                return false
+            when (autoStartSkip(context)) {
+                FtpAutoStartSkip.LocalNetworkPermission -> {
+                    activityLog.record("ftp", "auto-start skipped: local network permission missing")
+                    return false
+                }
+                FtpAutoStartSkip.NotificationPermission -> {
+                    activityLog.record("ftp", "auto-start skipped: notifications permission missing")
+                    return false
+                }
+                null -> Unit
             }
             return try {
                 start(context)
@@ -274,12 +358,46 @@ class FtpForegroundService : Service() {
             }
         }
 
+        fun autoStartSkip(context: Context): FtpAutoStartSkip? {
+            val notificationsGranted = Build.VERSION.SDK_INT < 33 ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
+            return ftpAutoStartSkip(hasLocalNetworkPermission(context), notificationsGranted)
+        }
+
         fun stop(context: Context) {
             context.startService(Intent(context, FtpForegroundService::class.java).setAction(ACTION_STOP))
         }
 
         fun restart(context: Context) {
-            context.startForegroundService(Intent(context, FtpForegroundService::class.java).setAction(ACTION_RESTART))
+            launchService(
+                context,
+                Intent(context, FtpForegroundService::class.java).setAction(ACTION_RESTART),
+            )
+        }
+
+        private fun launchService(context: Context, intent: Intent) {
+            try {
+                context.startForegroundService(intent)
+            } catch (e: Exception) {
+                if (!e.isForegroundStartNotAllowed()) throw e
+                degradeRejectedStart(context)
+            }
+        }
+
+        private fun degradeRejectedStart(context: Context) {
+            val plan = fgsRejectedPlan(FgsService.Ftp, inService = false)
+            for (step in plan.steps) {
+                when (step) {
+                    FgsStopStep.RecordPause -> foregroundPause(context).record(
+                        FgsService.Ftp,
+                        FgsPauseCause.StartRejected,
+                        plan.ftpWasListening,
+                    )
+                    FgsStopStep.NotifyFtpPaused -> FtpPausedNotification.show(context)
+                    FgsStopStep.StopListening, FgsStopStep.RemoveForeground, FgsStopStep.StopSelf -> Unit
+                }
+            }
         }
     }
 }

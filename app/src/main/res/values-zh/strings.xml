@@ -84,6 +84,9 @@
     <string name="ftp_starting">正在启动 FTP…</string>
     <string name="ftp_listening_fmt">FTP %1$s:%2$d</string>
     <string name="ftp_channel">相机 FTP</string>
+    <string name="ftp_paused_channel">FTP 已暂停</string>
+    <string name="ftp_paused_title">FTP 已暂停</string>
+    <string name="ftp_paused_text">FTP 因系统时限已暂停。点击即可重新开启。</string>
     <string name="ftp_port21_hint">Android 未取得 root 权限时无法绑定 21 端口。若相机支持修改端口，请使用 2121。</string>
     <string name="back_gallery">相册</string>
     <string name="not_found">未找到该照片</string>

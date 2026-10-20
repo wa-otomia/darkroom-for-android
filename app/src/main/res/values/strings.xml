@@ -78,6 +78,9 @@
     <string name="ftp_starting">Starting FTP…</string>
     <string name="ftp_listening_fmt">FTP %1$s:%2$d</string>
     <string name="ftp_channel">Camera FTP</string>
+    <string name="ftp_paused_channel">FTP paused</string>
+    <string name="ftp_paused_title">FTP paused</string>
+    <string name="ftp_paused_text">FTP was paused by a system time limit. Tap to start it again.</string>
     <string name="ftp_port21_hint">Port 21 needs root on Android. Use 2121 unless the camera cannot change ports.</string>
     <string name="back_gallery">Gallery</string>
     <string name="not_found">Photo not found</string>
