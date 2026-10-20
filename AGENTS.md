@@ -8,9 +8,9 @@
 
 维护者执行功能变更或规格文档改修时，使用公共 kit-work 工作流（`/kit-work`，流程与默认格式见全局 `openspec-development` 技能）。本仓库不再维护项目内规格技能；下列目录、功能 ID 与日志约定，以及私有规格根 `openspec/config.yaml` 中的规则，优先于全局默认格式。
 
-- 内部规格暂仅本地保存：`SPEC.md` 导航到 `openspec/specs/000-index.md`；整个 `openspec/` 与根入口被 Git 忽略，不强制添加、不复制完整内容到公开提交或 PR。
+- 内部规格暂仅本地保存：`SPEC.md` 导航到 `openspec/specs/AA-index.md`；整个 `openspec/` 与根入口被 Git 忽略，不强制添加、不复制完整内容到公开提交或 PR。
 - 本机规格已整理到私有 OpenSpec Store `darkroom`；执行前用 `pi-project context --json` 核对 `codeRoot/specRoot`。本文规格路径相对 `specRoot`，源码和 `tools/` 相对 `codeRoot`；外置规格不缺失于公开副本的判断不能仅看代码根。原代码根忽略规则保留。
-- 详细规格采用 `openspec/specs/XX-大功能中文名/XXYY-中功能中文名/XXYY010-小功能中文名/spec.md`；各大、中功能有 `000-index.md`。语义功能 ID 与旧 F ID 的关系由私有索引维护。
+- 详细规格采用 `openspec/specs/XX-大功能中文名/XXYY-中功能中文名/XXYY010-小功能中文名/spec.md`；各大功能有 `XXAA-index.md`、各中功能有 `XXYY000-index.md`。语义功能 ID 与旧 F ID 的关系由私有索引维护。
 - 修改前保存真实前态，影响评估与目标规格放在对应 change 中；完成实现和验收后同步当前规格。纯文档调整说明无运行时影响并执行文档校验。
 - 仅有公开代码副本时，贡献者可以按公开规则、行为说明和测试完成代码贡献，不要求访问私有规格。维护者负责补齐内部规格评估；不得自动下载或编造缺失规格。
 - CLI 入口为 `sh tools/openspec.sh`，版本固定；流程由 kit-work 衔接，不依赖额外安装的 slash commands。
