@@ -175,6 +175,7 @@
     <string name="settings_watermark_preview">Watermark preview</string>
     <string name="settings_watermark_logo_instagram">Instagram</string>
     <string name="settings_watermark_logo_x">X</string>
+    <string name="settings_watermark_sync_size">Match SNS and date size</string>
     <string name="settings_watermark_logo_facebook">Facebook</string>
     <string name="settings_watermark_logo_weibo">Weibo</string>
     <string name="settings_watermark_logo_none">None</string>

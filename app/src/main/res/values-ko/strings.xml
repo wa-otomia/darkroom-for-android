@@ -180,6 +180,7 @@
     <string name="settings_watermark_preview">워터마크 미리보기</string>
     <string name="settings_watermark_logo_instagram">Instagram</string>
     <string name="settings_watermark_logo_x">X</string>
+    <string name="settings_watermark_sync_size">날짜와 SNS 크기 맞추기</string>
     <string name="settings_watermark_logo_facebook">Facebook</string>
     <string name="settings_watermark_logo_weibo">Weibo</string>
     <string name="settings_watermark_logo_none">없음</string>

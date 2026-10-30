@@ -133,10 +133,11 @@ import io.github.wa_otomia.darkroom.core.GROK_MODELS
 import io.github.wa_otomia.darkroom.core.PrintFit
 import io.github.wa_otomia.darkroom.core.SnsLogo
 import io.github.wa_otomia.darkroom.core.withAnchor
+import io.github.wa_otomia.darkroom.core.withDateScale
+import io.github.wa_otomia.darkroom.core.withSnsScale
 import io.github.wa_otomia.darkroom.core.withDefaultAnchors
 import io.github.wa_otomia.darkroom.core.WATERMARK_SCALE_MAX
 import io.github.wa_otomia.darkroom.core.WATERMARK_SCALE_MIN
-import io.github.wa_otomia.darkroom.core.clampWatermarkScale
 import io.github.wa_otomia.darkroom.core.formatWatermarkDate
 import io.github.wa_otomia.darkroom.core.hasLocalNetworkPermission
 import io.github.wa_otomia.darkroom.core.isConfigured
@@ -1537,7 +1538,7 @@ fun SettingsScreen(
                     Slider(
                         value = watermark.sns.scale,
                         onValueChange = { next ->
-                            settings.updateWatermark { copy(sns = sns.copy(scale = clampWatermarkScale(next))) }
+                            settings.updateWatermark { withSnsScale(next) }
                         },
                         valueRange = WATERMARK_SCALE_MIN..WATERMARK_SCALE_MAX,
                         colors = SliderDefaults.colors(thumbColor = Amber, activeTrackColor = Amber),
@@ -1593,11 +1594,36 @@ fun SettingsScreen(
                     Slider(
                         value = watermark.date.scale,
                         onValueChange = { next ->
-                            settings.updateWatermark { copy(date = date.copy(scale = clampWatermarkScale(next))) }
+                            settings.updateWatermark { withDateScale(next) }
                         },
                         valueRange = WATERMARK_SCALE_MIN..WATERMARK_SCALE_MAX,
                         colors = SliderDefaults.colors(thumbColor = Amber, activeTrackColor = Amber),
                     )
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .toggleable(
+                                value = watermark.syncScale,
+                                role = Role.Switch,
+                                onValueChange = { on ->
+                                    settings.updateWatermark { copy(syncScale = on) }
+                                },
+                            )
+                            .semantics(mergeDescendants = true) {},
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.settings_watermark_sync_size),
+                            color = Paper,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = watermark.syncScale,
+                            onCheckedChange = null,
+                            colors = SwitchDefaults.colors(checkedTrackColor = Amber),
+                        )
+                    }
                     Text(
                         stringResource(R.string.settings_watermark_orientation_hint),
                         color = PaperDim,

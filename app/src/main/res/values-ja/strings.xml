@@ -180,6 +180,7 @@
     <string name="settings_watermark_preview">透かしプレビュー</string>
     <string name="settings_watermark_logo_instagram">Instagram</string>
     <string name="settings_watermark_logo_x">X</string>
+    <string name="settings_watermark_sync_size">日付と SNS のサイズを揃える</string>
     <string name="settings_watermark_logo_facebook">Facebook</string>
     <string name="settings_watermark_logo_weibo">Weibo</string>
     <string name="settings_watermark_logo_none">なし</string>
