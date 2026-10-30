@@ -27,8 +27,11 @@ const val MULTI_PACKET = 8192
 
 const val CHUNK_BYTES = 988
 const val PHOTO_PRINT_JOB = 0
-// JSON platform/source channel. Not the binary frame channel (3/4).
-const val DEFAULT_FILE_CHANNEL = 64
+// Official Android=576, iOS=64. JSON source value, not binary frame channel 3/4.
+const val DEFAULT_FILE_CHANNEL = 576
+
+/** Default no-progress window for one write+flush and for continuous polling with no valid reply. */
+const val PRINTER_NO_PROGRESS_MS = 60_000L
 const val SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB"
 const val RFCOMM_CHANNEL = 1
 

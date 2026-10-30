@@ -102,6 +102,57 @@ class AiPresetsTest {
     }
 
     @Test
+    fun airyPortraitIsAPortraitBuiltinRightAfterWarmFilm() {
+        val seeded = seedAiPresets().presets
+        val airy = seeded.single { it.id == "airy-portrait" }
+        assertEquals("日系空气感", airy.title)
+        assertEquals("portrait", airy.category)
+        val ids = seeded.map { it.id }
+        assertEquals(ids.indexOf("film-warm") + 1, ids.indexOf("airy-portrait"))
+        assertTrue(airy.prompt.endsWith("No cropping."))
+        assertTrue(airy.prompt.contains("nothing is clipped"))
+        assertTrue(airy.prompt.contains("Keep identity"))
+        assertEquals(23, seeded.size)
+        assertEquals(12, seeded.count { it.category == "portrait" })
+        assertEquals(11, seeded.count { it.category == "creative" })
+    }
+
+    @Test
+    fun heavyBeautyIsAPortraitBuiltinRightAfterRetouchWithItsGuards() {
+        val seeded = seedAiPresets().presets
+        val ids = seeded.map { it.id }
+        assertEquals(1, ids.indexOf("beauty-heavy"))
+        val heavy = seeded.single { it.id == "beauty-heavy" }
+        assertEquals("重度美颜", heavy.title)
+        assertEquals("portrait", heavy.category)
+        assertTrue(heavy.prompt.endsWith("No cropping."))
+        assertTrue(heavy.prompt.length <= 4000)
+        // The guards the preset promises: identity, ethnicity and skin tone, no sexualising, children.
+        assertTrue(heavy.prompt.contains("instantly recognisable"))
+        assertTrue(heavy.prompt.contains("never add or remove double eyelids"))
+        assertTrue(heavy.prompt.contains("style, not ethnicity"))
+        assertTrue(heavy.prompt.contains("enlarge bust or hips, sexualise"))
+        assertTrue(heavy.prompt.contains("child or teen: gentle skin cleanup only, no reshaping"))
+    }
+
+    @Test
+    fun upgradeAddsAiryPortraitAndKeepsUserEditsAndCustomPresets() {
+        val previous = seedAiPresets().presets.filter { it.id != "airy-portrait" }
+            .map { if (it.id == "soft-light") it.copy(prompt = "my soft light") else it }
+        val stored = AiPresetStore(
+            presets = previous + AiPreset("uuid-9", "我的", "mine", "custom"),
+            lastSelectedId = "soft-light",
+        )
+        val merged = mergeBuiltinPresets(stored)
+        assertTrue(merged !== stored)
+        val ids = merged.presets.map { it.id }
+        assertEquals(ids.indexOf("film-warm") + 1, ids.indexOf("airy-portrait"))
+        assertEquals("my soft light", merged.presets.single { it.id == "soft-light" }.prompt)
+        assertEquals("uuid-9", ids.last())
+        assertEquals("soft-light", merged.lastSelectedId)
+    }
+
+    @Test
     fun mergeIsNoOpWhenUpToDate() {
         val stored = seedAiPresets()
         assertTrue(mergeBuiltinPresets(stored) === stored)

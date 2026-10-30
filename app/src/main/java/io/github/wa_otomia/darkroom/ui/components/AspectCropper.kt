@@ -1,5 +1,6 @@
 package io.github.wa_otomia.darkroom.ui.components
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +27,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -39,28 +41,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.wa_otomia.darkroom.core.MAX_PRINT_ZOOM
 import io.github.wa_otomia.darkroom.core.MIN_PRINT_ZOOM
+import io.github.wa_otomia.darkroom.core.PREVIEW_MAX_EDGE
 import io.github.wa_otomia.darkroom.core.PRINT_ASPECT
-import io.github.wa_otomia.darkroom.core.PixelCrop
 import io.github.wa_otomia.darkroom.core.SNAP_POSITION_DP
 import io.github.wa_otomia.darkroom.core.SNAP_ROTATION_DEG
-import io.github.wa_otomia.darkroom.core.ViewportPlacement
 import io.github.wa_otomia.darkroom.core.clampPan
 import io.github.wa_otomia.darkroom.core.coverScale
 import io.github.wa_otomia.darkroom.core.largestFrameSize
 import io.github.wa_otomia.darkroom.core.normalizeQuarterTurns
 import io.github.wa_otomia.darkroom.core.normalizeRotationDegrees
 import io.github.wa_otomia.darkroom.core.panSnapGuides
+import io.github.wa_otomia.darkroom.core.panUnitScale
+import io.github.wa_otomia.darkroom.core.previewDecodeSize
 import io.github.wa_otomia.darkroom.core.rotatePan
 import io.github.wa_otomia.darkroom.core.safeInset
-import io.github.wa_otomia.darkroom.core.viewportCrop
-import io.github.wa_otomia.darkroom.core.viewportPlacement
 import io.github.wa_otomia.darkroom.data.progress.indeterminateUi
 import io.github.wa_otomia.darkroom.ui.theme.Amber
+import io.github.wa_otomia.darkroom.ui.theme.DarkroomMotion
 import io.github.wa_otomia.darkroom.ui.theme.Ink
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
+import coil.size.Precision
+import coil.size.Scale
 import coil.size.Size
 
 /**
@@ -76,12 +81,25 @@ import coil.size.Size
 private val FrameHairline = Paper.copy(alpha = 0.3f)
 
 /**
+ * Rule-of-thirds grid shown while the image is being dragged. A cream line alone disappears on
+ * a bright, airy photo and a dark one on a night shot, so each line is a faint dark stroke under
+ * a lighter cream one; together they read on any image without competing with the amber snap
+ * guides drawn on top.
+ */
+private val GridLine = Paper.copy(alpha = 0.55f)
+private val GridShadow = Color.Black.copy(alpha = 0.28f)
+
+/**
  * [imageWidth] and [imageHeight] are the dimensions the image has *after* [quarterTurns]
  * when [onRotationChange] is null (legacy Studio). Once [onRotationChange] is wired they
  * are the unturned source, and [rotationDegrees] is the live angle.
  *
- * The crop reported by [onCrop] stays in that same space. [onPlacement] is the full
- * zoom + pan + rotation the printer should apply.
+ * [panX]/[panY] are measured in a frame of [panFrameWidth]×[panFrameHeight], which must have
+ * the same [aspect] (Studio passes the print sheet). The on-screen frame changes size whenever
+ * the layout around the cropper does (drawer, progress strips, rotation), so pan is converted to
+ * screen pixels only to draw and to apply a gesture, and the same pose looks the same at every
+ * size. Left at 0, pan is plain on-screen frame pixels. Out-of-range pan is clamped in pan units
+ * and written back through [onPanChange]; the caller derives the placement from the same values.
  *
  * Pan and rotation go through [SnapDragState] (8 dp / 3°) before [clampPan]. Pass
  * [snapState] to share the same instance with a reset control; otherwise one is remembered here.
@@ -96,14 +114,14 @@ fun AspectCropper(
     panY: Float,
     onZoomChange: (Float) -> Unit,
     onPanChange: (Float, Float) -> Unit,
-    onCrop: (PixelCrop) -> Unit,
     overlay: String,
     modifier: Modifier = Modifier,
     aspect: Float = PRINT_ASPECT.toFloat(),
     quarterTurns: Int = 0,
     rotationDegrees: Float = quarterTurns * 90f,
     onRotationChange: ((Float) -> Unit)? = null,
-    onPlacement: (ViewportPlacement) -> Unit = {},
+    panFrameWidth: Float = 0f,
+    panFrameHeight: Float = 0f,
     enabled: Boolean = true,
     note: String? = null,
     snapState: SnapDragState? = null,
@@ -120,6 +138,12 @@ fun AspectCropper(
     val rawWidth = if (legacyTurns % 2 == 1) imageHeight else imageWidth
     val rawHeight = if (legacyTurns % 2 == 1) imageWidth else imageHeight
     val clampRotation = if (onRotationChange == null) 0f else rotationDegrees
+    val ownPanFrame = panFrameWidth > 0f && panFrameHeight > 0f
+    val spaceW = if (ownPanFrame) panFrameWidth else frameW
+    val spaceH = if (ownPanFrame) panFrameHeight else frameH
+    // Screen px per pan unit, from the width only: the two frames share the aspect, and one
+    // factor keeps x and y in the same unit so rotating a pan stays a rotation.
+    val pxPerUnit = panUnitScale(frameW, spaceW)
 
     val zoomState = rememberUpdatedState(zoom)
     val panState = rememberUpdatedState(Offset(panX, panY))
@@ -128,38 +152,46 @@ fun AspectCropper(
     val onPanState = rememberUpdatedState(onPanChange)
     val onRotationState = rememberUpdatedState(onRotationChange)
     val frameState = rememberUpdatedState(frameW to frameH)
+    val spaceState = rememberUpdatedState(spaceW to spaceH)
+    val pxPerUnitState = rememberUpdatedState(pxPerUnit)
     val imageState = rememberUpdatedState(imageWidth to imageHeight)
     val clampRotationState = rememberUpdatedState(clampRotation)
     val snapHolder = rememberUpdatedState(snap)
     val hapticHolder = rememberUpdatedState(haptic)
-    var decoding by remember(model) { mutableStateOf(true) }
-    val request = remember(model) {
+    // True from the first movement past touch slop until the fingers lift; a tap never shows it.
+    var dragging by remember { mutableStateOf(false) }
+    val gridAlpha = remember { Animatable(0f) }
+    LaunchedEffect(dragging) {
+        if (dragging) {
+            gridAlpha.animateTo(1f, DarkroomMotion.enter())
+        } else if (gridAlpha.value > 0f) {
+            // A new drag inside the hold or the fade restarts this effect and cancels the fade.
+            delay(DarkroomMotion.GuideHoldMillis)
+            gridAlpha.animateTo(0f, DarkroomMotion.valueChange())
+        }
+    }
+    // rawWidth/rawHeight are EXIF-corrected and not yet quarter-turned: Coil's decode space.
+    // Size.ORIGINAL decodes the full raster; a portrait A7CR software bitmap exceeds 100 MiB.
+    val preview = previewDecodeSize(rawWidth, rawHeight, PREVIEW_MAX_EDGE)
+    var decoding by remember(model, preview.width, preview.height) { mutableStateOf(true) }
+    val request = remember(model, preview.width, preview.height) {
         ImageRequest.Builder(context)
             .data(model)
-            .size(Size.ORIGINAL)
+            .size(Size(preview.width, preview.height))
+            .precision(Precision.EXACT)
+            .scale(Scale.FIT)
+            .memoryCacheKey("${model}:${preview.width}x${preview.height}")
             .crossfade(true)
             .build()
     }
 
-    LaunchedEffect(zoom, panX, panY, frameW, frameH, imageWidth, imageHeight, model, clampRotation) {
-        if (frameW <= 0f || frameH <= 0f || imageWidth <= 0 || imageHeight <= 0) return@LaunchedEffect
-        val (x, y) = clampPan(panX, panY, zoom, frameW, frameH, imageWidth, imageHeight, clampRotation)
-        if (x != panX || y != panY) {
-            onPanChange(x, y)
-            return@LaunchedEffect
-        }
-        val placement = viewportPlacement(
-            frameW,
-            frameH,
-            imageWidth,
-            imageHeight,
-            zoom,
-            x,
-            y,
-            clampRotation,
-        )
-        onPlacement(placement)
-        onCrop(placement.toPixelCrop() ?: viewportCrop(frameW, frameH, imageWidth, imageHeight, zoom, x, y))
+    // Clamp in pan units against the pan frame. clampPan scales linearly with the frame, so this
+    // is the same bound at any on-screen size: resizing the preview never moves or trims the pan,
+    // and an in-range value comes back unchanged (no write-back loop).
+    LaunchedEffect(zoom, panX, panY, spaceW, spaceH, imageWidth, imageHeight, model, clampRotation) {
+        if (spaceW <= 0f || spaceH <= 0f || imageWidth <= 0 || imageHeight <= 0) return@LaunchedEffect
+        val (x, y) = clampPan(panX, panY, zoom, spaceW, spaceH, imageWidth, imageHeight, clampRotation)
+        if (x != panX || y != panY) onPanState.value(x, y)
     }
 
     Box(
@@ -200,8 +232,8 @@ fun AspectCropper(
                             scaleX = zoom
                             scaleY = zoom
                             rotationZ = rotationDegrees
-                            translationX = panX
-                            translationY = panY
+                            translationX = panX * pxPerUnit
+                            translationY = panY * pxPerUnit
                         },
                 )
             }
@@ -217,6 +249,10 @@ fun AspectCropper(
                     addRect(Rect(left, top, left + frameW, top + frameH))
                 }
                 drawPath(hole, Color.Black.copy(alpha = 0.55f))
+                val grid = gridAlpha.value
+                if (grid > 0f) {
+                    drawThirdsGrid(left, top, frameW, frameH, grid, guideStroke)
+                }
                 drawSnapGuides(
                     guides = guides,
                     frameLeft = left,
@@ -278,19 +314,32 @@ fun AspectCropper(
                 .fillMaxSize()
                 .pointerInput(model, enabled) {
                     if (!enabled) return@pointerInput
+                    // pushed: pan units last sent or seen. live: the same pose in screen px, which
+                    // is what the centroid, snap and clamp math below works in.
                     var pushed = panState.value
-                    var live = pushed
+                    var pushedScale = pxPerUnitState.value
+                    var live = pushed * pushedScale
                     detectSnappingTransformGestures(
                         onBegin = {
-                            live = panState.value
-                            pushed = live
+                            pushed = panState.value
+                            pushedScale = pxPerUnitState.value
+                            live = pushed * pushedScale
                             val rot = if (onRotationState.value != null) rotationState.value else 0f
                             snapHolder.value.begin(live.x, live.y, rot)
                         },
-                        onEnd = { snapHolder.value.end() },
+                        onEnd = {
+                            dragging = false
+                            snapHolder.value.end()
+                        },
                     ) { centroid, pan, zoomChange, rotation ->
-                        if (panState.value != pushed) {
-                            live = panState.value
+                        dragging = true
+                        // Re-read when the pan was changed elsewhere (clamp, rotate button) or the
+                        // frame resized mid-gesture (drawer settling), so px and units agree.
+                        val unit = pxPerUnitState.value
+                        if (panState.value != pushed || unit != pushedScale) {
+                            pushed = panState.value
+                            pushedScale = unit
+                            live = pushed * unit
                             val currentRotation =
                                 if (onRotationState.value != null) rotationState.value else 0f
                             snapHolder.value.sync(live.x, live.y, currentRotation)
@@ -349,13 +398,43 @@ fun AspectCropper(
                         if (snapped.snappedIn) {
                             hapticHolder.value.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         }
+                        // Back to pan units, clamped there too so the clamp effect sees an
+                        // in-range value and does not nudge it by a float ulp.
+                        val (sw, sh) = spaceState.value
+                        val (ux, uy) = if (sw > 0f && sh > 0f) {
+                            clampPan(x / unit, y / unit, nextZoom, sw, sh, iw, ih, clampRot)
+                        } else {
+                            x to y
+                        }
                         live = Offset(x, y)
-                        pushed = live
+                        pushed = Offset(ux, uy)
                         onZoomState.value(nextZoom)
-                        onPanState.value(x, y)
+                        onPanState.value(ux, uy)
                         onRotationState.value?.invoke(clampRot)
                     }
                 },
         )
+    }
+}
+
+/** Two vertical and two horizontal lines at the thirds of the frame, faded by [alpha]. */
+private fun DrawScope.drawThirdsGrid(
+    left: Float,
+    top: Float,
+    frameW: Float,
+    frameH: Float,
+    alpha: Float,
+    strokeWidth: Float,
+) {
+    if (frameW <= 0f || frameH <= 0f) return
+    val shadow = GridShadow.copy(alpha = GridShadow.alpha * alpha)
+    val line = GridLine.copy(alpha = GridLine.alpha * alpha)
+    for (i in 1..2) {
+        val x = left + frameW * i / 3f
+        val y = top + frameH * i / 3f
+        drawLine(shadow, Offset(x, top), Offset(x, top + frameH), strokeWidth * 2f)
+        drawLine(shadow, Offset(left, y), Offset(left + frameW, y), strokeWidth * 2f)
+        drawLine(line, Offset(x, top), Offset(x, top + frameH), strokeWidth)
+        drawLine(line, Offset(left, y), Offset(left + frameW, y), strokeWidth)
     }
 }

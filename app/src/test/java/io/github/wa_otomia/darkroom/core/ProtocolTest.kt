@@ -73,7 +73,38 @@ class ProtocolTest {
         val dec = decryptEcb(key, parseFrame(fr).body, stripZeros = true)
         val text = String(dec, Charsets.UTF_8)
         assertTrue(text.contains("\"method\":\"print_job\""))
-        assertTrue(text.contains("\"channel\":64"))
+        assertTrue(text.contains("\"channel\":576"))
+        assertFalse(text.contains("\"channel\":64"))
+    }
+
+    @Test
+    fun androidPrintJobChannelIs576NotFrameChannel() {
+        assertEquals(576, DEFAULT_FILE_CHANNEL)
+        assertEquals(60_000L, PRINTER_NO_PROGRESS_MS)
+        assertEquals(3, CHANNEL_DATA_ENC)
+        assertEquals(4, CHANNEL_FILE_ENC)
+        val params = printJobParams(2000, 2)
+        assertEquals(mapOf("file_size" to 2000, "copies" to 2, "job_type" to 0, "channel" to 576), params)
+        val raw = encodeRpc("print_job", 5, params)
+        val text = String(raw, Charsets.UTF_8)
+        assertEquals(
+            "{\"method\":\"print_job\",\"id\":5,\"params\":{\"file_size\":2000,\"copies\":2,\"job_type\":0,\"channel\":576}}",
+            text,
+        )
+        assertFalse(text.contains("\"channel\":64"))
+        val key = ByteArray(16) { it.toByte() }
+        val frame = buildFrame(
+            channelId = CHANNEL_DATA_ENC,
+            interactive = INTERACTIVE_REQUEST,
+            encoding = ENCODING_JSON,
+            arcMsgSn = 5,
+            msgSn = 5,
+            encryptOffset = ENCRYPT_ECB_OFFSET,
+            body = encryptEcb(key, raw),
+        )
+        val parsed = parseFrame(frame)
+        assertEquals(CHANNEL_DATA_ENC, parsed.channelId)
+        assertEquals(text, String(decryptEcb(key, parsed.body, stripZeros = true), Charsets.UTF_8))
     }
 
     @Test

@@ -50,6 +50,49 @@ fun Framing.panInFrame(frameWidth: Float, frameHeight: Float): Pair<Float, Float
     return (offsetX * frameWidth / this.frameWidth) to (offsetY * frameHeight / this.frameHeight)
 }
 
+/**
+ * Saved pan expressed in print-sheet pixels of this framing's orientation. Studio keeps its live
+ * pan in these units so the pose does not depend on the on-screen cropper size. Rows saved by
+ * older builds carry the on-screen frame they were measured in, and convert here per axis.
+ */
+fun Framing.sheetPan(): Pair<Float, Float> {
+    val (sheetW, sheetH) = framingSheetSize(landscape)
+    return panInFrame(sheetW, sheetH)
+}
+
+/**
+ * The Studio pose as a placement on the print sheet of [landscape]. [panX]/[panY] are sheet
+ * pixels and are clamped here, so the result is the same however large the preview is (drawer
+ * open or closed, phone or wide layout). Null until the image size is known.
+ */
+fun studioPlacement(
+    landscape: Boolean,
+    imageWidth: Int,
+    imageHeight: Int,
+    zoom: Float,
+    panX: Float,
+    panY: Float,
+    rotationDegrees: Float,
+): ViewportPlacement? {
+    if (imageWidth <= 0 || imageHeight <= 0) return null
+    val (sheetW, sheetH) = framingSheetSize(landscape)
+    return viewportPlacement(sheetW, sheetH, imageWidth, imageHeight, zoom, panX, panY, rotationDegrees)
+}
+
+/** Pixel crop for [placement]: the right-angle cover crop, else the zoom-1 cut of the unturned source. */
+fun studioCrop(placement: ViewportPlacement?): PixelCrop? {
+    if (placement == null) return null
+    return placement.toPixelCrop() ?: viewportCrop(
+        placement.frameWidth,
+        placement.frameHeight,
+        placement.imageWidth,
+        placement.imageHeight,
+        placement.zoom,
+        placement.offsetX,
+        placement.offsetY,
+    )
+}
+
 fun Framing.toPlacement(): ViewportPlacement {
     val (fallbackW, fallbackH) = framingSheetSize(landscape)
     return ViewportPlacement(
@@ -161,4 +204,80 @@ fun resolveQueuedPose(
         rotationDegrees = explicitRotationDegrees,
         placement = explicitPlacement,
     )
+}
+
+/** Relative aspect gap at or below this fills the sheet; above it letterboxes. */
+const val AI_ASPECT_TOLERANCE = 0.01
+
+/**
+ * Pose for one print run. A saved framing wins. With none, a manual job uses the
+ * studio default (zoom 1, no pan or rotation, sheet from [autoLandscape]) and is
+ * not affected by print fit; an automated job leaves placement unset so print fit decides.
+ */
+fun resolveExecutionPose(
+    saved: Framing?,
+    manual: Boolean,
+    autoLandscape: Boolean,
+): ResolvedJobPose {
+    if (saved != null) {
+        return ResolvedJobPose(
+            landscape = saved.landscape,
+            rotationDegrees = saved.rotationDegrees,
+            placement = saved.toPlacement(),
+        )
+    }
+    if (manual) {
+        val (frameWidth, frameHeight) = framingSheetSize(autoLandscape)
+        return ResolvedJobPose(
+            landscape = autoLandscape,
+            rotationDegrees = 0f,
+            placement = Framing(
+                landscape = autoLandscape,
+                zoom = 1f,
+                offsetX = 0f,
+                offsetY = 0f,
+                rotationDegrees = 0f,
+                frameWidth = frameWidth,
+                frameHeight = frameHeight,
+            ).toPlacement(),
+        )
+    }
+    return ResolvedJobPose(
+        landscape = autoLandscape,
+        rotationDegrees = 0f,
+        placement = null,
+    )
+}
+
+/**
+ * Framing that places an AI still on the execution sheet. Within [AI_ASPECT_TOLERANCE]
+ * of the sheet aspect, zoom is 1 (fill). Otherwise zoom is contain/cover, floored at
+ * [MIN_PRINT_ZOOM]. Unknown output size (<= 0) stays zoom 1. Pan and rotation stay 0.
+ */
+fun alignedEditFraming(outW: Int, outH: Int, landscape: Boolean): Framing {
+    val (sheetW, sheetH) = framingSheetSize(landscape)
+    return Framing(
+        landscape = landscape,
+        zoom = alignedEditZoom(outW, outH, sheetW, sheetH),
+        offsetX = 0f,
+        offsetY = 0f,
+        rotationDegrees = 0f,
+        frameWidth = sheetW,
+        frameHeight = sheetH,
+        imageWidth = outW,
+        imageHeight = outH,
+    )
+}
+
+private fun alignedEditZoom(outW: Int, outH: Int, sheetW: Float, sheetH: Float): Float {
+    if (outW <= 0 || outH <= 0 || sheetW <= 0f || sheetH <= 0f) return 1f
+    val imageAspect = outW.toDouble() / outH.toDouble()
+    val sheetAspect = sheetW.toDouble() / sheetH.toDouble()
+    if (sheetAspect <= 0.0) return 1f
+    val relative = abs(imageAspect - sheetAspect) / sheetAspect
+    if (relative <= AI_ASPECT_TOLERANCE) return 1f
+    val contain = minOf(sheetW.toDouble() / outW, sheetH.toDouble() / outH)
+    val cover = maxOf(sheetW.toDouble() / outW, sheetH.toDouble() / outH)
+    if (cover <= 0.0) return 1f
+    return clampZoom((contain / cover).toFloat())
 }

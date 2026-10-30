@@ -44,6 +44,12 @@ val EDIT_PRESETS = listOf(
         "portrait",
     ),
     EditPresetSeed(
+        "beauty-heavy",
+        "重度美颜",
+        "Edit this exact photo with a heavy but believable Japanese-style beauty retouch, applied to each adult: clearly visible at first glance, yet everyone stays instantly recognisable to friends. Skin: remove blemishes, acne, redness and dark circles, even the tone, refine texture but keep fine pores, add a clear translucent toumei-kan glow without lightening the skin. Face, Japanese kogao ideal: smaller face with a softer, slimmer jaw toward a gentle V-line, eyes noticeably larger and brighter with clear catchlights, soft under-eye fullness (namida-bukuro), gently refined nose bridge, soft natural brows, rosy upper cheeks, natural lips with soft sheen. Body: slimmer waist, arms and legs, longer leg proportion, upright posture. Strength: about 10-15% per feature, never more; adapt to each face. Keep bone-structure character, eyelid type (never add or remove double eyelids), eye shape and spacing, nose and lip character, moles, beauty marks, defining freckles and scars, smile, age, expression, hairstyle, hair color, clothing, pose, lighting, background and composition. Japanese aesthetic means style, not ethnicity: do NOT alter ancestry-related features or skin tone depth, lighten or whiten skin, make people look alike, enlarge bust or hips, sexualise, make anyone look younger or older, add heavy makeup, or make skin plastic or doll-like. Anyone who may be a child or teen: gentle skin cleanup only, no reshaping. When slimming, keep background lines and doorframes straight, never warp or stretch. Photorealistic. No cropping.",
+        "portrait",
+    ),
+    EditPresetSeed(
         "auto-fix",
         "一键修正",
         "Technical correction only. Fix exposure (recover clipped highlights and crushed shadows), neutralise white balance so skin looks natural, reduce noise and slight softness. Do not restyle, do not shift colors beyond correction, do not alter people, expressions, clothing, background or framing. It should look like the same shot taken with better camera settings. No cropping.",
@@ -89,6 +95,12 @@ val EDIT_PRESETS = listOf(
         "film-warm",
         "暖调胶片",
         "Color grade only: a warm analog film look like Kodak Portra. Soft warm skin tones, slightly lifted blacks, gentle highlight roll-off, fine subtle grain. This is purely a tonal and color change: keep the same people, faces, clothing, background, sharpness and framing. No added objects, no cropping.",
+        "portrait",
+    ),
+    EditPresetSeed(
+        "airy-portrait",
+        "日系空气感",
+        "Edit this exact photo into a Japanese airy (kuuki-kan) portrait: light retouch, tone and color grade only. Skin: remove temporary blemishes (acne, red patches), reduce oily shine, soften under-eye circles and redness, lightly even the skin tone; keep pores, texture, moles and freckles. Tone: bright and high-key, so it reads almost overexposed at first glance, as if lit by soft diffused daylight from the original light direction, yet nothing is clipped: highlights on skin, white clothing and sky keep texture and roll off smoothly into near-white. Open the shadows gently and lower contrast, but keep true dark tones in pupils, lashes, brows and hair and soft shading on cheeks, jaw and nose, so the image stays crisp and clear like morning air, never grey, foggy or milky. Air: a faint light wrap only where bright background light meets hair and shoulder edges; the background sits slightly brighter and softer than the subject so the light breathes around the person. Color: clean neutral-to-cool whites, a faint cool cyan in the shadows, soft pastel colors with greens leaning fresh mint; skin luminous, translucent and rosy-neutral, never grey, yellow, orange or chalky; lips keep their natural color; eyes crisp with clear irises and catchlights. Keep identity, face shape, features, eye size, age, expression, hairstyle, clothing, pose, background content and composition unchanged. Do NOT blow out whites, bleach the skin, make skin plastic, reshape or slim the face, enlarge eyes, add makeup, whiten teeth, or add fog, haze or glow over faces, light leaks or objects. Photorealistic. No cropping.",
         "portrait",
     ),
     EditPresetSeed(

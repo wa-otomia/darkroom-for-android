@@ -74,11 +74,18 @@ fun WatermarkSettings.withDefaultAnchors(): WatermarkSettings {
  */
 const val WATERMARK_TEXT_BASELINE = 0.83f
 
-/** Persisted watermark configuration. Overlay happens only at print/export time. */
+/**
+ * Persisted watermark configuration. Overlay happens only at print/export time.
+ *
+ * [syncScale] links the two size sliders: while it is on, moving either one sets both marks to
+ * that size ([withSnsScale], [withDateScale]). Switching it on changes nothing by itself; the
+ * sizes only meet the next time a slider moves. Older saves have no field and decode as off.
+ */
 @Serializable
 data class WatermarkSettings(
     val sns: SnsWatermark = SnsWatermark(),
     val date: DateWatermark = DateWatermark(),
+    val syncScale: Boolean = false,
 )
 
 /** True when automation / Studio should treat a watermark as configured. */
@@ -108,6 +115,24 @@ data class WatermarkBox(
 }
 
 fun clampWatermarkScale(scale: Float): Float = scale.coerceIn(WATERMARK_SCALE_MIN, WATERMARK_SCALE_MAX)
+
+/** SNS size from its slider; with [WatermarkSettings.syncScale] on, the date mark follows. */
+fun WatermarkSettings.withSnsScale(scale: Float): WatermarkSettings {
+    val next = clampWatermarkScale(scale)
+    return copy(
+        sns = sns.copy(scale = next),
+        date = if (syncScale) date.copy(scale = next) else date,
+    )
+}
+
+/** Date size from its slider; with [WatermarkSettings.syncScale] on, the SNS mark follows. */
+fun WatermarkSettings.withDateScale(scale: Float): WatermarkSettings {
+    val next = clampWatermarkScale(scale)
+    return copy(
+        date = date.copy(scale = next),
+        sns = if (syncScale) sns.copy(scale = next) else sns,
+    )
+}
 
 /**
  * Pixel boxes for every enabled watermark.

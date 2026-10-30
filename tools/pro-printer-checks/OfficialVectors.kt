@@ -48,7 +48,8 @@ internal fun verifyOfficialVectors() {
         check(body.contentEquals(hex("8b52a48308217b3d9017e666027669de1a7c45ed50befba96646b382deb71c6eedb7e5c57a9d2bdd2f826d330c4ef6a6")))
         check(buildFrame(3, 6, 3, 101, 101, 5120, body).contentEquals(hex("7e640003060365000000650000000000000030148b52a48308217b3d9017e666027669de1a7c45ed50befba96646b382deb71c6eedb7e5c57a9d2bdd2f826d330c4ef6a6437e")))
     }
-    verify("official/printJob2") {
+    // iOS sample: channel 64 ciphertext and frame bytes are unchanged. Android production uses 576.
+    verify("official/ios-printJob-channel-64") {
         val raw = encodeRpc("print_job", 101, linkedMapOf<String, Any>("file_size" to 2000,"copies" to 2,"job_type" to 0,"channel" to 64))
         check(String(raw) == "{\"method\":\"print_job\",\"id\":101,\"params\":{\"file_size\":2000,\"copies\":2,\"job_type\":0,\"channel\":64}}")
         val body = encryptEcb(hex("30313233343536373839414243444546"), raw)

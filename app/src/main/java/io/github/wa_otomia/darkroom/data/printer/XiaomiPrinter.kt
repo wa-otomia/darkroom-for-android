@@ -3,6 +3,7 @@ package io.github.wa_otomia.darkroom.data.printer
 import io.github.wa_otomia.darkroom.core.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import java.net.SocketTimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -306,28 +307,33 @@ class XiaomiPrinter(
         return id
     }
 
+    /** Poll until finished. Does not close the transport.
+     * A successful job_info or mixed_status reply, even without this job, resets [noReplyMs].
+     * Read timeouts, read-side failures and write failures count as no reply; RPC rejection still propagates. */
     @Synchronized
     fun waitUntilDone(
         jobId: Int,
         timeoutMs: Int = 180_000,
         pollMs: Long = 2_000,
+        noReplyMs: Long = PRINTER_NO_PROGRESS_MS,
         onState: ((String, Map<String, Any?>, Long) -> Unit)? = null,
     ): Map<String, Any?> {
-        require(jobId > 0)
+        require(jobId > 0 && noReplyMs > 0)
         if (currentJobId == null) currentJobId = jobId
         require(currentJobId == jobId)
         settledJob?.let { return it }
         val start = nowMs()
+        var lastReplyAt = start
         var activeMs = 0L
         var lastTick = start
         var wasFaulted = false
         var lastState = "unknown"
-        var missedPolls = 0
         while (nowMs() - start < timeoutMs + 900_000L) {
             if (handleCancel()) return settledJob!!
             val status: ProPrinterStatus
             try {
                 val job = findJob(jobId)
+                lastReplyAt = nowMs() // job_info returned; a missing job is still a valid reply.
                 if (job != null) {
                     val state = job["job_state"] as? String ?: "unknown"
                     lastState = state
@@ -335,11 +341,14 @@ class XiaomiPrinter(
                     terminal(job)?.let { phase(null); return it }
                 }
                 status = mixedStatus()
-                missedPolls = 0
-            } catch (e: SocketTimeoutException) {
+                lastReplyAt = nowMs()
+            } catch (_: IOException) {
                 lastStatus = null
                 onStatus(null, controlPhase)
-                if (++missedPolls >= 3) throw PrinterOutcomeUnknown("Status polling timed out; printer outcome unknown")
+                // Elapsed blocking time is included in nowMs(), so a watchdog close is not followed by another window.
+                if (nowMs() - lastReplyAt >= noReplyMs) {
+                    throw PrinterOutcomeUnknown("Status polling timed out; printer outcome unknown")
+                }
                 sleep(pollMs)
                 continue
             }

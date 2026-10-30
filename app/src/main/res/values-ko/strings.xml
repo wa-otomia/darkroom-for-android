@@ -49,7 +49,7 @@
     <string name="common_edit">편집</string>
     <string name="io_eyebrow">카메라 FTP</string>
     <string name="io_title">전송</string>
-    <string name="io_desc">서버를 시작한 뒤 카메라 호스트에 이 기기의 wlan0 또는 wlan1 IP를 입력하세요. 패시브 모드를 사용하고 원격 디렉터리는 비워 둡니다. 세션, 전송, 인쇄 대기열은 아래에 표시됩니다.</string>
+    <string name="io_desc">서버를 시작한 뒤 카메라 호스트에 이 기기의 Wi-Fi 또는 핫스팟 IP를 입력하세요. 모바일 데이터에서는 수신 대기하지 않습니다. 패시브 모드를 사용하고 원격 디렉터리는 비워 둡니다. 세션, 전송, 인쇄 대기열은 아래에 표시됩니다.</string>
     <string name="io_sessions">세션</string>
     <string name="io_sessions_empty">연결된 카메라가 없습니다</string>
     <string name="io_session_anonymous">익명</string>
@@ -83,7 +83,14 @@
     <string name="ftp_stop">중지</string>
     <string name="ftp_starting">FTP를 시작하는 중…</string>
     <string name="ftp_listening_fmt">FTP %1$s:%2$d</string>
+    <string name="ftp_waiting">Wi-Fi 대기 중</string>
+    <string name="ftp_waiting_wifi">FTP가 Wi-Fi를 기다리는 중입니다. 모바일 데이터에서는 수신 대기하지 않습니다.</string>
+    <string name="ftp_port_unavailable">포트를 사용할 수 없음</string>
+    <string name="ftp_port_unavailable_fmt">FTP가 포트 %1$d에서 수신 대기할 수 없습니다. 사용 중이거나 허용되지 않는 포트입니다. 설정에서 포트를 변경하세요.</string>
     <string name="ftp_channel">카메라 FTP</string>
+    <string name="ftp_paused_channel">FTP 일시 중지</string>
+    <string name="ftp_paused_title">FTP가 일시 중지됨</string>
+    <string name="ftp_paused_text">시스템 시간 제한으로 FTP가 일시 중지되었습니다. 탭하면 다시 시작할 수 있습니다.</string>
     <string name="ftp_port21_hint">Android에서는 루트 권한 없이 21번 포트를 사용할 수 없습니다. 카메라에서 포트를 바꿀 수 있으면 2121을 사용하세요.</string>
     <string name="back_gallery">갤러리</string>
     <string name="not_found">사진을 찾을 수 없습니다</string>
@@ -173,6 +180,7 @@
     <string name="settings_watermark_handle">SNS ID</string>
     <string name="settings_watermark_size">크기</string>
     <string name="settings_watermark_include_time">시간 포함</string>
+    <string name="settings_watermark_sync_size">날짜와 SNS 크기 맞추기</string>
     <string name="settings_watermark_reset">위치 재설정</string>
     <string name="settings_watermark_preview">워터마크 미리보기</string>
     <string name="settings_watermark_logo_instagram">Instagram</string>

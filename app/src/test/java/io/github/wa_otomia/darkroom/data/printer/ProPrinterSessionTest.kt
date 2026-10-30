@@ -4,6 +4,7 @@ import io.github.wa_otomia.darkroom.core.*
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
+import java.io.IOException
 import java.net.SocketTimeoutException
 
 class ProPrinterSessionTest {
@@ -12,7 +13,12 @@ class ProPrinterSessionTest {
     private inner class ScriptPipe : BytePipe {
         val commands = mutableListOf<Map<String, Any?>>()
         val inbox = ArrayDeque<Byte>()
+        val rpcChannels = mutableListOf<Int>()
+        var fileChannel: Int? = null
         var dataFrames = 0
+        var closed = false
+        var readFailure: IOException? = null
+        var beforeRead: () -> Unit = {}
         var onData: () -> Unit = {}
         var handler: (String, Any?) -> Map<String, Any?>? = { method, _ ->
             when (method) {
@@ -34,10 +40,12 @@ class ProPrinterSessionTest {
                 val frame = parseFrame(data.copyOfRange(pos, pos + size))
                 pos += size
                 if (frame.channelId == 4) {
+                    fileChannel = frame.channelId
                     dataFrames++
                     assertEquals(37, readU32LE(decryptEcb(key, frame.body), 0))
                     onData()
                 } else {
+                    rpcChannels += frame.channelId
                     val request = XiaomiPrinter.parseLooseJson(String(decryptEcb(key, frame.body, true)))!!
                     commands += request
                     val method = request["method"] as String
@@ -46,10 +54,12 @@ class ProPrinterSessionTest {
             }
         }
         override fun readExact(n: Int, timeoutMs: Int): ByteArray {
+            beforeRead()
+            readFailure?.let { throw it }
             if (inbox.size < n) throw SocketTimeoutException("simulated timeout")
             return ByteArray(n) { inbox.removeFirst() }
         }
-        override fun close() = Unit
+        override fun close() { closed = true }
     }
     private fun make(pipe: ScriptPipe, clock: Clock = Clock(), status: (ProPrinterStatus?, String?) -> Unit = { _, _ -> }) =
         XiaomiPrinter(pipe, log = {}, onStatus = status, nowMs = { clock.time }, sleep = clock::sleep).also { it.useSessionKey(key) }
@@ -221,6 +231,115 @@ class ProPrinterSessionTest {
         } }
         p.printJpeg(ByteArray(20)); p.waitUntilDone(37)
         assertFalse(pipe.commands.any { it["method"] == "resume_printer" })
+    }
+    @Test fun printJobJsonUsesAndroidChannel576OnFrameChannels() {
+        for ((size, copies) in listOf(2000 to 2, 500 * 1024 to 1, 2 * 1024 * 1024 to 9)) {
+            val pipe = ScriptPipe(); val p = make(pipe)
+            p.printJpeg(ByteArray(size), copies)
+            val params = pipe.commands.first { it["method"] == "print_job" }["params"] as Map<*, *>
+            assertEquals(size, (params["file_size"] as Number).toInt())
+            assertEquals(copies, (params["copies"] as Number).toInt())
+            assertEquals(0, (params["job_type"] as Number).toInt())
+            assertEquals(576, (params["channel"] as Number).toInt())
+            assertEquals(3, pipe.rpcChannels.first())
+            assertEquals(4, pipe.fileChannel)
+            assertTrue(pipe.dataFrames > 0)
+            assertFalse(pipe.closed)
+        }
+    }
+    @Test fun threeStatusTimeoutsThenFinishedIsSuccess() {
+        val pipe = ScriptPipe(); val clock = Clock(); val p = make(pipe, clock)
+        var timeouts = 0
+        val fallback = pipe.handler
+        pipe.handler = { m, a -> if (m == "job_info" && timeouts++ < 3) null else fallback(m, a) }
+        p.printJpeg(ByteArray(20))
+        assertEquals("finished", p.waitUntilDone(37)["job_state"])
+        assertEquals(6_000L, clock.time)
+        assertTrue(clock.time < PRINTER_NO_PROGRESS_MS)
+        assertTrue(p.remoteJobSettled)
+        assertFalse(pipe.closed)
+    }
+    @Test fun noReplyForSixtySecondsIsUnknownWithoutClosing() {
+        val pipe = ScriptPipe(); val clock = Clock(); val p = make(pipe, clock)
+        p.printJpeg(ByteArray(20))
+        pipe.handler = { m, _ -> if (m == "job_info" || m == "mixed_status") null else mapOf("result" to listOf("ok")) }
+        assertThrows(PrinterOutcomeUnknown::class.java) { p.waitUntilDone(37) }
+        assertEquals(PRINTER_NO_PROGRESS_MS, clock.time)
+        assertFalse(p.remoteJobSettled)
+        assertFalse(pipe.closed)
+    }
+    @Test fun readSideFailureStaysConnectedUntilNoReplyWindow() {
+        val pipe = ScriptPipe(); val clock = Clock(); val p = make(pipe, clock)
+        p.printJpeg(ByteArray(20))
+        pipe.readFailure = IOException("read side down")
+        assertThrows(PrinterOutcomeUnknown::class.java) { p.waitUntilDone(37) }
+        assertEquals(PRINTER_NO_PROGRESS_MS, clock.time)
+        assertFalse(p.remoteJobSettled)
+        assertFalse(pipe.closed)
+    }
+    @Test fun blockedStatusReadCountsTowardNoReplyWindowWithoutClosing() {
+        val pipe = ScriptPipe(); val clock = Clock(); val p = make(pipe, clock)
+        pipe.beforeRead = { clock.sleep(PRINTER_NO_PROGRESS_MS) }
+        pipe.handler = { m, _ -> if (m == "job_info" || m == "mixed_status") null else mapOf("result" to listOf("ok")) }
+        assertThrows(PrinterOutcomeUnknown::class.java) { p.waitUntilDone(37) }
+        assertEquals(PRINTER_NO_PROGRESS_MS, clock.time)
+        assertFalse(pipe.closed)
+    }
+    @Test fun validReplyResetsNoReplyTimer() {
+        val pipe = ScriptPipe(); val clock = Clock(); val p = make(pipe, clock)
+        var replied = false
+        pipe.handler = { m, _ ->
+            when (m) {
+                "job_info" -> when {
+                    clock.time < 50_000 -> null
+                    clock.time == 50_000L && !replied -> {
+                        replied = true
+                        job("printing_Y")
+                    }
+                    else -> null
+                }
+                "mixed_status" -> mapOf("result" to mapOf("category" to "processing", "job_id" to 37))
+                else -> mapOf("result" to listOf("ok"))
+            }
+        }
+        assertThrows(PrinterOutcomeUnknown::class.java) { p.waitUntilDone(37) }
+        assertTrue(replied)
+        assertEquals(110_000L, clock.time)
+        assertFalse(p.remoteJobSettled)
+        assertFalse(pipe.closed)
+    }
+    @Test fun jobInfoWithoutJobResetsTimerEvenIfStatusReadFails() {
+        val pipe = ScriptPipe(); val clock = Clock(); val p = make(pipe, clock)
+        var replied = false
+        pipe.handler = { m, _ ->
+            when (m) {
+                "job_info" -> when {
+                    clock.time < 50_000 -> null
+                    clock.time == 50_000L && !replied -> {
+                        replied = true
+                        mapOf("result" to emptyList<Any>())
+                    }
+                    else -> null
+                }
+                "mixed_status" -> null
+                else -> mapOf("result" to listOf("ok"))
+            }
+        }
+        assertThrows(PrinterOutcomeUnknown::class.java) { p.waitUntilDone(37) }
+        assertTrue(replied)
+        assertEquals(110_000L, clock.time)
+        assertFalse(pipe.closed)
+    }
+    @Test fun rpcRejectionDuringPollingIsNotAnUnknownOutcome() {
+        val pipe = ScriptPipe(); val p = make(pipe)
+        p.printJpeg(ByteArray(20))
+        pipe.handler = { m, _ ->
+            if (m == "job_info") mapOf("error" to mapOf("code" to -1))
+            else mapOf("result" to mapOf("category" to "idle"))
+        }
+        val error = assertThrows(PrinterError::class.java) { p.waitUntilDone(37) }
+        assertFalse(error is PrinterOutcomeUnknown)
+        assertFalse(pipe.closed)
     }
 
 }

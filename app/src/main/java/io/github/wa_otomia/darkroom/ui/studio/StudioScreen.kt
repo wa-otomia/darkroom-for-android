@@ -80,22 +80,22 @@ import io.github.wa_otomia.darkroom.core.PRINT_ASPECT
 import io.github.wa_otomia.darkroom.core.PRINT_ASPECT_LANDSCAPE
 import io.github.wa_otomia.darkroom.core.PhotoMeta
 import io.github.wa_otomia.darkroom.core.SNAP_POSITION_DP
-import io.github.wa_otomia.darkroom.core.ViewportPlacement
 import io.github.wa_otomia.darkroom.core.defaultLandscape
 import io.github.wa_otomia.darkroom.core.editsInCreationOrder
 import io.github.wa_otomia.darkroom.core.isConfigured
 import io.github.wa_otomia.darkroom.core.exactQuarterTurns
-import io.github.wa_otomia.darkroom.core.formatCropSpec
 import io.github.wa_otomia.darkroom.core.framingFor
 import io.github.wa_otomia.darkroom.core.isCancelledPrintMessage
 import io.github.wa_otomia.darkroom.core.isGenerated
 import io.github.wa_otomia.darkroom.core.listRelatedPhotos
+import io.github.wa_otomia.darkroom.core.framingSheetSize
 import io.github.wa_otomia.darkroom.core.liveFraming
 import io.github.wa_otomia.darkroom.core.newestVersionSource
-import io.github.wa_otomia.darkroom.core.panInFrame
 import io.github.wa_otomia.darkroom.core.normalizeRotationDegrees
-import io.github.wa_otomia.darkroom.core.parseCropSpec
 import io.github.wa_otomia.darkroom.core.persistableFraming
+import io.github.wa_otomia.darkroom.core.sheetPan
+import io.github.wa_otomia.darkroom.core.studioCrop
+import io.github.wa_otomia.darkroom.core.studioPlacement
 import io.github.wa_otomia.darkroom.core.printImageSize
 import io.github.wa_otomia.darkroom.core.resolveEditPresetName
 import io.github.wa_otomia.darkroom.core.resolveRootId
@@ -178,6 +178,9 @@ fun StudioScreen(
     }
     val haptics = LocalHapticFeedback.current
     var zoom by rememberSaveable(photoId, source) { mutableStateOf(1f) }
+    // Pan is in print-sheet pixels (framingSheetSize(landscape)), never on-screen pixels: the
+    // preview resizes with the drawer, the progress strips and rotation, and a pose stored in
+    // screen pixels would mean a different composition at every size.
     var panX by rememberSaveable(photoId, source) { mutableStateOf(0f) }
     var panY by rememberSaveable(photoId, source) { mutableStateOf(0f) }
     var rotationDegrees by rememberSaveable(photoId, source) { mutableStateOf(0f) }
@@ -186,10 +189,10 @@ fun StudioScreen(
         mutableStateOf(defaultLandscape(photo?.width ?: 0, photo?.height ?: 0))
     }
     var framingReady by remember(photoId, source) { mutableStateOf(false) }
+    // The loaded row, written back unchanged until the image size is known (an edit without
+    // stored dimensions waits for a probe), so leaving early cannot rewrite it half-resolved.
     var restoreFraming by remember(photoId, source) { mutableStateOf<Framing?>(null) }
     var useCurrentFraming by rememberSaveable { mutableStateOf(true) }
-    var cropSpec by rememberSaveable(photoId, source) { mutableStateOf("") }
-    var placement by remember(photoId, source) { mutableStateOf<ViewportPlacement?>(null) }
     var prompt by rememberSaveable(photoId) { mutableStateOf("") }
     var extraPromptOpen by rememberSaveable(photoId) { mutableStateOf(false) }
     var presetId by rememberSaveable(photoId) { mutableStateOf(presets.lastSelectedId) }
@@ -221,7 +224,6 @@ fun StudioScreen(
     val shareText = stringResource(R.string.studio_share)
     val exportFailedText = stringResource(R.string.studio_export_failed)
 
-    val crop = remember(cropSpec) { parseCropSpec(cropSpec) }
     val myPrint = printJobs.find {
         it.photoId == photoId && jobFieldKey(it.state) in ACTIVE_PRINT_STATES
     }
@@ -386,9 +388,13 @@ fun StudioScreen(
         val saved = catalog.get(photoId)?.framingFor(source) ?: photo.framingFor(source)
         restoreFraming = saved
         if (saved != null) {
+            // One snapshot, no suspension: the cropper must never clamp the new pan against
+            // the old zoom or orientation. Older rows were measured on the on-screen frame of
+            // the time and convert to sheet pixels here; no layout is needed.
+            val (sheetPanX, sheetPanY) = saved.sheetPan()
             zoom = saved.zoom
-            panX = saved.offsetX
-            panY = saved.offsetY
+            panX = sheetPanX
+            panY = sheetPanY
             rotationDegrees = saved.rotationDegrees
             landscape = saved.landscape
             landscapeTouched = true
@@ -403,16 +409,17 @@ fun StudioScreen(
         }
         framingReady = true
     }
-    LaunchedEffect(photoId, source, restoreFraming, placement?.frameWidth, placement?.frameHeight) {
-        val saved = restoreFraming ?: return@LaunchedEffect
-        val fw = placement?.frameWidth ?: return@LaunchedEffect
-        val fh = placement?.frameHeight ?: return@LaunchedEffect
-        if (fw <= 0f || fh <= 0f) return@LaunchedEffect
-        val (x, y) = saved.panInFrame(fw, fh)
-        panX = x
-        panY = y
-        restoreFraming = null
+    val sizeKnown = orientedW > 0 && orientedH > 0
+    LaunchedEffect(photoId, source, restoreFraming, sizeKnown) {
+        if (restoreFraming != null && sizeKnown) restoreFraming = null
     }
+    val (sheetW, sheetH) = framingSheetSize(landscape)
+    // Derived from state alone, so it does not change when only the preview size does: the
+    // drawer opening, a strip appearing or a rotation re-saves nothing and re-renders nothing.
+    val placement = remember(landscape, orientedW, orientedH, zoom, panX, panY, rotationDegrees) {
+        studioPlacement(landscape, orientedW, orientedH, zoom, panX, panY, rotationDegrees)
+    }
+    val crop = remember(placement) { studioCrop(placement) }
 
     val currentFraming = liveFraming(
         landscape = landscape,
@@ -503,6 +510,7 @@ fun StudioScreen(
             rotationDegrees = rotationDegrees,
             placement = placement,
             watermark = watermarkArmed,
+            framing = framingToPersist,
         )
         scope.launch { snackbar.showSnackbar(printQueuedText) }
     }
@@ -858,14 +866,15 @@ fun StudioScreen(
                 panY = panY,
                 onZoomChange = { zoom = it },
                 onPanChange = { x, y -> panX = x; panY = y },
-                onCrop = { cropSpec = formatCropSpec(it) },
                 overlay = if (landscape) landscapeOverlay else portraitOverlay,
                 aspect = if (landscape) PRINT_ASPECT_LANDSCAPE.toFloat() else PRINT_ASPECT.toFloat(),
                 rotationDegrees = rotationDegrees,
                 onRotationChange = { rotationDegrees = it },
-                onPlacement = { placement = it },
+                panFrameWidth = sheetW,
+                panFrameHeight = sheetH,
                 // Lock only while a visible AI job is running. A queued print
-                // must not freeze framing — the crop was already captured at enqueue.
+                // must not freeze framing — execution reads the latest saved pose,
+                // and enqueue saves the on-screen pose before the row can run.
                 enabled = !cropLocked,
                 snapState = snapState,
             )

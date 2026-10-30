@@ -65,6 +65,8 @@ class TransferRegistry @Inject constructor(
     private val trackers = ConcurrentHashMap<String, JobProgressTracker>()
     private val sessionByTransfer = ConcurrentHashMap<String, String>()
     private val receiveClosed = ConcurrentHashMap.newKeySet<String>()
+    private val interrupted = ConcurrentHashMap.newKeySet<String>()
+    private val interruptLock = Any()
     private val lastCompletedBySession = ConcurrentHashMap<String, Long>()
 
     /**
@@ -195,6 +197,13 @@ class TransferRegistry @Inject constructor(
     }
 
     fun receiveFinished(id: String, received: Long? = null) {
+        synchronized(interruptLock) {
+            if (isInterrupted(id)) return
+            receiveFinishedLocked(id, received)
+        }
+    }
+
+    private fun receiveFinishedLocked(id: String, received: Long?) {
         if (!receiveClosed.add(id)) return
         val tracker = trackers[id]
         val got = received ?: tracker?.snapshot()?.bytesLoaded ?: row(id)?.bytes ?: 0L
@@ -217,6 +226,13 @@ class TransferRegistry @Inject constructor(
     }
 
     fun transcoding(id: String) {
+        synchronized(interruptLock) {
+            if (isInterrupted(id)) return
+            transcodingLocked(id)
+        }
+    }
+
+    private fun transcodingLocked(id: String) {
         val tracker = trackers[id]
         if (tracker != null) {
             if (tracker.snapshot().phase != "transcoding") tracker.startPhase("transcoding")
@@ -227,6 +243,13 @@ class TransferRegistry @Inject constructor(
     }
 
     fun ingesting(id: String) {
+        synchronized(interruptLock) {
+            if (isInterrupted(id)) return
+            ingestingLocked(id)
+        }
+    }
+
+    private fun ingestingLocked(id: String) {
         val tracker = trackers[id]
         if (tracker != null) {
             val phase = tracker.snapshot().phase
@@ -242,34 +265,72 @@ class TransferRegistry @Inject constructor(
     }
 
     fun done(id: String) {
-        trackers[id]?.succeed()
-        setState(id, TransferState.Done, error = null)
-        publish(id)
-        clearSessionTransfer(id)
+        synchronized(interruptLock) {
+            if (isInterrupted(id)) return
+            trackers[id]?.succeed()
+            setState(id, TransferState.Done, error = null)
+            publish(id)
+            clearSessionTransfer(id)
+        }
         scope.launch {
             delay(DONE_RETAIN_MS)
-            _transfers.update { list ->
-                list.filterNot { it.id == id && it.state == TransferState.Done }
+            synchronized(interruptLock) {
+                if (isInterrupted(id)) return@launch
+                _transfers.update { list ->
+                    list.filterNot { it.id == id && it.state == TransferState.Done }
+                }
+                trackers.remove(id)
+                sessionByTransfer.remove(id)
+                receiveClosed.remove(id)
             }
-            trackers.remove(id)
-            sessionByTransfer.remove(id)
-            receiveClosed.remove(id)
         }
     }
 
     fun failed(id: String, error: String) {
         if (id.isEmpty()) return
+        synchronized(interruptLock) {
+            if (isInterrupted(id)) return
+            markFailed(id, error)
+        }
+    }
+
+    /**
+     * Fail FTP rows that are still receiving and have not closed the receive.
+     * [receiveClosed] is the atomic claim against [receiveFinished]; only a
+     * successful claim is marked interrupted, and that id is then terminal.
+     */
+    fun interruptReceiving() {
+        val candidates = _transfers.value.filter { row ->
+            isInterruptedByStop(row.state, row.kind, receiveClosed.contains(row.id))
+        }
+        candidates.forEach { candidate ->
+            synchronized(interruptLock) {
+                val row = row(candidate.id) ?: return@synchronized
+                if (!isInterruptedByStop(row.state, row.kind, receiveClosed.contains(row.id))) return@synchronized
+                if (!receiveClosed.add(row.id)) return@synchronized
+                markFailed(row.id, "传输中断")
+                interrupted.add(row.id)
+            }
+        }
+    }
+
+    fun isInterrupted(id: String): Boolean = interrupted.contains(id)
+
+    fun dismiss(id: String) {
+        synchronized(interruptLock) {
+            _transfers.update { list -> list.filterNot { it.id == id } }
+            trackers.remove(id)
+            sessionByTransfer.remove(id)
+            receiveClosed.remove(id)
+            interrupted.remove(id)
+            clearSessionTransfer(id)
+        }
+    }
+
+    private fun markFailed(id: String, error: String) {
         trackers[id]?.fail(error)
         setState(id, TransferState.Failed, error = error)
         publish(id)
-        clearSessionTransfer(id)
-    }
-
-    fun dismiss(id: String) {
-        _transfers.update { list -> list.filterNot { it.id == id } }
-        trackers.remove(id)
-        sessionByTransfer.remove(id)
-        receiveClosed.remove(id)
         clearSessionTransfer(id)
     }
 
@@ -344,19 +405,22 @@ class TransferRegistry @Inject constructor(
     }
 
     private fun setState(id: String, state: TransferState, error: String? = null) {
+        if (isInterrupted(id)) return
         val now = System.currentTimeMillis()
         _transfers.update { list ->
             list.map { row ->
-                if (row.id != id) row else row.copy(state = state, error = error, updatedAt = now)
+                if (row.id != id || isInterrupted(id)) row else row.copy(state = state, error = error, updatedAt = now)
             }
         }
     }
 
     private fun publish(id: String) {
+        if (isInterrupted(id)) return
         val tracker = trackers[id]
         val snap = tracker?.snapshot()
         val now = System.currentTimeMillis()
         _transfers.update { list ->
+            if (isInterrupted(id)) return@update list
             list.map { row ->
                 if (row.id != id) {
                     row
@@ -404,6 +468,12 @@ class TransferRegistry @Inject constructor(
         private const val STALE_CHECK_MS = 15_000L
     }
 }
+
+fun isInterruptedByStop(
+    state: TransferState,
+    kind: JobKind,
+    receiveClosed: Boolean,
+): Boolean = kind == JobKind.FtpTransfer && state == TransferState.Receiving && !receiveClosed
 
 fun isStaleReceiving(
     state: TransferState,

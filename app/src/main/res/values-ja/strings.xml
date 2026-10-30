@@ -49,7 +49,7 @@
     <string name="common_edit">編集</string>
     <string name="io_eyebrow">カメラ FTP</string>
     <string name="io_title">転送</string>
-    <string name="io_desc">サーバーを開始し、カメラのホストにこの端末の wlan0 または wlan1 の IP を入力してください。パッシブモードを使用し、リモートディレクトリは空にします。セッション、転送、印刷待ちは下に表示されます。</string>
+    <string name="io_desc">サーバーを開始し、カメラのホストにこの端末の Wi-Fi またはテザリングの IP を入力してください。モバイルデータ通信では待ち受けません。パッシブモードを使用し、リモートディレクトリは空にします。セッション、転送、印刷待ちは下に表示されます。</string>
     <string name="io_sessions">セッション</string>
     <string name="io_sessions_empty">カメラは接続されていません</string>
     <string name="io_session_anonymous">匿名</string>
@@ -83,7 +83,14 @@
     <string name="ftp_stop">停止</string>
     <string name="ftp_starting">FTP を開始しています…</string>
     <string name="ftp_listening_fmt">FTP %1$s:%2$d</string>
+    <string name="ftp_waiting">Wi-Fi 待機中</string>
+    <string name="ftp_waiting_wifi">FTP は Wi-Fi を待っています。モバイルデータ通信では待ち受けません。</string>
+    <string name="ftp_port_unavailable">ポートを使用できません</string>
+    <string name="ftp_port_unavailable_fmt">FTP はポート %1$d で待ち受けできません。使用中か、使用が許可されていません。設定でポートを変更してください。</string>
     <string name="ftp_channel">カメラ FTP</string>
+    <string name="ftp_paused_channel">FTP 一時停止</string>
+    <string name="ftp_paused_title">FTP を一時停止しました</string>
+    <string name="ftp_paused_text">システムの時間制限により FTP を一時停止しました。タップすると再度開始できます。</string>
     <string name="ftp_port21_hint">Android では root 権限がないとポート 21 を使用できません。カメラ側でポートを変更できる場合は 2121 を使用してください。</string>
     <string name="back_gallery">ギャラリー</string>
     <string name="not_found">写真が見つかりません</string>
@@ -173,6 +180,7 @@
     <string name="settings_watermark_handle">SNS ID</string>
     <string name="settings_watermark_size">サイズ</string>
     <string name="settings_watermark_include_time">時刻を含める</string>
+    <string name="settings_watermark_sync_size">日付と SNS のサイズを揃える</string>
     <string name="settings_watermark_reset">位置をリセット</string>
     <string name="settings_watermark_preview">透かしプレビュー</string>
     <string name="settings_watermark_logo_instagram">Instagram</string>

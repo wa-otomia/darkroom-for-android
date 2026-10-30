@@ -103,6 +103,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        (application as DarkroomApp).resumeAfterForegroundPause()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         applyDebugConfig(intent)

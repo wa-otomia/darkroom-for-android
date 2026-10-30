@@ -16,12 +16,12 @@ This is an independent implementation based on that client, not an official firm
 |---|---|---|---|
 | `mixed_status` | `{}` | `result` object; category, error, sensors, battery fields | 12407.js 201-300; 12311.js 581-619, 648-706 |
 | `get_prop` | `["device_info"]` | `result[0]` device information | 12407.js 201-300; 12311.js 709-742 |
-| `print_job` | file_size, copies, job_type=0, channel=64 | `result.job_id`, persist before first data frame | 12407.js 327-378 |
+| `print_job` | file_size, copies, job_type=0, channel=576 (Android; iOS=64) | `result.job_id`, persist before first data frame | 12407.js 327-378 |
 | `job_info` | `[jobId]` | `result` array, select the exact job_id | 12407.js 686-725; 12311.js 906-965 |
 | `cancel_job` | `[jobId]` | Acknowledgement is not a canceled terminal state | 12407.js 262-281; 12311.js 1209-1235; 13208.js 820-848 |
 | `resume_printer` | `{}` | Resume existing device/job; no new print_job | 12407.js 282-300; 13145.js 293-325 |
 
-Android's JSON `channel=64` is the client platform/source value, not binary frame channel 3/4. The plugin uses 576 for iOS. Existing DH and AES key derivation are retained. File data stays in 988-byte chunks with a four-byte little-endian job ID and up to three complete frames per Android write. Do not replay an ambiguous failed socket write.
+Android's JSON `channel=576` is the client platform/source value, not binary frame channel 3/4. The plugin uses 64 for iOS. Existing DH and AES key derivation are retained. File data stays in 988-byte chunks with a four-byte little-endian job ID and up to three complete frames per Android write. Do not replay an ambiguous failed socket write.
 
 `command` has a single IO owner. A valid response requires the data JSON channel, response interactive type, and an exact numeric JSON id. Events, idless objects and late replies are placed in a bounded diagnostic inbox. The official listener is looser (12407.js 793-900); this implementation deliberately does not let an uncorrelated message complete an arbitrary request. Firmware that omits JSON ids needs a separately captured, narrowly scoped compatibility strategy. Do not simply accept every idless object.
 
@@ -47,7 +47,7 @@ The status panel is on the Print Queue screen. It shows the time of the last suc
 6. Only finished is success. canceled and aborted are separate terminal outcomes. pending, printing_Y/M/C/OC, home_feed, cool_down, missing results and unfamiliar states never become success by exclusion.
 7. Unknown remote outcomes pause the persisted queue and disable retry/removal. After inspecting the printer and printed sheets, an explicit user confirmation plus a fresh idle/no-job snapshot can release unrelated queued work. This never automatically retries or marks the old job successful.
 
-The raw reader buffers partial bytes across read timeouts, validates length/checksum, resynchronizes after corrupt frames and handles EOF. A bounded write watchdog closes the transport; it never repeats a possibly partially delivered batch.
+The raw reader buffers partial bytes across read timeouts, validates length/checksum and resynchronizes after corrupt frames. A read of -1 or 0 is idle, not a disconnect; a read-side IO failure is reported only to readers and does not by itself close the transport. A write that does not finish within the 60-second no-progress window closes the transport and is not replayed.
 
 ## Validation and required integration gate
 
