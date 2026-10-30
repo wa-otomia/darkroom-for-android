@@ -254,7 +254,7 @@ class TransferStopTest {
         repeat(5) {
             val port = ServerSocket(0).use { it.localPort }
             val server = CameraFtpServer(
-                bind = "127.0.0.1",
+                bindTargets = { listOf(FtpBindTarget("lo", "127.0.0.1")) },
                 port = port,
                 user = user,
                 password = password,
@@ -265,6 +265,7 @@ class TransferStopTest {
                 hooks = hooks,
             )
             server.admitInterfaceForTest { true }
+            server.allowLoopbackForTest()
             try {
                 server.start()
                 return server to port

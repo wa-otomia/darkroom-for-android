@@ -49,7 +49,7 @@
     <string name="photo_tag_generated">生成</string>
     <string name="io_eyebrow">相机 FTP</string>
     <string name="io_title">传输</string>
-    <string name="io_desc">启动服务器后，将相机的主机地址填为本机 wlan0 或 wlan1 的 IP。请使用被动模式，远程目录留空。会话、传输和打印队列显示在下方。</string>
+    <string name="io_desc">启动服务器后，将相机的主机地址填为本机 Wi-Fi 或本机热点的 IP；FTP 不会在移动数据网络上监听。请使用被动模式，远程目录留空。会话、传输和打印队列显示在下方。</string>
     <string name="io_sessions">会话</string>
     <string name="io_sessions_empty">没有已连接的相机</string>
     <string name="io_session_anonymous">匿名</string>
@@ -83,6 +83,10 @@
     <string name="ftp_stop">停止</string>
     <string name="ftp_starting">正在启动 FTP…</string>
     <string name="ftp_listening_fmt">FTP %1$s:%2$d</string>
+    <string name="ftp_waiting">等待 Wi-Fi</string>
+    <string name="ftp_waiting_wifi">FTP 正在等待 Wi-Fi，不会在移动数据网络上监听。</string>
+    <string name="ftp_port_unavailable">端口不可用</string>
+    <string name="ftp_port_unavailable_fmt">FTP 无法在端口 %1$d 上监听：已被占用或不允许使用。请在设置中更换端口。</string>
     <string name="ftp_channel">相机 FTP</string>
     <string name="ftp_paused_channel">FTP 已暂停</string>
     <string name="ftp_paused_title">FTP 已暂停</string>
@@ -176,11 +180,11 @@
     <string name="settings_watermark_handle">SNS ID</string>
     <string name="settings_watermark_size">大小</string>
     <string name="settings_watermark_include_time">包含时间</string>
+    <string name="settings_watermark_sync_size">同步日期和 SNS 大小</string>
     <string name="settings_watermark_reset">重置位置</string>
     <string name="settings_watermark_preview">水印预览</string>
     <string name="settings_watermark_logo_instagram">Instagram</string>
     <string name="settings_watermark_logo_x">X</string>
-    <string name="settings_watermark_sync_size">同步日期和 SNS 大小</string>
     <string name="settings_watermark_logo_facebook">Facebook</string>
     <string name="settings_watermark_logo_weibo">微博</string>
     <string name="settings_watermark_logo_none">无</string>

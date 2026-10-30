@@ -43,7 +43,7 @@
     <string name="photo_tag_generated">Generated</string>
     <string name="io_eyebrow">CAMERA FTP</string>
     <string name="io_title">Transfer</string>
-    <string name="io_desc">Start the server, then set the camera host to a Wi-Fi IP on this phone (wlan0 or wlan1). Use passive mode and leave the remote directory empty. Sessions, transfers and the print queue appear below.</string>
+    <string name="io_desc">Start the server, then set the camera host to this phone\'s Wi-Fi or hotspot IP; FTP never listens on mobile data. Use passive mode and leave the remote directory empty. Sessions, transfers and the print queue appear below.</string>
     <string name="io_sessions">Sessions</string>
     <string name="io_sessions_empty">No camera connected</string>
     <string name="io_session_anonymous">anonymous</string>
@@ -77,6 +77,10 @@
     <string name="ftp_stop">Stop</string>
     <string name="ftp_starting">Starting FTP…</string>
     <string name="ftp_listening_fmt">FTP %1$s:%2$d</string>
+    <string name="ftp_waiting">Waiting for Wi-Fi</string>
+    <string name="ftp_waiting_wifi">FTP is waiting for Wi-Fi. It never listens on mobile data.</string>
+    <string name="ftp_port_unavailable">Port unavailable</string>
+    <string name="ftp_port_unavailable_fmt">FTP cannot listen on port %1$d: it is in use or not allowed. Change the port in Settings.</string>
     <string name="ftp_channel">Camera FTP</string>
     <string name="ftp_paused_channel">FTP paused</string>
     <string name="ftp_paused_title">FTP paused</string>
@@ -171,11 +175,11 @@
     <string name="settings_watermark_handle">SNS ID</string>
     <string name="settings_watermark_size">Size</string>
     <string name="settings_watermark_include_time">Include time</string>
+    <string name="settings_watermark_sync_size">Match SNS and date size</string>
     <string name="settings_watermark_reset">Reset position</string>
     <string name="settings_watermark_preview">Watermark preview</string>
     <string name="settings_watermark_logo_instagram">Instagram</string>
     <string name="settings_watermark_logo_x">X</string>
-    <string name="settings_watermark_sync_size">Match SNS and date size</string>
     <string name="settings_watermark_logo_facebook">Facebook</string>
     <string name="settings_watermark_logo_weibo">Weibo</string>
     <string name="settings_watermark_logo_none">None</string>

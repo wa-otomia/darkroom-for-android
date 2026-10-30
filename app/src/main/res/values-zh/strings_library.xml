@@ -35,7 +35,7 @@
     <string name="lib_io_notif_blocked_desc">Android 需要通知权限才能在 FTP 服务运行期间持续显示状态。未授予权限时，接收照片仍可正常工作。</string>
     <string name="lib_io_open_settings">前往系统设置</string>
     <string name="lib_io_no_host_title">未检测到 Wi-Fi 地址</string>
-    <string name="lib_io_no_host_desc">相机与本机需连接同一 Wi-Fi 网络。若使用本机热点，请先将相机连接至该热点，然后刷新。</string>
+    <string name="lib_io_no_host_desc">FTP 只在 Wi-Fi 上监听，包括本机热点和 Wi-Fi 直连，不会在移动数据网络上监听。相机与本机需连接同一 Wi-Fi 网络。若使用本机热点，请先将相机连接至该热点，然后刷新。</string>
     <string name="lib_io_refresh_hosts">刷新地址</string>
 
     <!-- 预设 -->

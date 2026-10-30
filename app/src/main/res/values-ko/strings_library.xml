@@ -35,7 +35,7 @@
     <string name="lib_io_notif_blocked_desc">FTP 서버 실행 상태를 계속 표시하려면 알림 권한이 필요합니다. 권한이 없어도 사진 수신은 정상 작동합니다.</string>
     <string name="lib_io_open_settings">시스템 설정 열기</string>
     <string name="lib_io_no_host_title">Wi-Fi 주소를 찾을 수 없습니다</string>
-    <string name="lib_io_no_host_desc">카메라와 이 기기는 같은 Wi-Fi 네트워크에 연결되어야 합니다. 기기의 핫스팟을 사용하는 경우 카메라를 해당 핫스팟에 연결한 후 새로 고치세요.</string>
+    <string name="lib_io_no_host_desc">FTP는 Wi-Fi(이 기기의 핫스팟과 Wi-Fi Direct 포함)에서만 수신 대기하며 모바일 데이터에서는 수신 대기하지 않습니다. 카메라와 이 기기는 같은 Wi-Fi 네트워크에 연결되어야 합니다. 기기의 핫스팟을 사용하는 경우 카메라를 해당 핫스팟에 연결한 후 새로 고치세요.</string>
     <string name="lib_io_refresh_hosts">주소 새로 고침</string>
 
     <!-- 프리셋 -->

@@ -84,6 +84,7 @@ import io.github.wa_otomia.darkroom.core.FtpBindTarget
 import io.github.wa_otomia.darkroom.core.hasLocalNetworkPermission
 import io.github.wa_otomia.darkroom.core.needsLocalNetworkPermission
 import io.github.wa_otomia.darkroom.data.ftp.CameraFtpServer
+import io.github.wa_otomia.darkroom.data.ftp.FtpInterfaces
 import io.github.wa_otomia.darkroom.data.ftp.FtpForegroundService
 import io.github.wa_otomia.darkroom.data.printer.PrintJob
 import io.github.wa_otomia.darkroom.data.printer.PrintQueue
@@ -130,13 +131,21 @@ fun IoScreen(
     val activity = LocalActivity.current
     val listening by FtpForegroundService.listening.collectAsState()
     val serviceLocalNetworkBlocked by FtpForegroundService.localNetworkBlocked.collectAsState()
+    val boundHosts by FtpForegroundService.boundHosts.collectAsState()
+    val bindBlocked by FtpForegroundService.bindBlocked.collectAsState()
+    // Running with nothing bound: either the port cannot be used, or there is no Wi-Fi yet.
+    // The server never falls back to mobile data.
+    val portBlocked = listening && boundHosts.isEmpty() && bindBlocked
+    val waitingForWifi = listening && boundHosts.isEmpty() && !bindBlocked
     val listenPort by FtpForegroundService.listenPort.collectAsState()
     val listenUser by FtpForegroundService.listenUser.collectAsState()
     val listenPassword by FtpForegroundService.listenPassword.collectAsState()
     val listenPasvMin by FtpForegroundService.listenPasvMin.collectAsState()
     val listenPasvMax by FtpForegroundService.listenPasvMax.collectAsState()
     val printJobs by printQueue.printJobs.collectAsState(initial = emptyList())
-    var hosts by remember { mutableStateOf(CameraFtpServer.wlanHostTargets()) }
+    // Name rules only here (no system calls on the main thread); the resume loop below adds the
+    // system's hotspot view off the main thread straight away.
+    var hosts by remember { mutableStateOf(CameraFtpServer.wifiHostTargets()) }
     var refreshing by remember { mutableStateOf(false) }
     var resumed by remember { mutableStateOf(true) }
     val snackbar = remember { SnackbarHostState() }
@@ -222,7 +231,11 @@ fun IoScreen(
     fun refreshHosts() {
         scope.launch {
             refreshing = true
-            hosts = withContext(Dispatchers.IO) { CameraFtpServer.wlanHostTargets() }
+            hosts = withContext(Dispatchers.IO) {
+                // A running server re-binds right away, so the rows it shows update too.
+                FtpForegroundService.requestRebind()
+                CameraFtpServer.wifiHostTargets(FtpInterfaces.policy(context))
+            }
             refreshing = false
         }
     }
@@ -242,7 +255,7 @@ fun IoScreen(
     // open, so keep them current instead of only reading them once on resume.
     LaunchedEffect(resumed) {
         while (resumed) {
-            hosts = withContext(Dispatchers.IO) { CameraFtpServer.wlanHostTargets() }
+            hosts = withContext(Dispatchers.IO) { CameraFtpServer.wifiHostTargets(FtpInterfaces.policy(context)) }
             if (notifGranted()) notifBlocked = false
             if (localNetworkGranted()) {
                 localNetworkDenied = false
@@ -327,6 +340,8 @@ fun IoScreen(
                     )
                     Text(
                         when {
+                            portBlocked -> stringResource(R.string.ftp_port_unavailable)
+                            waitingForWifi -> stringResource(R.string.ftp_waiting)
                             listening -> stringResource(R.string.ftp_on)
                             starting -> stringResource(R.string.ftp_starting)
                             else -> stringResource(R.string.ftp_off)
@@ -353,7 +368,9 @@ fun IoScreen(
                 }
                 ConnectionFold(open = ftpInfoOpen, onToggle = { ftpInfoOpen = !ftpInfoOpen }) {
                     HostRows(
-                        hosts = hosts,
+                        // While running, show what is actually bound; otherwise (or when the
+                        // port is blocked) the Wi-Fi addresses that would be used.
+                        hosts = if (listening && !bindBlocked) boundHosts else hosts,
                         refreshing = refreshing,
                         confirmedLabel = confirmedLabel,
                         onRefresh = { refreshHosts() },
@@ -623,7 +640,7 @@ private fun HostRows(
     onCopy: (String, String) -> Unit,
 ) {
     val hostLabel = stringResource(R.string.ftp_host)
-    val visible = hosts.filter { it.ip != "0.0.0.0" && it.iface != "*" }
+    val visible = hosts
     if (visible.isEmpty()) {
         Column(Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
             SectionLabel(hostLabel)

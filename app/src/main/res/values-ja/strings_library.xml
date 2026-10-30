@@ -35,7 +35,7 @@
     <string name="lib_io_notif_blocked_desc">FTP サーバーの稼働状況を表示し続けるには通知権限が必要です。許可しない場合でも写真の受信は動作します。</string>
     <string name="lib_io_open_settings">システム設定を開く</string>
     <string name="lib_io_no_host_title">Wi-Fi アドレスが見つかりません</string>
-    <string name="lib_io_no_host_desc">カメラとこの端末は同じ Wi-Fi ネットワークに接続してください。端末のテザリングを使う場合は、カメラをそのアクセスポイントに接続してから更新してください。</string>
+    <string name="lib_io_no_host_desc">FTP は Wi-Fi（この端末のテザリングと Wi-Fi Direct を含む）でのみ待ち受け、モバイルデータ通信では待ち受けません。カメラとこの端末は同じ Wi-Fi ネットワークに接続してください。端末のテザリングを使う場合は、カメラをそのアクセスポイントに接続してから更新してください。</string>
     <string name="lib_io_refresh_hosts">アドレスを更新</string>
 
     <!-- プリセット -->

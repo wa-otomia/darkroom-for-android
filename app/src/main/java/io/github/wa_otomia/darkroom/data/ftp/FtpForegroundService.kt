@@ -23,9 +23,11 @@ import io.github.wa_otomia.darkroom.core.FgsStartOrigin
 import io.github.wa_otomia.darkroom.core.FgsStopPlan
 import io.github.wa_otomia.darkroom.core.FgsStopStep
 import io.github.wa_otomia.darkroom.core.FtpAutoStartSkip
+import io.github.wa_otomia.darkroom.core.FtpBindTarget
 import io.github.wa_otomia.darkroom.core.fgsRejectedPlan
 import io.github.wa_otomia.darkroom.core.fgsStartAllowed
 import io.github.wa_otomia.darkroom.core.fgsTimeoutPlan
+import io.github.wa_otomia.darkroom.core.formatFtpHostsOneLine
 import io.github.wa_otomia.darkroom.core.ftpAutoStartSkip
 import io.github.wa_otomia.darkroom.core.hasLocalNetworkPermission
 import io.github.wa_otomia.darkroom.data.automation.Automation
@@ -189,9 +191,14 @@ class FtpForegroundService : Service() {
             override fun transferFinished(transferId: String) = registry.receiveFinished(transferId)
             override fun transferFailed(transferId: String, error: String) = registry.failed(transferId, error)
         }
+        val port = cfg.ftpPort
         val srv = CameraFtpServer(
-            bind = "0.0.0.0",
-            port = cfg.ftpPort,
+            // Wi-Fi and phone-hotspot addresses only, re-read every few seconds: never the
+            // wildcard, so the port is not reachable over mobile data, and Wi-Fi or the hotspot
+            // coming or going is followed.
+            bindTargets = { policy -> CameraFtpServer.wifiHostTargets(policy) },
+            interfacePolicy = { FtpInterfaces.policy(applicationContext) },
+            port = port,
             user = cfg.ftpUser,
             password = cfg.ftpPassword,
             pasvMin = cfg.ftpPasvMin,
@@ -232,6 +239,11 @@ class FtpForegroundService : Service() {
                 }
             },
             log = { activityLog.record("ftp", it) },
+            onBoundChanged = { state ->
+                boundHosts.value = state.bound
+                bindBlocked.value = state.blocked
+                updateFtpNotification(notification(listeningText(state.bound, state.blocked, port)))
+            },
         )
         try {
             srv.start()
@@ -243,15 +255,23 @@ class FtpForegroundService : Service() {
             listenPasvMin.value = cfg.ftpPasvMin
             listenPasvMax.value = cfg.ftpPasvMax
             FtpPausedNotification.cancel(this)
-            val ip = CameraFtpServer.wlanHostOneLine().ifBlank { "0.0.0.0" }
-            updateFtpNotification(notification(getString(R.string.ftp_listening_fmt, ip, cfg.ftpPort)))
+            rebindNow = { srv.reconcile() }
+            updateFtpNotification(notification(listeningText(boundHosts.value, bindBlocked.value, port)))
             return true
         } catch (e: Exception) {
             activityLog.record("ftp", "listen failed", "error", e.message)
             listening.value = false
+            boundHosts.value = emptyList()
+            bindBlocked.value = false
             stopSelf()
             return false
         }
+    }
+
+    private fun listeningText(hosts: List<FtpBindTarget>, blocked: Boolean, port: Int): String = when {
+        hosts.isNotEmpty() -> getString(R.string.ftp_listening_fmt, formatFtpHostsOneLine(hosts), port)
+        blocked -> getString(R.string.ftp_port_unavailable_fmt, port)
+        else -> getString(R.string.ftp_waiting_wifi)
     }
 
     private fun stopSelfServer() {
@@ -260,6 +280,9 @@ class FtpForegroundService : Service() {
         } catch (_: Exception) {
         }
         server = null
+        rebindNow = null
+        boundHosts.value = emptyList()
+        bindBlocked.value = false
         registry.interruptReceiving()
         if (wifiLock?.isHeld == true) wifiLock?.release()
         wifiLock = null
@@ -326,6 +349,19 @@ class FtpForegroundService : Service() {
         const val NOTIF_ID = 21
         val listening = MutableStateFlow(false)
         val localNetworkBlocked = MutableStateFlow(false)
+        /** Wi-Fi addresses the running server is bound to. Empty while listening means waiting for Wi-Fi. */
+        val boundHosts = MutableStateFlow<List<FtpBindTarget>>(emptyList())
+        /** Wi-Fi is there but the port cannot be bound (in use or not permitted); retried. */
+        val bindBlocked = MutableStateFlow(false)
+        @Volatile private var rebindNow: (() -> Unit)? = null
+
+        /** Re-check the Wi-Fi addresses now instead of at the next poll. Call off the main thread. */
+        fun requestRebind() {
+            try {
+                rebindNow?.invoke()
+            } catch (_: Exception) {
+            }
+        }
         val listenPort = MutableStateFlow(2121)
         val listenUser = MutableStateFlow("camera")
         val listenPassword = MutableStateFlow("")
