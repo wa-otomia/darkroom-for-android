@@ -50,6 +50,49 @@ fun Framing.panInFrame(frameWidth: Float, frameHeight: Float): Pair<Float, Float
     return (offsetX * frameWidth / this.frameWidth) to (offsetY * frameHeight / this.frameHeight)
 }
 
+/**
+ * Saved pan expressed in print-sheet pixels of this framing's orientation. Studio keeps its live
+ * pan in these units so the pose does not depend on the on-screen cropper size. Rows saved by
+ * older builds carry the on-screen frame they were measured in, and convert here per axis.
+ */
+fun Framing.sheetPan(): Pair<Float, Float> {
+    val (sheetW, sheetH) = framingSheetSize(landscape)
+    return panInFrame(sheetW, sheetH)
+}
+
+/**
+ * The Studio pose as a placement on the print sheet of [landscape]. [panX]/[panY] are sheet
+ * pixels and are clamped here, so the result is the same however large the preview is (drawer
+ * open or closed, phone or wide layout). Null until the image size is known.
+ */
+fun studioPlacement(
+    landscape: Boolean,
+    imageWidth: Int,
+    imageHeight: Int,
+    zoom: Float,
+    panX: Float,
+    panY: Float,
+    rotationDegrees: Float,
+): ViewportPlacement? {
+    if (imageWidth <= 0 || imageHeight <= 0) return null
+    val (sheetW, sheetH) = framingSheetSize(landscape)
+    return viewportPlacement(sheetW, sheetH, imageWidth, imageHeight, zoom, panX, panY, rotationDegrees)
+}
+
+/** Pixel crop for [placement]: the right-angle cover crop, else the zoom-1 cut of the unturned source. */
+fun studioCrop(placement: ViewportPlacement?): PixelCrop? {
+    if (placement == null) return null
+    return placement.toPixelCrop() ?: viewportCrop(
+        placement.frameWidth,
+        placement.frameHeight,
+        placement.imageWidth,
+        placement.imageHeight,
+        placement.zoom,
+        placement.offsetX,
+        placement.offsetY,
+    )
+}
+
 fun Framing.toPlacement(): ViewportPlacement {
     val (fallbackW, fallbackH) = framingSheetSize(landscape)
     return ViewportPlacement(

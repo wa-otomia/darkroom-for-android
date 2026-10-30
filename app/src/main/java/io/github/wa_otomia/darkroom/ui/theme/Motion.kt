@@ -27,6 +27,9 @@ object DarkroomMotion {
     /** How long an inline confirmation stays on screen before it fades out. */
     const val ConfirmVisibleMillis = 1600L
 
+    /** How long the Studio thirds grid stays fully visible after a drag ends, before it fades. */
+    const val GuideHoldMillis = 1000L
+
     /** Material 3 `emphasized`/standard easing. */
     val Standard: Easing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 

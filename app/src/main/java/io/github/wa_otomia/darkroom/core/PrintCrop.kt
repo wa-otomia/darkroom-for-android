@@ -207,6 +207,14 @@ fun largestFrameSize(
     }
 }
 
+/**
+ * On-screen pixels per pan unit, when pan is measured in a frame [spaceWidth] wide and the
+ * cropper frame on screen is [frameWidth] wide. Both frames share one aspect, so one factor
+ * serves both axes and a rotated pan stays a rotation. Unknown sizes give 1 (pan is screen px).
+ */
+fun panUnitScale(frameWidth: Float, spaceWidth: Float): Float =
+    if (frameWidth > 0f && spaceWidth > 0f) frameWidth / spaceWidth else 1f
+
 fun clampPan(
     offsetX: Float,
     offsetY: Float,
