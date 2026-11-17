@@ -63,6 +63,8 @@
     <string name="studio_id_feather_medium">중간</string>
     <string name="studio_id_feather_strong">강하게</string>
     <string name="studio_id_feather_inward">안쪽으로 부드럽게</string>
+    <string name="studio_id_mask_offset">마스크 범위 축소/확장</string>
+    <string name="studio_id_mask_offset_note">음수는 마스크를 안쪽으로 줄이고 양수는 바깥쪽으로 넓힙니다. 단위는 인화지 픽셀(1 px ≈ 0.05 mm)이며 가장자리를 부드럽게 하기 전에 적용됩니다.</string>
     <string name="studio_id_compositing">새 배경을 합성하는 중…</string>
 
     <!-- Last failed cut-out viewer (EDID040-R09) -->

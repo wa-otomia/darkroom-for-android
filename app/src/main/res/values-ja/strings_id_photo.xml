@@ -63,6 +63,8 @@
     <string name="studio_id_feather_medium">中</string>
     <string name="studio_id_feather_strong">強</string>
     <string name="studio_id_feather_inward">内側にぼかす</string>
+    <string name="studio_id_mask_offset">マスク範囲の縮小/拡大</string>
+    <string name="studio_id_mask_offset_note">マイナスでマスクを内側に縮め、プラスで外側に広げます。単位は印刷用紙のピクセル（1 px ≈ 0.05 mm）で、境界のぼかしの前に適用します。</string>
     <string name="studio_id_compositing">新しい背景を合成中…</string>
 
     <!-- Last failed cut-out viewer (EDID040-R09) -->

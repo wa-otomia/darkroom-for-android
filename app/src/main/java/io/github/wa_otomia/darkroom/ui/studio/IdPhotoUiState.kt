@@ -14,6 +14,8 @@ internal data class CutoutKey(
     val argb: Int,
     val feather: String,
     val featherInward: Boolean,
+    /** Mask edge shift in print px (EDID040-R14); a change freezes like a feather change. */
+    val maskOffset: Int = 0,
     val cellWidth: Int,
     val cellHeight: Int,
     val zoomStep: Int,
@@ -199,6 +201,13 @@ internal fun idShowNeedKey(local: Boolean, keySet: Boolean): Boolean = !local &&
  * building (EDID040-R10); the mode of a running job is frozen when it is queued anyway.
  */
 internal fun idLocalSwitchEnabled(busy: Boolean, compositing: Boolean): Boolean = !busy && !compositing
+
+/** The signed edge shift number (EDID040-R14): "+3", "-3" or "0", ASCII for screen readers. */
+internal fun idMaskOffsetSigned(px: Int): String = when {
+    px > 0 -> "+$px"
+    px < 0 -> "-${-px}"
+    else -> "0"
+}
 
 /**
  * True when a failure record without an image came from the on-device cut-out, so the viewer

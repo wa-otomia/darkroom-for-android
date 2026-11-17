@@ -96,6 +96,7 @@ import io.github.wa_otomia.darkroom.core.framingFor
 import io.github.wa_otomia.darkroom.core.idBackground
 import io.github.wa_otomia.darkroom.core.idFeather
 import io.github.wa_otomia.darkroom.core.idInitialPose
+import io.github.wa_otomia.darkroom.core.idMaskOffset
 import io.github.wa_otomia.darkroom.core.idMaskRequired
 import io.github.wa_otomia.darkroom.core.idPhotoFor
 import io.github.wa_otomia.darkroom.core.idPhotoLayout
@@ -237,6 +238,7 @@ fun StudioScreen(
     var idBgPending by remember(photoId, source) { mutableStateOf(PendingIdChoice()) }
     var idFeatherPending by remember(photoId, source) { mutableStateOf(PendingIdChoice()) }
     var idInwardPending by remember(photoId, source) { mutableStateOf(PendingIdChoice()) }
+    var idOffsetPending by remember(photoId, source) { mutableStateOf(PendingIdChoice()) }
     // EDID040-R08: the preview is building a new composite; the ID controls wait for it.
     // Reported by the preview while it is composed, false for every new version.
     var idCompositing by remember(photoId, source) { mutableStateOf(false) }
@@ -623,6 +625,7 @@ fun StudioScreen(
     val idBg = idBackground(idBgPending.value ?: idStored?.background)
     val idFeatherChoice = idFeather(idFeatherPending.value ?: idStored?.feather)
     val idFeatherInward = idInwardPending.value?.toBooleanStrictOrNull() ?: idStored?.featherInward ?: true
+    val idMaskOffsetChoice = idMaskOffset(idOffsetPending.value?.toIntOrNull() ?: idStored?.maskOffset ?: 0)
     // Backstop for the load above: a first entry written by a composition that is already gone
     // (left and reopened at once) can land after the load found nothing. Adopt it when it shows,
     // so the screen never shows ordinary framing while the row (and so a print) has ID mode on.
@@ -645,6 +648,9 @@ fun StudioScreen(
     }
     LaunchedEffect(idStored?.featherInward, idInwardPending) {
         idInwardPending = idInwardPending.settle(idStored?.featherInward?.toString())
+    }
+    LaunchedEffect(idStored?.maskOffset, idOffsetPending) {
+        idOffsetPending = idOffsetPending.settle(idStored?.maskOffset?.toString())
     }
     val setIdPose: (IdPhotoPose) -> Unit = { p ->
         idZoom = p.zoom
@@ -746,6 +752,17 @@ fun StudioScreen(
         }
     }
 
+    val onIdMaskOffset: (Int) -> Unit = { px ->
+        val id = photo.id
+        val src = source
+        val value = idMaskOffset(px)
+        idOffsetPending = idOffsetPending.begin(value.toString())
+        val token = idOffsetPending.seq
+        writeIdChoice({ catalog.setIdPhotoMaskOffset(id, src, value) }) { ok ->
+            idOffsetPending = idOffsetPending.finish(token, ok)
+        }
+    }
+
     val appliedAiFraming: AppliedFraming? =
         if (useCurrentFraming) {
             AppliedFraming(
@@ -819,6 +836,7 @@ fun StudioScreen(
                         background = idBg.id,
                         feather = idFeatherChoice.id,
                         featherInward = idFeatherInward,
+                        maskOffset = idMaskOffsetChoice,
                     )
                     .withPose(idPose)
             } else {
@@ -1088,6 +1106,7 @@ fun StudioScreen(
                     background = idBg,
                     feather = idFeatherChoice,
                     featherInward = idFeatherInward,
+                    maskOffset = idMaskOffsetChoice,
                     compositing = idCompositing,
                     canCutOut = idCanCutOut(local = idLocalCutout, keySet = grokPub.keySet, busy = aiBusy),
                     maskJob = maskJobUi,
@@ -1099,6 +1118,7 @@ fun StudioScreen(
                     onBackground = onIdBackground,
                     onFeather = onIdFeather,
                     onFeatherInward = onIdFeatherInward,
+                    onMaskOffset = onIdMaskOffset,
                     onViewCutoutResult = if (idMaskFailure != null) {
                         { idCutoutResultOpen = true }
                     } else {
@@ -1298,6 +1318,7 @@ fun StudioScreen(
                 background = idBg,
                 feather = idFeatherChoice,
                 featherInward = idFeatherInward,
+                maskOffset = idMaskOffsetChoice,
                 zoom = idZoom,
                 layout = idLayout,
                 imageWidth = orientedW,

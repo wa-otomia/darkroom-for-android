@@ -333,6 +333,22 @@ fun featherAlphaInwardFine(alpha: ByteArray, width: Int, height: Int, radius: In
 fun featherAlphaFor(alpha: ByteArray, width: Int, height: Int, radius: Int, inward: Boolean): ByteArray =
     if (inward) featherAlphaInwardFine(alpha, width, height, radius) else featherAlpha(alpha, width, height, radius)
 
+/** The mask edge shift range in print px, either way (EDID040-R14). */
+const val ID_MASK_OFFSET_MAX_PX = 10
+
+/** [px] clamped to ±[ID_MASK_OFFSET_MAX_PX]. */
+fun idMaskOffset(px: Int): Int = px.coerceIn(-ID_MASK_OFFSET_MAX_PX, ID_MASK_OFFSET_MAX_PX)
+
+/**
+ * Shifts the mask edge (EDID040-R14): [px] < 0 shrinks α inward by |px| ([erodeAlpha]), [px] > 0
+ * grows it outward ([dilateAlpha]), 0 returns a copy. Applied before the feather.
+ */
+fun offsetAlpha(alpha: ByteArray, width: Int, height: Int, px: Int): ByteArray = when {
+    px < 0 -> erodeAlpha(alpha, width, height, -px)
+    px > 0 -> dilateAlpha(alpha, width, height, px)
+    else -> alpha.copyOf()
+}
+
 /**
  * `out = src·a + bg·(1−a)` with `a = srcA/255 · α/255`. The result is opaque; an opaque
  * source under α 255 keeps its exact RGB, and α 0 (or a transparent source) gives [background].

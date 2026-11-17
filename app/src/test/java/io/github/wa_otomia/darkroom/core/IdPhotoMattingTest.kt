@@ -464,6 +464,51 @@ class IdPhotoMattingTest {
     }
 
     // ---------------------------------------------------------------------------------------
+    // Mask edge shift (EDID040-R14)
+    // ---------------------------------------------------------------------------------------
+
+    @Test
+    fun offsetIsAWindowMinOrMaxAndZeroCopies() {
+        val w = 37
+        val h = 29
+        val a = randomMask(w, h, 9, noiseEvery = 6)
+        for (px in 1..10) {
+            assertArrayEquals("+$px", bruteDilate(a, w, h, px), offsetAlpha(a, w, h, px))
+            assertArrayEquals("-$px", erodeAlpha(a, w, h, px), offsetAlpha(a, w, h, -px))
+        }
+        val out = offsetAlpha(a, w, h, 0)
+        assertArrayEquals(a, out)
+        assertNotSame(a, out)
+    }
+
+    @Test
+    fun shrinkingClearsTheRimAndGrowingRestoresIt() {
+        val w = 60
+        val h = 40
+        val img = Img(w, h)
+        img.rect(20, 10, 40, 30, 255)
+        val shrunk = offsetAlpha(img.px, w, h, -3)
+        assertEquals(0, u(shrunk[20 * w + 22]))
+        assertEquals(255, u(shrunk[20 * w + 23]))
+        val grown = offsetAlpha(img.px, w, h, 3)
+        assertEquals(255, u(grown[20 * w + 17]))
+        assertEquals(0, u(grown[20 * w + 16]))
+    }
+
+    @Test
+    fun offsetClampsAndPersists() {
+        assertEquals(10, idMaskOffset(25))
+        assertEquals(-10, idMaskOffset(-11))
+        assertEquals(-3, idMaskOffset(-3))
+        assertEquals(10, IdPhotoState(maskOffset = 25).normalized().maskOffset)
+        assertEquals(0, IdPhotoState().maskOffset)
+        val legacy = """{"e1":{"idPhoto":{"active":true,"maskRev":"abc"}}}"""
+        assertEquals(0, decodeVersionStates(legacy).second.getValue("e1").maskOffset)
+        val state = IdPhotoState(active = true, maskRev = "r1", maskOffset = -4)
+        assertEquals(state, decodeVersionStates(encodeVersionStates(emptyMap(), mapOf("e1" to state))).second["e1"])
+    }
+
+    // ---------------------------------------------------------------------------------------
     // On-device cut-out (EDID040-R10/R11)
     // ---------------------------------------------------------------------------------------
 

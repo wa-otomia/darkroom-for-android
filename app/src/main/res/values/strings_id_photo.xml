@@ -64,6 +64,9 @@
     <string name="studio_id_feather_medium">Medium</string>
     <string name="studio_id_feather_strong">Strong</string>
     <string name="studio_id_feather_inward">Soften inward</string>
+    <string name="studio_id_mask_offset">Mask edge shift</string>
+    <string name="studio_id_mask_offset_value" translatable="false">%1$s px</string>
+    <string name="studio_id_mask_offset_note">Negative values shrink the mask inward and positive values grow it outward, in print pixels (1 px ≈ 0.05 mm), before edge softening.</string>
     <string name="studio_id_compositing">Applying the new background…</string>
 
     <!-- Last failed cut-out viewer (EDID040-R09) -->

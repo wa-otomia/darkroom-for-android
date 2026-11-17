@@ -257,6 +257,15 @@ class IdPhotoUiStateTest {
     }
 
     @Test
+    fun maskOffsetChangeFreezesAndReadsSigned() {
+        assertEquals(CutoutTransition.FREEZE, cutoutTransition(navy10, navy10.copy(maskOffset = -3)))
+        assertEquals(CutoutTransition.ZOOM_ONLY, cutoutTransition(navy10.copy(maskOffset = 2), navy10.copy(maskOffset = 2, zoomStep = 12)))
+        assertEquals("+3", idMaskOffsetSigned(3))
+        assertEquals("-10", idMaskOffsetSigned(-10))
+        assertEquals("0", idMaskOffsetSigned(0))
+    }
+
+    @Test
     fun localSwitchDisabledWhileBusyOrCompositing() {
         assertTrue(idLocalSwitchEnabled(busy = false, compositing = false))
         assertFalse(idLocalSwitchEnabled(busy = true, compositing = false))

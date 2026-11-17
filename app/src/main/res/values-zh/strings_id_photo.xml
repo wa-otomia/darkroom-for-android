@@ -63,6 +63,8 @@
     <string name="studio_id_feather_medium">中</string>
     <string name="studio_id_feather_strong">强</string>
     <string name="studio_id_feather_inward">向内羽化</string>
+    <string name="studio_id_mask_offset">选区收缩/扩展</string>
+    <string name="studio_id_mask_offset_note">负值向内收缩选区，正值向外扩展；单位为相纸像素（1 px 约 0.05 mm），在羽化之前应用。</string>
     <string name="studio_id_compositing">正在合成新背景…</string>
 
     <!-- Last failed cut-out viewer (EDID040-R09) -->

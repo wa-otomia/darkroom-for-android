@@ -401,6 +401,8 @@ data class IdPhotoState(
     val maskRev: String? = null,
     /** Shrink the mask by the feather radius before smoothing, so the blend stays inside (EDID040-R07). */
     val featherInward: Boolean = true,
+    /** Mask edge shift in print px, −10 (inward) to +10 (outward), applied before the feather (EDID040-R14). */
+    val maskOffset: Int = 0,
 ) {
     val pose: IdPhotoPose get() = IdPhotoPose(zoom, panX, panY, rotation)
 
@@ -421,6 +423,7 @@ data class IdPhotoState(
         feather = idFeather(feather).id,
         maskRev = maskRev?.trim()?.takeIf { it.isNotEmpty() },
         featherInward = featherInward,
+        maskOffset = idMaskOffset(maskOffset),
     )
 }
 

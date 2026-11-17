@@ -500,6 +500,7 @@ internal fun rememberIdPreviewCutout(
     background: IdBackground,
     feather: IdFeather,
     featherInward: Boolean,
+    maskOffset: Int,
     zoom: Float,
     layout: IdPhotoLayout,
     imageWidth: Int,
@@ -513,6 +514,7 @@ internal fun rememberIdPreviewCutout(
             argb = argb,
             feather = feather.id,
             featherInward = featherInward,
+            maskOffset = maskOffset,
             cellWidth = layout.cellWidth,
             cellHeight = layout.cellHeight,
             zoomStep = Math.round(zoom / CUTOUT_ZOOM_STEP),
@@ -549,6 +551,20 @@ internal fun rememberIdPreviewCutout(
             imageHeight,
             key.zoomStep * CUTOUT_ZOOM_STEP,
         )
+        // EDID040-R14: the print-px edge shift in source px, with its sign.
+        val offsetSourcePx = if (key.maskOffset == 0) {
+            0f
+        } else {
+            val magnitude = idFeatherSourcePx(
+                Math.abs(key.maskOffset),
+                key.cellWidth,
+                key.cellHeight,
+                imageWidth,
+                imageHeight,
+                key.zoomStep * CUTOUT_ZOOM_STEP,
+            )
+            if (key.maskOffset < 0) -magnitude else magnitude
+        }
         var attempt = 0
         while (true) {
             try {
@@ -564,6 +580,7 @@ internal fun rememberIdPreviewCutout(
                             key.argb,
                             featherSourcePx,
                             featherInward = key.featherInward,
+                            offsetSourcePx = offsetSourcePx,
                         ).asImageBitmap()
                     }
                 }

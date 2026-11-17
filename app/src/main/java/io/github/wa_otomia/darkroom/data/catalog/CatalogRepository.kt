@@ -17,6 +17,7 @@ import io.github.wa_otomia.darkroom.core.framingFor
 import io.github.wa_otomia.darkroom.core.framingVersionKey
 import io.github.wa_otomia.darkroom.core.idBackground
 import io.github.wa_otomia.darkroom.core.idFeather
+import io.github.wa_otomia.darkroom.core.idMaskOffset
 import io.github.wa_otomia.darkroom.core.idMaskRequired
 import io.github.wa_otomia.darkroom.core.hasVersion
 import io.github.wa_otomia.darkroom.core.idPhotoFor
@@ -501,6 +502,12 @@ class CatalogRepository @Inject constructor(
     /** The version's inward-feather switch (EDID040-R07); other fields stay as stored. */
     suspend fun setIdPhotoFeatherInward(photoId: String, source: String, inward: Boolean) {
         updateIdPhoto(photoId, source) { old -> (old ?: IdPhotoState()).copy(featherInward = inward) }
+    }
+
+    /** EDID040-R14: the mask edge shift in print px, clamped to ±10. */
+    suspend fun setIdPhotoMaskOffset(photoId: String, source: String, px: Int) {
+        val value = idMaskOffset(px)
+        updateIdPhoto(photoId, source) { old -> (old ?: IdPhotoState()).copy(maskOffset = value) }
     }
 
     /**
