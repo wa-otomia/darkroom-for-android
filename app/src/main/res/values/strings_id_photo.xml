@@ -70,6 +70,7 @@
     <string name="studio_id_view_cutout_result">View this cut-out result</string>
     <string name="studio_id_cutout_result_title">Result of this cut-out</string>
     <string name="studio_id_cutout_result_no_image">The AI did not return a usable image.</string>
+    <string name="studio_id_cutout_result_no_image_local">The on-device cut-out did not produce an image.</string>
     <string name="studio_id_cutout_result_at">Failed at %1$s</string>
     <string name="studio_id_failed_mask_close">Close</string>
 

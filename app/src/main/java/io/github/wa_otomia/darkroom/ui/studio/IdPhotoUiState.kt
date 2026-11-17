@@ -1,5 +1,7 @@
 package io.github.wa_otomia.darkroom.ui.studio
 
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_LOCAL_FAILED
+
 /*
  * Pure state rules behind Studio's ID photo UI, kept free of Android and Compose so the JVM
  * tests can cover them.
@@ -164,3 +166,42 @@ internal data class PendingIdChoice(
  */
 internal fun maskErrorFor(error: String?, errorVersion: String?, currentVersion: String): String? =
     error?.takeIf { it.isNotBlank() && errorVersion == currentVersion }
+
+/** Which label the cut-out button shows (EDID040-R02). */
+internal enum class IdCutOutLabel {
+    /** No mask yet, on-device cut-out off: "AI cut out person". */
+    AI,
+
+    /** No mask yet, on-device cut-out on: "Cut out person on device". */
+    LOCAL,
+
+    /** A mask exists: "Cut out again", whichever mode. */
+    RECUT,
+}
+
+internal fun idCutOutLabel(hasMask: Boolean, local: Boolean): IdCutOutLabel = when {
+    hasMask -> IdCutOutLabel.RECUT
+    local -> IdCutOutLabel.LOCAL
+    else -> IdCutOutLabel.AI
+}
+
+/**
+ * Whether the cut-out can start (EDID040-R02/R10): an on-device cut-out needs no provider key; an
+ * AI one needs [keySet]. Any job on this photo ([busy], hidden ones included) blocks both.
+ */
+internal fun idCanCutOut(local: Boolean, keySet: Boolean, busy: Boolean): Boolean = (local || keySet) && !busy
+
+/** The "set an API key" hint and Settings entry show only for an AI cut-out without a key. */
+internal fun idShowNeedKey(local: Boolean, keySet: Boolean): Boolean = !local && !keySet
+
+/**
+ * The on-device switch is disabled while this photo has any job or the preview composite is
+ * building (EDID040-R10); the mode of a running job is frozen when it is queued anyway.
+ */
+internal fun idLocalSwitchEnabled(busy: Boolean, compositing: Boolean): Boolean = !busy && !compositing
+
+/**
+ * True when a failure record without an image came from the on-device cut-out, so the viewer
+ * does not blame the AI for the missing image (EDID040-R11 keeps no image for such failures).
+ */
+internal fun idFailureIsLocal(message: String): Boolean = message.trimStart().startsWith(ID_MASK_MSG_LOCAL_FAILED)

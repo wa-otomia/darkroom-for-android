@@ -69,6 +69,7 @@
     <string name="studio_id_view_cutout_result">查看本次抠图结果</string>
     <string name="studio_id_cutout_result_title">本次抠图结果</string>
     <string name="studio_id_cutout_result_no_image">AI 没有返回可用的图片。</string>
+    <string name="studio_id_cutout_result_no_image_local">本地抠图没有生成图片。</string>
     <string name="studio_id_cutout_result_at">失败时间：%1$s</string>
     <string name="studio_id_failed_mask_close">关闭</string>
 

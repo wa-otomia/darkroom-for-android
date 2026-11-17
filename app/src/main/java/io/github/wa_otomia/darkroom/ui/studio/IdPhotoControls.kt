@@ -286,7 +286,8 @@ internal fun IdMaskJobRow(job: IdMaskJobUi, elsewhere: String?) {
 }
 
 /**
- * Replaces the AI generate block in ID mode: what the AI does, the cut-out button and its gate,
+ * Replaces the AI generate block in ID mode: what the cut-out does (AI or on this device), the
+ * "cut out on this device" switch row ([local], EDID040-R10), the cut-out button and its gate,
  * the running job, the last failure, "view this cut-out's result" whenever [onViewCutoutResult]
  * is set (a failure record exists for the version, EDID040-R09), the palette, the feather
  * selector and the inward feather switch row below it (EDID040-R07).
@@ -297,6 +298,8 @@ internal fun IdMaskJobRow(job: IdMaskJobUi, elsewhere: String?) {
 @Composable
 internal fun IdPhotoProcessSection(
     keySet: Boolean,
+    local: Boolean,
+    localSwitchEnabled: Boolean,
     hasMask: Boolean,
     background: IdBackground,
     feather: IdFeather,
@@ -307,6 +310,7 @@ internal fun IdPhotoProcessSection(
     maskJobElsewhere: String?,
     maskError: String?,
     onCutOut: () -> Unit,
+    onLocalChange: (Boolean) -> Unit,
     onOpenSettings: () -> Unit,
     onBackground: (IdBackground) -> Unit,
     onFeather: (IdFeather) -> Unit,
@@ -316,8 +320,19 @@ internal fun IdPhotoProcessSection(
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.fillMaxWidth()) {
             SectionLabel(stringResource(R.string.studio_id_section))
-            StudioNote(stringResource(R.string.studio_id_explain), topPadding = 0)
-            if (!keySet) {
+            // Cloud: the whole photo is uploaded; on device: nothing is uploaded, no key needed.
+            StudioNote(
+                stringResource(if (local) R.string.studio_id_local_explain else R.string.studio_id_explain),
+                topPadding = 0,
+            )
+            // Only the setting changes; an existing mask and a running job keep their mode.
+            StudioSwitchRow(
+                label = stringResource(R.string.studio_id_local_cutout),
+                checked = local,
+                enabled = localSwitchEnabled,
+                onCheckedChange = onLocalChange,
+            )
+            if (idShowNeedKey(local = local, keySet = keySet)) {
                 Text(
                     stringResource(R.string.grok_need_key),
                     color = Amber,
@@ -329,7 +344,13 @@ internal fun IdPhotoProcessSection(
             }
         }
         PaperButton(
-            stringResource(if (hasMask) R.string.studio_id_recut else R.string.studio_id_cutout),
+            stringResource(
+                when (idCutOutLabel(hasMask = hasMask, local = local)) {
+                    IdCutOutLabel.RECUT -> R.string.studio_id_recut
+                    IdCutOutLabel.LOCAL -> R.string.studio_id_cutout_local
+                    IdCutOutLabel.AI -> R.string.studio_id_cutout
+                },
+            ),
             enabled = canCutOut && !compositing,
             onClick = onCutOut,
         )
@@ -550,7 +571,12 @@ internal fun IdCutoutResultViewer(failure: IdMaskFailure, onDismiss: () -> Unit)
                 )
             } else {
                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                    Text(stringResource(R.string.studio_id_cutout_result_no_image), color = Paper)
+                    val noImage = if (idFailureIsLocal(failure.message)) {
+                        R.string.studio_id_cutout_result_no_image_local
+                    } else {
+                        R.string.studio_id_cutout_result_no_image
+                    }
+                    Text(stringResource(noImage), color = Paper)
                 }
             }
             // Bounded and scrollable, so a long reason at a large font scale keeps Close on screen.

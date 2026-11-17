@@ -185,6 +185,8 @@ fun StudioScreen(
     val presets by settings.presets.collectAsState()
     val grokPub by settings.ai.collectAsState()
     val appSettings by settings.settings.collectAsState()
+    // An app setting, not per version (EDID040-R10); read at the tap to freeze the job's mode.
+    val idLocalCutout by settings.idPhotoLocalCutoutFlow.collectAsState()
     val scope = rememberCoroutineScope()
     val printJobs by printQueue.printJobs.collectAsState(initial = emptyList())
     val runningProgress by printQueue.runningProgress.collectAsState(initial = null)
@@ -690,7 +692,8 @@ fun StudioScreen(
         maskErrorVersion = null
         maskCutVersion = version
         try {
-            aiJobs.enqueueMask(photo.id, source)
+            // The mode is frozen into the job here (EDID040-R10): what the switch shows now.
+            aiJobs.enqueueMask(photo.id, source, local = idLocalCutout)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -1079,16 +1082,19 @@ fun StudioScreen(
             if (idActive) {
                 IdPhotoProcessSection(
                     keySet = grokPub.keySet,
+                    local = idLocalCutout,
+                    localSwitchEnabled = idLocalSwitchEnabled(busy = aiBusy, compositing = idCompositing),
                     hasMask = idHasMask,
                     background = idBg,
                     feather = idFeatherChoice,
                     featherInward = idFeatherInward,
                     compositing = idCompositing,
-                    canCutOut = grokPub.keySet && !aiBusy,
+                    canCutOut = idCanCutOut(local = idLocalCutout, keySet = grokPub.keySet, busy = aiBusy),
                     maskJob = maskJobUi,
                     maskJobElsewhere = maskJobElsewhereLabel,
                     maskError = maskErrorHere,
                     onCutOut = onCutOut,
+                    onLocalChange = { settings.setIdPhotoLocalCutout(it) },
                     onOpenSettings = { onSettings("grok") },
                     onBackground = onIdBackground,
                     onFeather = onIdFeather,

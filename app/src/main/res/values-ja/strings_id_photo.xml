@@ -69,6 +69,7 @@
     <string name="studio_id_view_cutout_result">今回の切り抜き結果を見る</string>
     <string name="studio_id_cutout_result_title">今回の切り抜き結果</string>
     <string name="studio_id_cutout_result_no_image">AI から使える画像が返されませんでした。</string>
+    <string name="studio_id_cutout_result_no_image_local">端末内での切り抜きでは画像が作成されませんでした。</string>
     <string name="studio_id_cutout_result_at">失敗日時：%1$s</string>
     <string name="studio_id_failed_mask_close">閉じる</string>
 
