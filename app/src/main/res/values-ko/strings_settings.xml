@@ -140,6 +140,7 @@
     <string name="settings_xai_client_id">Client ID</string>
     <string name="settings_xai_client_id_required">로그인하기 전에 client ID를 입력하고 AI 설정을 저장하세요.</string>
     <string name="settings_xai_client_id_locked">client ID를 변경하려면 먼저 로그아웃하세요.</string>
+    <string name="settings_xai_client_id_locked_login">client ID를 변경하려면 먼저 로그인을 취소하세요.</string>
     <string name="settings_xai_start_login">로그인 시작(실험적)</string>
     <string name="settings_xai_starting">xAI에 로그인 코드를 요청하는 중…</string>
     <string name="settings_xai_code_label">로그인 코드</string>

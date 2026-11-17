@@ -307,6 +307,6 @@
     <string name="error_xai_relogin">xAI 订阅登录已失效，请在设置中重新登录。</string>
     <string name="error_xai_rejected">xAI 拒绝了订阅凭据，请稍后重试或重新登录。</string>
     <string name="error_xai_refresh_network">无法更新 xAI 订阅凭据：网络不可用或服务暂时不可用。</string>
-    <string name="error_xai_forbidden">xAI 拒绝了订阅请求（403）：订阅层级不支持，或账号、client ID 未获授权。</string>
+    <string name="error_xai_forbidden">xAI 拒绝了订阅请求（403）：订阅层级不支持，或该账号或 client ID 未获 API 访问授权，可改用 API 密钥。</string>
     <string name="error_xai_quota">xAI 订阅用量已用尽或受限（429）。</string>
 </resources>

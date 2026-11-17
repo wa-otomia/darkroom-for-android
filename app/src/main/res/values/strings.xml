@@ -302,6 +302,6 @@
     <string name="error_xai_relogin">The xAI subscription sign-in has expired. Sign in again in Settings.</string>
     <string name="error_xai_rejected">xAI rejected the subscription credential. Try again later, or sign in again.</string>
     <string name="error_xai_refresh_network">Couldn\'t renew the xAI subscription credential: the network or the service is unavailable.</string>
-    <string name="error_xai_forbidden">xAI refused the subscription request (403): the plan does not support it, or the account or client ID is not authorized.</string>
+    <string name="error_xai_forbidden">xAI refused the subscription request (403): the plan does not support it, or the account or client ID is not authorized for API access. You can use an API key instead.</string>
     <string name="error_xai_quota">The xAI subscription usage is used up or limited (429).</string>
 </resources>

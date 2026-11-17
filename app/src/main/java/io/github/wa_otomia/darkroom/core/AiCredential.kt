@@ -45,7 +45,7 @@ const val XAI_MSG_NOT_SIGNED_IN = "xAI 订阅未登录。去设置页登录后�
 const val XAI_MSG_RELOGIN = "xAI 订阅登录已失效，请重新登录。"
 const val XAI_MSG_REJECTED = "xAI 订阅凭据被拒绝，请稍后重试或重新登录。"
 const val XAI_MSG_REFRESH_NETWORK = "xAI 订阅凭据刷新失败：网络不可用或服务暂时不可用。"
-const val XAI_MSG_FORBIDDEN = "xAI 拒绝了订阅请求（403）：订阅层级不支持，或账号、client ID 未获授权。"
+const val XAI_MSG_FORBIDDEN = "xAI 拒绝了订阅请求（403）：订阅层级不支持，或该账号或 client ID 未获 API 访问授权；可改用 API key。"
 const val XAI_MSG_QUOTA = "xAI 订阅用量已用尽或受限（429）。"
 
 /** Message for an AI gate that is not [AiCredentialState.READY]; [action] is e.g. "修图" or "生成". */

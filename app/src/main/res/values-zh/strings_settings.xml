@@ -140,6 +140,7 @@
     <string name="settings_xai_client_id">Client ID</string>
     <string name="settings_xai_client_id_required">请先填写 client ID 并保存 AI 设置，再开始登录。</string>
     <string name="settings_xai_client_id_locked">已登录时不能修改 client ID，请先登出。</string>
+    <string name="settings_xai_client_id_locked_login">正在登录时不能修改 client ID，请先取消登录。</string>
     <string name="settings_xai_start_login">开始登录（实验性）</string>
     <string name="settings_xai_starting">正在向 xAI 申请登录代码…</string>
     <string name="settings_xai_code_label">登录代码</string>

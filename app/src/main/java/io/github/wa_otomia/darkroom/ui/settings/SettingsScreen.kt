@@ -147,6 +147,7 @@ import io.github.wa_otomia.darkroom.core.isConfigured
 import io.github.wa_otomia.darkroom.core.normalizeAiBaseUrl
 import io.github.wa_otomia.darkroom.data.ai.AiImageClient
 import io.github.wa_otomia.darkroom.data.ai.AiProbe
+import io.github.wa_otomia.darkroom.data.ai.XaiLoginUiState
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
 import io.github.wa_otomia.darkroom.data.ftp.FtpForegroundService
 import io.github.wa_otomia.darkroom.data.jobs.KeepAliveService
@@ -514,6 +515,8 @@ fun SettingsScreen(
     // credential is READY exactly when a sign-in is stored.
     val grokSubscription = formProvider == AiProvider.GROK && storedForm?.authMode == AiAuthMode.SUBSCRIPTION
     val grokSignedIn = grokSubscription && storedForm?.credential == AiCredentialState.READY
+    // The client ID is also read-only while a sign-in runs: the tokens must belong to the saved ID.
+    val grokSigningIn = xaiLoginState is XaiLoginUiState.Starting || xaiLoginState is XaiLoginUiState.AwaitingUser
 
     LaunchedEffect(openGrok, formProvider, storedForm?.credential, ai.cachedModels[formProvider]) {
         if (!openGrok) return@LaunchedEffect
@@ -786,8 +789,12 @@ fun SettingsScreen(
                         SettingsField(
                             label = stringResource(R.string.settings_xai_client_id),
                             value = grokClientIdDraft,
-                            supporting = if (grokSignedIn) stringResource(R.string.settings_xai_client_id_locked) else null,
-                            enabled = !grokSignedIn,
+                            supporting = when {
+                                grokSignedIn -> stringResource(R.string.settings_xai_client_id_locked)
+                                grokSigningIn -> stringResource(R.string.settings_xai_client_id_locked_login)
+                                else -> null
+                            },
+                            enabled = !grokSignedIn && !grokSigningIn,
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Ascii,
                                 autoCorrectEnabled = false,
@@ -803,6 +810,8 @@ fun SettingsScreen(
                             reloginRequired = storedForm?.credential == AiCredentialState.RELOGIN_REQUIRED,
                             onStart = {
                                 probeResult = null
+                                // The attempt uses the saved client ID; drop an unsaved edit.
+                                grokClientIdDraft = storedForm?.clientId.orEmpty()
                                 xaiLogin.start()
                             },
                             onCancel = { xaiLogin.cancel() },
@@ -1006,7 +1015,7 @@ fun SettingsScreen(
                             draft.quality,
                         )
                         if (formProvider == AiProvider.GROK && grokClientIdDraft.trim() != settings.grokClientId()) {
-                            // Refused (and the field read-only) while signed in.
+                            // Refused (and the field read-only) while signed in or signing in.
                             settings.setGrokClientId(grokClientIdDraft)
                         }
                         val saved = settings.readAi().byProvider.getValue(formProvider)

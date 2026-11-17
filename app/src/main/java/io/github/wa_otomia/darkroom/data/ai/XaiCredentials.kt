@@ -31,6 +31,7 @@ class XaiCredentials @Inject constructor(
         clientId = { settings.grokClientId() },
         nowWallMs = System::currentTimeMillis,
         onReloginRequired = { settings.setGrokReloginRequired(true) },
+        onAccountLabelChanged = { settings.publishAi() },
     )
 
     fun hasCredential(): Boolean = store.hasCredential()

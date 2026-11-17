@@ -1,8 +1,10 @@
 package io.github.wa_otomia.darkroom.core
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** What the encrypted token file holds (AIPV050-R07). */
 class StoredXaiCredential(
@@ -68,6 +70,8 @@ class XaiCredentialCoordinator(
     private val clientId: () -> String,
     private val nowWallMs: () -> Long,
     private val onReloginRequired: () -> Unit,
+    /** Runs after a refresh saved a different account label, so the public state can be republished. */
+    private val onAccountLabelChanged: () -> Unit = {},
 ) {
     private val mutex = Mutex()
 
@@ -84,6 +88,14 @@ class XaiCredentialCoordinator(
         if (rejected == null && !needsRefresh(tokens.expiresAtMs, nowWallMs())) {
             return@withLock CredentialResult.Token(tokens.accessToken)
         }
+        // Once started, the refresh and its persistence are not cancelled with the caller: a
+        // response the server already sent may carry a rotated refresh token that must be saved
+        // (AIPV050-R08). Only the caller's wait for the result is cancelled.
+        withContext(NonCancellable) { refreshAndPersist(current) }
+    }
+
+    private suspend fun refreshAndPersist(current: StoredXaiCredential): CredentialResult {
+        val tokens = current.tokens
         val call = try {
             refresher.refresh(current.tokenEndpoint, clientId(), tokens.refreshToken)
         } catch (e: CancellationException) {
@@ -91,7 +103,7 @@ class XaiCredentialCoordinator(
         } catch (_: Exception) {
             RefreshCall.Failed(null, null)
         }
-        when (call) {
+        return when (call) {
             is RefreshCall.Ok -> {
                 val parsed = call.parsed
                 val next = StoredXaiCredential(
@@ -111,8 +123,9 @@ class XaiCredentialCoordinator(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
-                    return@withLock CredentialResult.Rejected
+                    return CredentialResult.Rejected
                 }
+                if (next.tokens.accountLabel != tokens.accountLabel) onAccountLabelChanged()
                 CredentialResult.Token(parsed.accessToken)
             }
             is RefreshCall.Failed -> when (classifyRefreshError(call.status, call.errorCode)) {

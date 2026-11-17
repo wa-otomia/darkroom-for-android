@@ -307,6 +307,6 @@
     <string name="error_xai_relogin">xAI サブスクリプションのサインインが無効になりました。設定でもう一度サインインしてください。</string>
     <string name="error_xai_rejected">xAI がサブスクリプションの認証情報を拒否しました。しばらくしてから再試行するか、もう一度サインインしてください。</string>
     <string name="error_xai_refresh_network">xAI サブスクリプションの認証情報を更新できませんでした。ネットワークまたはサービスが利用できません。</string>
-    <string name="error_xai_forbidden">xAI がサブスクリプションのリクエストを拒否しました（403）。プランが対応していないか、アカウントまたは client ID が認可されていません。</string>
+    <string name="error_xai_forbidden">xAI がサブスクリプションのリクエストを拒否しました（403）。プランが対応していないか、アカウントまたは client ID に API アクセスが認可されていません。代わりに API キーを使用できます。</string>
     <string name="error_xai_quota">xAI サブスクリプションの利用量が上限に達したか、制限されています（429）。</string>
 </resources>

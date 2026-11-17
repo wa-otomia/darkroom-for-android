@@ -2,6 +2,7 @@ package io.github.wa_otomia.darkroom.core
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -60,12 +61,14 @@ class XaiCredentialCoordinatorTest {
         val store = FakeStore(store, events)
         val refresher = FakeRefresher(events, next = next)
         var reloginCallbacks = 0
+        var labelChanges = 0
         val coordinator = XaiCredentialCoordinator(
             store = this.store,
             refresher = refresher,
             clientId = { "test-client-id" },
             nowWallMs = { 1_000L },
             onReloginRequired = { reloginCallbacks++ },
+            onAccountLabelChanged = { labelChanges++ },
         )
     }
 
@@ -107,6 +110,38 @@ class XaiCredentialCoordinatorTest {
         h.events += "returned"
         assertEquals(CredentialResult.Token("at-new"), result)
         assertEquals(listOf("refresh", "save:at-new", "returned"), h.events)
+    }
+
+    @Test
+    fun cancelledCallerStillPersistsRotatedRefreshToken() = runTest {
+        val h = Harness(stored("at-old", refresh = "rt-old")) { ok("at-new", refresh = "rt-new") }
+        val gate = CompletableDeferred<Unit>()
+        h.refresher.gate = gate
+        val caller = launch { h.coordinator.accessToken() }
+        testScheduler.advanceUntilIdle()
+        assertEquals(1, h.refresher.calls)
+        caller.cancel()
+        gate.complete(Unit)
+        testScheduler.advanceUntilIdle()
+        assertTrue(caller.isCancelled)
+        assertEquals(1, h.store.saves)
+        assertEquals("rt-new", h.store.current?.tokens?.refreshToken)
+        // The next caller uses the saved token without another refresh.
+        assertEquals(CredentialResult.Token("at-new"), h.coordinator.accessToken())
+        assertEquals(1, h.refresher.calls)
+    }
+
+    @Test
+    fun accountLabelChangeIsReportedOnlyWhenItChanges() = runTest {
+        val changed = Harness(stored("at-old", label = "a@example.com")) { ok("at-new", label = "b@example.com") }
+        changed.coordinator.accessToken()
+        assertEquals(1, changed.labelChanges)
+        val same = Harness(stored("at-old", label = "a@example.com")) { ok("at-new", label = "a@example.com") }
+        same.coordinator.accessToken()
+        assertEquals(0, same.labelChanges)
+        val absent = Harness(stored("at-old", label = "a@example.com")) { ok("at-new", label = null) }
+        absent.coordinator.accessToken()
+        assertEquals(0, absent.labelChanges)
     }
 
     @Test

@@ -226,9 +226,12 @@ class SettingsRepository @Inject constructor(
 
     fun grokClientId(): String = prefs.getString(KEY_GROK_CLIENT_ID, "").orEmpty().trim()
 
-    /** @return false (nothing written) while signed in: the client ID is read-only until sign-out. */
+    /**
+     * @return false (nothing written) while signed in or while a sign-in is running: the tokens
+     * must belong to the client ID that later refreshes and revokes them.
+     */
     fun setGrokClientId(id: String): Boolean {
-        if (xaiTokens.hasCredential()) return false
+        if (xaiTokens.hasCredential() || isLoginInProgress()) return false
         prefs.edit().putString(KEY_GROK_CLIENT_ID, id.trim()).commit()
         publishAi()
         return true

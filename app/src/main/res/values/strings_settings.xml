@@ -148,6 +148,7 @@
     <string name="settings_xai_client_id">Client ID</string>
     <string name="settings_xai_client_id_required">Enter a client ID and save the AI settings before signing in.</string>
     <string name="settings_xai_client_id_locked">Sign out to change the client ID.</string>
+    <string name="settings_xai_client_id_locked_login">Cancel the sign-in to change the client ID.</string>
     <string name="settings_xai_start_login">Start sign-in (experimental)</string>
     <string name="settings_xai_starting">Requesting a sign-in code from xAI…</string>
     <string name="settings_xai_code_label">Sign-in code</string>
