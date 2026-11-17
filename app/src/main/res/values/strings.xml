@@ -138,7 +138,7 @@
     <string name="preset_none">No processing</string>
     <string name="presets_eyebrow">PRESETS</string>
     <string name="presets_title">AI presets</string>
-    <string name="presets_desc">Portrait and creative looks. Gallery, print and print-on-receive share the preset you selected last.</string>
+    <string name="presets_desc">Portrait and creative looks. Gallery and print share the preset you selected last; auto-edit after import uses its own preset, chosen in Settings.</string>
     <string name="default_preset">Default preset</string>
     <string name="default_badge">DEFAULT</string>
     <string name="add_preset">Add preset</string>
@@ -169,6 +169,7 @@
     <string name="settings_automation_blocked_edit">AI edit will be skipped:</string>
     <string name="settings_automation_blocked_print">Print cannot run yet:</string>
     <string name="settings_automation_preset">Preset for auto-edit</string>
+    <string name="settings_automation_preset_hint">Used only for auto-edit after import. The default preset in Studio and the preset library does not affect it.</string>
     <string name="settings_watermark">Watermark</string>
     <string name="settings_watermark_sns">SNS watermark</string>
     <string name="settings_watermark_date">Date watermark</string>

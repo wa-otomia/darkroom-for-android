@@ -219,6 +219,7 @@ fun SettingsScreen(
     val watermark by settings.watermark.collectAsState()
     val photos by catalog.photos.collectAsState(initial = emptyList())
     val presets by settings.presets.collectAsState()
+    val autoEditPresetId by settings.autoEditPreset.collectAsState()
     val logs by activityLog.entries.collectAsState()
     val ftpListening by FtpForegroundService.listening.collectAsState()
     val scope = rememberCoroutineScope()
@@ -340,6 +341,7 @@ fun SettingsScreen(
     val needPrinterText = stringResource(R.string.settings_autoprint_need_printer)
     val needKeyText = stringResource(R.string.settings_automation_need_key)
     val needPresetText = stringResource(R.string.settings_automation_need_preset)
+    val presetMissingText = stringResource(R.string.error_preset_missing)
     val needWatermarkText = stringResource(R.string.settings_automation_need_watermark)
 
     val btPerms = if (Build.VERSION.SDK_INT >= 31) {
@@ -564,7 +566,7 @@ fun SettingsScreen(
     }
 
     val printerBound = cfg.printerMac.isNotBlank()
-    val autoHasPreset = presets.lastSelectedId != AI_PRESET_NONE
+    val autoHasPreset = autoEditPresetId != AI_PRESET_NONE
     val autoAiReady = ai.keySet
     val autoParts = buildList {
         if (cfg.autoEdit) add(stringResource(R.string.chip_automation_edit))
@@ -1333,11 +1335,21 @@ fun SettingsScreen(
                             colors = SwitchDefaults.colors(checkedTrackColor = Amber),
                         )
                     }
+                    // The automation preset only; the Studio and library default is not touched (AUTG040-R01).
                     PresetDropdown(
-                        value = presets.lastSelectedId,
+                        value = autoEditPresetId,
                         presets = presets.presets,
                         label = stringResource(R.string.settings_automation_preset),
-                    ) { settings.setLastPreset(it) }
+                    ) { id ->
+                        runCatching { settings.setAutoEditPreset(id) }
+                            .onFailure { scope.launch { snackbar.showSnackbar(presetMissingText) } }
+                    }
+                    Text(
+                        stringResource(R.string.settings_automation_preset_hint),
+                        color = PaperDim,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
                     if (cfg.autoEdit && (!autoAiReady || !autoHasPreset)) {
                         Column(
                             Modifier
