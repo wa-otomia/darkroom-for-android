@@ -3,9 +3,12 @@ package io.github.wa_otomia.darkroom.data.jobs
 import io.github.wa_otomia.darkroom.core.AiJobSnapshot
 import io.github.wa_otomia.darkroom.core.AppliedFraming
 import io.github.wa_otomia.darkroom.core.GENERATED_PHOTO_TAG
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NEED_KEY
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_VERSION_GONE
 import io.github.wa_otomia.darkroom.core.combineGeneratePrompt
 import io.github.wa_otomia.darkroom.core.generatedPhotoFilename
 import io.github.wa_otomia.darkroom.core.resolvePhotoSource
+import io.github.wa_otomia.darkroom.core.sanitizeAiSecrets
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
 import io.github.wa_otomia.darkroom.data.ai.AiImageClient
 import io.github.wa_otomia.darkroom.data.imaging.ImagePipeline
@@ -20,9 +23,12 @@ import io.github.wa_otomia.darkroom.data.settings.SettingsRepository
 import io.github.wa_otomia.darkroom.di.ApplicationScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -34,7 +40,7 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
-enum class AiKind { Generate, Edit }
+enum class AiKind { Generate, Edit, Mask }
 
 data class AiJob(
     val id: String,
@@ -55,6 +61,7 @@ data class AiJob(
         kind = when (kind) {
             AiKind.Generate -> "generate"
             AiKind.Edit -> "edit"
+            AiKind.Mask -> "mask"
         },
         sourcePhotoId = sourcePhotoId,
         targetPhotoId = targetPhotoId,
@@ -101,6 +108,94 @@ class AiJobs @Inject constructor(
         appliedFraming: AppliedFraming? = null,
     ) {
         start(AiKind.Edit, photoId, source, presetId, prompt, appliedFraming)
+    }
+
+    /**
+     * Starts a person-matte job for one version (EDID040, AIJB010-R04). Returns the job id, or null
+     * when any AI job row for [photoId] exists (hidden or still in its finished/failed tail).
+     * Throws [IllegalStateException] with [ID_MASK_MSG_NEED_KEY] when no AI key is configured.
+     *
+     * The version key is frozen here, so switching versions later still stores the mask on the
+     * originating version. The job never uses presets or extra prompts, never touches the last
+     * preset, and never creates an edit or a photo: only [CatalogRepository.saveIdPhotoMask] commits.
+     * A cancel before the commit discards any late result.
+     */
+    fun enqueueMask(photoId: String, source: String): String? {
+        // D8 gate: no key means no job and no request. The job re-checks at execution time.
+        if (!settings.aiConfigured()) error(ID_MASK_MSG_NEED_KEY)
+        val versionKey = resolvePhotoSource(source)
+        val id = UUID.randomUUID().toString()
+        val row = AiJob(
+            id = id,
+            kind = AiKind.Mask,
+            sourcePhotoId = photoId,
+            source = versionKey,
+            targetPhotoId = photoId,
+            phase = "preparing",
+            loaded = null,
+            total = null,
+            hidden = false,
+            startedAt = System.currentTimeMillis(),
+            error = null,
+        )
+        while (true) {
+            val current = _jobs.value
+            if (current.any { it.sourcePhotoId == photoId }) return null
+            if (_jobs.compareAndSet(current, current + row)) break
+        }
+        val tracker = JobProgressTracker(id, JobKind.Ai, aiPhases(stats), stats)
+        tracker.startPhase("preparing")
+        publish(id, tracker)
+        val handle = appScope.launch(start = CoroutineStart.LAZY) {
+            val ticker = tracker.launchTicks(this) { publish(id, tracker) }
+            var committed = false
+            try {
+                if (!settings.aiConfigured()) error(ID_MASK_MSG_NEED_KEY)
+                val raw = withContext(Dispatchers.IO) {
+                    val file = catalog.sourceFile(photoId, versionKey)
+                    if (!file.isFile) error(ID_MASK_MSG_VERSION_GONE)
+                    file.readBytes()
+                }
+                val response = grok.mask(raw, photoId) { progress ->
+                    applyAiProgress(tracker, progress)
+                    publish(id, tracker)
+                }
+                tracker.startPhase("saving")
+                publish(id, tracker)
+                val png = withContext(Dispatchers.Default) {
+                    val decoded = ImagePipeline.decodeIdMask(response.bytes, response.upload)
+                    ImagePipeline.encodeIdMaskPng(decoded)
+                }
+                ensureActive()
+                withContext(NonCancellable) {
+                    if (!catalog.saveIdPhotoMask(photoId, versionKey, png)) error(ID_MASK_MSG_VERSION_GONE)
+                    committed = true
+                    tracker.succeed()
+                    publish(id, tracker)
+                    _events.tryEmit(StudioJobEvent.MaskReady(photoId, versionKey))
+                }
+            } catch (e: CancellationException) {
+                if (!committed) {
+                    _jobs.value = _jobs.value.filter { it.id != id }
+                    _events.tryEmit(StudioJobEvent.Failed(photoId, AiKind.Mask.action, ""))
+                }
+            } catch (e: Exception) {
+                val message = sanitizeAiSecrets(e.message ?: e.toString())
+                tracker.fail(message)
+                publish(id, tracker)
+                _events.tryEmit(StudioJobEvent.Failed(photoId, AiKind.Mask.action, message))
+            } finally {
+                ticker.cancel()
+                withContext(NonCancellable) {
+                    delay(KEEP_MS)
+                    _jobs.value = _jobs.value.filter { it.id != id }
+                    handles.remove(id)
+                }
+            }
+        }
+        handles[id] = handle
+        handle.start()
+        return id
     }
 
     fun cancel(id: String): Pair<Boolean, String> {
@@ -197,6 +292,8 @@ class AiJobs @Inject constructor(
                         publish(id, tracker)
                         _events.tryEmit(StudioJobEvent.Edited(photoId, editId))
                     }
+                    // Mask jobs run only through enqueueMask; start() is never called with this kind.
+                    AiKind.Mask -> error("mask jobs use enqueueMask")
                 }
             } catch (e: CancellationException) {
                 _jobs.value = _jobs.value.filter { it.id != id }
@@ -236,10 +333,18 @@ class AiJobs @Inject constructor(
     }
 
     private val AiKind.purpose: String
-        get() = if (this == AiKind.Generate) "generate" else "edit"
+        get() = when (this) {
+            AiKind.Generate -> "generate"
+            AiKind.Edit -> "edit"
+            AiKind.Mask -> "mask"
+        }
 
     private val AiKind.action: String
-        get() = if (this == AiKind.Generate) "generate" else "edit"
+        get() = when (this) {
+            AiKind.Generate -> "generate"
+            AiKind.Edit -> "edit"
+            AiKind.Mask -> "mask"
+        }
 
     companion object {
         private const val KEEP_MS = 1_500L

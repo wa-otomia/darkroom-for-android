@@ -21,6 +21,7 @@ import io.github.wa_otomia.darkroom.core.mergeBuiltinPresets
 import io.github.wa_otomia.darkroom.core.mergeFgsPause
 import io.github.wa_otomia.darkroom.core.mergeProviderSettings
 import io.github.wa_otomia.darkroom.core.newPresetId
+import io.github.wa_otomia.darkroom.core.normalizeIdPhotoPresetId
 import io.github.wa_otomia.darkroom.core.normalizeAiBaseUrl
 import io.github.wa_otomia.darkroom.core.normalizeAiPresetStore
 import io.github.wa_otomia.darkroom.core.parseGrokResolution
@@ -314,6 +315,7 @@ class SettingsRepository @Inject constructor(
             .putString(KEY_GROK_MODELS, "[]")
             .putString(KEY_OPENAI_MODELS, "[]")
             .putString(KEY_WATERMARK, json.encodeToString(WatermarkSettings()))
+            .remove(KEY_ID_PHOTO_PRESET)
             .apply()
         _settings.value = readSettings()
         _watermark.value = readWatermark()
@@ -338,6 +340,13 @@ class SettingsRepository @Inject constructor(
         val last = id.trim()
         if (last.isNotEmpty() && store.presets.none { it.id == last }) error("预设不存在")
         return writePresets(store.copy(lastSelectedId = last))
+    }
+
+    /** The ID photo size picked last in Studio (EDID010-R02); unknown or unset gives 35×45. */
+    fun lastIdPhotoPreset(): String = normalizeIdPhotoPresetId(prefs.getString(KEY_ID_PHOTO_PRESET, null))
+
+    fun setLastIdPhotoPreset(id: String) {
+        prefs.edit().putString(KEY_ID_PHOTO_PRESET, normalizeIdPhotoPresetId(id)).apply()
     }
 
     fun createPreset(title: String, prompt: String, category: String): AiPresetStore {
@@ -408,6 +417,7 @@ class SettingsRepository @Inject constructor(
         private const val KEY_OPENAI_MODELS = "openai_models"
         private const val KEY_WATERMARK = "watermark"
         private const val KEY_PRESETS = "presets"
+        private const val KEY_ID_PHOTO_PRESET = "id_photo_preset"
 
         fun generatePassword(): String {
             val alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"

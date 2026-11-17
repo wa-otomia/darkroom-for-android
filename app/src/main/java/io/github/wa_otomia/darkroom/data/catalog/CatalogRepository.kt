@@ -4,10 +4,23 @@ import android.content.Context
 import io.github.wa_otomia.darkroom.core.EditRecord
 import io.github.wa_otomia.darkroom.core.Framing
 import io.github.wa_otomia.darkroom.core.GENERATED_PHOTO_TAG
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_MISSING
+import io.github.wa_otomia.darkroom.core.IdBackground
+import io.github.wa_otomia.darkroom.core.IdFeather
+import io.github.wa_otomia.darkroom.core.IdPhotoPose
+import io.github.wa_otomia.darkroom.core.IdPhotoState
 import io.github.wa_otomia.darkroom.core.PhotoMeta
 import io.github.wa_otomia.darkroom.core.PrintFit
 import io.github.wa_otomia.darkroom.core.PrintRecord
+import io.github.wa_otomia.darkroom.core.ORIGINAL_VERSION_ID
 import io.github.wa_otomia.darkroom.core.framingFor
+import io.github.wa_otomia.darkroom.core.framingVersionKey
+import io.github.wa_otomia.darkroom.core.idBackground
+import io.github.wa_otomia.darkroom.core.idFeather
+import io.github.wa_otomia.darkroom.core.idMaskRequired
+import io.github.wa_otomia.darkroom.core.idPhotoFor
+import io.github.wa_otomia.darkroom.core.normalizeIdPhotoPresetId
+import io.github.wa_otomia.darkroom.core.withIdPhoto
 import io.github.wa_otomia.darkroom.core.galleryThumbSource
 import io.github.wa_otomia.darkroom.core.toPlacement
 import io.github.wa_otomia.darkroom.core.withFraming
@@ -34,6 +47,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Instant
@@ -61,6 +76,13 @@ class CatalogRepository @Inject constructor(
     private val inbox: File get() = File(context.filesDir, "inbox")
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Serialises the read-modify-replace of a photo row between the per-version writers that
+     * can overlap: Studio's framing and ID pose saves, the background / feather taps, the mask
+     * job's commit, version deletion and photo deletion. Never held across a network call.
+     */
+    private val rowLock = Mutex()
 
     /** Ids hidden from [photos] because a deletion is waiting for its undo window to close. */
     private val hiddenIds = MutableStateFlow<Set<String>>(emptySet())
@@ -113,8 +135,28 @@ class CatalogRepository @Inject constructor(
     fun galleryThumbFile(photo: PhotoMeta): File {
         val source = galleryThumbSource(photo) { thumbFile(photo.id, it).exists() }
         val framed = framedThumbFile(photo.id)
-        if (photo.framingFor(source) != null && framed.exists()) return framed
+        if (hasFramedThumb(photo, source) && framed.exists()) return framed
         return thumbFile(photo.id, source)
+    }
+
+    /** The display version gets a framed thumb when it has a saved framing or its ID mode is on. */
+    private fun hasFramedThumb(photo: PhotoMeta, source: String): Boolean =
+        photo.framingFor(source) != null || photo.idPhotoFor(source)?.active == true
+
+    /** `library/<photoId>/idphoto/<versionKey>-mask-<rev>.png`. */
+    fun idPhotoMaskFile(photoId: String, source: String, rev: String): File =
+        File(idPhotoDir(photoId), "${idMaskPrefix(framingVersionKey(source))}$rev.png")
+
+    private fun idPhotoDir(photoId: String) = File(library, "$photoId/idphoto")
+
+    private fun idMaskPrefix(versionKey: String) = "$versionKey-mask-"
+
+    /** The mask bytes for [maskRev], or null when there is no rev or the file is missing or empty. */
+    fun readIdPhotoMask(photoId: String, source: String, maskRev: String?): ByteArray? {
+        val rev = maskRev?.trim()?.takeIf { it.isNotEmpty() && '/' !in it && '\\' !in it } ?: return null
+        val file = idPhotoMaskFile(photoId, source, rev)
+        if (!file.isFile) return null
+        return runCatching { file.readBytes() }.getOrNull()?.takeIf { it.isNotEmpty() }
     }
 
     /** Edit/original thumb, or the full file when the thumb has not been written yet. */
@@ -216,19 +258,23 @@ class CatalogRepository @Inject constructor(
     }
 
     suspend fun deleteEdit(photoId: String, editId: String) = withContext(Dispatchers.IO) {
-        val resolved = resolvePhotoSource(editId)
-        if (resolved == "original") return@withContext
-        val current = get(photoId) ?: return@withContext
-        if (current.edits.none { it.id == resolved }) return@withContext
-        val next = current.copy(
-            edits = current.edits.filter { it.id != resolved },
-            framings = current.framings - resolved,
-        )
-        refreshGalleryFramedThumb(next)
-        db.photoDao().upsert(next.toEntity())
-        editFile(photoId, resolved).delete()
-        thumbFile(photoId, resolved).delete()
-        activityLog.record("catalog", "delete edit $resolved of $photoId")
+        rowLock.withLock {
+            val resolved = resolvePhotoSource(editId)
+            if (resolved == "original") return@withLock
+            val current = get(photoId) ?: return@withLock
+            if (current.edits.none { it.id == resolved }) return@withLock
+            val next = current.copy(
+                edits = current.edits.filter { it.id != resolved },
+                framings = current.framings - resolved,
+                idPhotos = current.idPhotos - resolved,
+            )
+            refreshGalleryFramedThumb(next)
+            db.photoDao().upsert(next.toEntity())
+            editFile(photoId, resolved).delete()
+            thumbFile(photoId, resolved).delete()
+            deleteIdMasks(photoId, resolved)
+            activityLog.record("catalog", "delete edit $resolved of $photoId")
+        }
     }
 
     fun persistFraming(photoId: String, source: String, framing: Framing?) {
@@ -236,22 +282,149 @@ class CatalogRepository @Inject constructor(
     }
 
     suspend fun saveFraming(photoId: String, source: String, framing: Framing?) = withContext(Dispatchers.IO) {
-        val current = get(photoId) ?: return@withContext
-        val next = current.withFraming(source, framing)
-        val display = galleryThumbSource(next) { thumbFile(next.id, it).exists() }
-        val framedMissing = next.framingFor(display) != null && !framedThumbFile(next.id).exists()
-        if (next.framings == current.framings && !framedMissing) return@withContext
-        refreshGalleryFramedThumb(next)
-        if (next.framings != current.framings) {
-            db.photoDao().upsert(next.toEntity())
+        rowLock.withLock {
+            val current = get(photoId) ?: return@withLock
+            val next = current.withFraming(source, framing)
+            val display = galleryThumbSource(next) { thumbFile(next.id, it).exists() }
+            val framedMissing = hasFramedThumb(next, display) && !framedThumbFile(next.id).exists()
+            if (next.framings == current.framings && !framedMissing) return@withLock
+            refreshGalleryFramedThumb(next)
+            if (next.framings != current.framings) {
+                db.photoDao().upsert(next.toEntity())
+            }
+        }
+    }
+
+    /**
+     * Studio's ID mode toggle, size and pose for one version (EDID010-R03). Merges only these
+     * fields: background, feather and the mask revision are left exactly as stored. The state is
+     * kept even when [active] is false, so leaving and re-entering ID mode restores it. An
+     * inactive save for a version that never entered ID mode writes nothing, so its first entry
+     * still starts from the initial pose (EDID010-R04).
+     */
+    suspend fun saveIdPhotoPose(photoId: String, source: String, active: Boolean, presetId: String, pose: IdPhotoPose) {
+        updateIdPhoto(photoId, source) { old ->
+            if (old == null && !active) return@updateIdPhoto null
+            (old ?: IdPhotoState()).copy(
+                active = active,
+                presetId = normalizeIdPhotoPresetId(presetId),
+            ).withPose(pose)
+        }
+    }
+
+    /** Fire-and-forget [saveIdPhotoPose] on the repository scope, so it outlives the caller. */
+    fun persistIdPhotoPose(photoId: String, source: String, active: Boolean, presetId: String, pose: IdPhotoPose) {
+        scope.launch { saveIdPhotoPose(photoId, source, active, presetId, pose) }
+    }
+
+    suspend fun setIdPhotoBackground(photoId: String, source: String, background: String) {
+        val id = idBackground(background).id
+        updateIdPhoto(photoId, source) { old -> (old ?: IdPhotoState()).copy(background = id) }
+    }
+
+    suspend fun setIdPhotoFeather(photoId: String, source: String, feather: String) {
+        val id = idFeather(feather).id
+        updateIdPhoto(photoId, source) { old -> (old ?: IdPhotoState()).copy(feather = id) }
+    }
+
+    /**
+     * Stores a validated mask for [source] as a new revision and points the version's ID state
+     * at it. The first mask of a version also selects navy and weak feathering (EDID040-R04/R07);
+     * a later one keeps the user's choices.
+     *
+     * Returns false, writing nothing, when the photo or the version no longer exists. The file is
+     * written to a temp name and renamed before the row changes; the previous revision's file is
+     * deleted only after the row points at the new one.
+     */
+    suspend fun saveIdPhotoMask(photoId: String, source: String, png: ByteArray): Boolean = withContext(Dispatchers.IO) {
+        rowLock.withLock {
+            val current = get(photoId) ?: return@withLock false
+            val key = framingVersionKey(source)
+            if (key != ORIGINAL_VERSION_ID && current.edits.none { it.id == key }) return@withLock false
+            val rev = UUID.randomUUID().toString().replace("-", "").take(MASK_REV_LENGTH)
+            val file = idPhotoMaskFile(photoId, key, rev)
+            writeAtomically(file, png)
+            val old = current.idPhotoFor(key)
+            val firstMask = old?.hasMask != true
+            val base = old ?: IdPhotoState()
+            val state = base.copy(
+                maskRev = rev,
+                background = if (firstMask) IdBackground.NAVY.id else base.background,
+                feather = if (firstMask) IdFeather.WEAK.id else base.feather,
+            ).normalized()
+            val next = current.withIdPhoto(key, state)
+            try {
+                if (state.active && key == displaySource(next)) refreshGalleryFramedThumb(next)
+                db.photoDao().upsert(next.toEntity())
+            } catch (e: Throwable) {
+                file.delete()
+                throw e
+            }
+            old?.maskRev?.takeIf { it != rev }?.let { idPhotoMaskFile(photoId, key, it).delete() }
+            activityLog.record("catalog", "save id photo mask $key of $photoId")
+            true
+        }
+    }
+
+    /**
+     * Read-modify-replace of one version's ID state under [rowLock]; [transform] returning null
+     * keeps the stored state. Upserts only on a change.
+     * The gallery's framed thumb is re-rendered first (so the row emission sees the new file)
+     * when the change can show on it: the version is the display version and ID mode is or was
+     * on, or the thumb it needs is missing.
+     */
+    private suspend fun updateIdPhoto(
+        photoId: String,
+        source: String,
+        transform: (IdPhotoState?) -> IdPhotoState?,
+    ) = withContext(Dispatchers.IO) {
+        rowLock.withLock {
+            val current = get(photoId) ?: return@withLock
+            val key = framingVersionKey(source)
+            val old = current.idPhotoFor(key)
+            val state = transform(old)?.normalized() ?: old
+            val next = current.withIdPhoto(key, state)
+            val display = displaySource(next)
+            val changed = state != old
+            val framedMissing = hasFramedThumb(next, display) && !framedThumbFile(next.id).exists()
+            if (!changed && !framedMissing) return@withLock
+            val showsOnThumb = key == display && (old?.active == true || state?.active == true)
+            if ((changed && showsOnThumb) || framedMissing) refreshGalleryFramedThumb(next)
+            if (changed) db.photoDao().upsert(next.toEntity())
+        }
+    }
+
+    private fun displaySource(photo: PhotoMeta): String =
+        galleryThumbSource(photo) { thumbFile(photo.id, it).exists() }
+
+    /** Temp file plus rename, so a crash never leaves a half-written file under the final name. */
+    private fun writeAtomically(file: File, bytes: ByteArray) {
+        val dir = checkNotNull(file.parentFile)
+        dir.mkdirs()
+        val temp = File(dir, "${file.name}.tmp")
+        try {
+            temp.writeBytes(bytes)
+            if (!temp.renameTo(file)) error("无法保存证件照蒙版")
+        } catch (e: Throwable) {
+            temp.delete()
+            throw e
+        }
+    }
+
+    /** Every mask revision of [versionKey], current or left behind. */
+    private fun deleteIdMasks(photoId: String, versionKey: String) {
+        val prefix = idMaskPrefix(versionKey)
+        idPhotoDir(photoId).listFiles()?.forEach { file ->
+            if (file.isFile && file.name.startsWith(prefix)) file.delete()
         }
     }
 
     private fun refreshGalleryFramedThumb(photo: PhotoMeta) {
         val source = galleryThumbSource(photo) { thumbFile(photo.id, it).exists() }
         val dest = framedThumbFile(photo.id)
+        val idState = photo.idPhotoFor(source)?.takeIf { it.active }
         val framing = photo.framingFor(source)
-        if (framing == null) {
+        if (idState == null && framing == null) {
             dest.delete()
             return
         }
@@ -261,17 +434,43 @@ class CatalogRepository @Inject constructor(
             return
         }
         runCatching {
-            val jpeg = ImagePipeline.renderPrintJpeg(
-                file.readBytes(),
-                crop = null,
-                fit = PrintFit.COVER,
-                landscape = framing.landscape,
-                rotationDegrees = framing.rotationDegrees,
-                placement = framing.toPlacement(),
-                watermark = null,
-                sheetForPrinter = false,
-            )
+            val bytes = file.readBytes()
+            val jpeg = if (idState != null) {
+                renderIdThumbSheet(photo.id, source, idState, bytes)
+            } else {
+                ImagePipeline.renderPrintJpeg(
+                    bytes,
+                    crop = null,
+                    fit = PrintFit.COVER,
+                    landscape = framing!!.landscape,
+                    rotationDegrees = framing.rotationDegrees,
+                    placement = framing.toPlacement(),
+                    watermark = null,
+                    sheetForPrinter = false,
+                )
+            }
             ImagePipeline.writeFile(dest, ImagePipeline.thumbnailJpeg(jpeg))
+        }
+    }
+
+    /**
+     * The ID sheet on the portrait printer sheet, so the 2:3 gallery card shows all of it. A
+     * missing or broken mask shows the layout with the original background rather than a stale
+     * thumb; printing and export still refuse it.
+     */
+    private fun renderIdThumbSheet(photoId: String, source: String, state: IdPhotoState, bytes: ByteArray): ByteArray {
+        val mask = if (idMaskRequired(state)) readIdPhotoMask(photoId, source, state.maskRev) else null
+        return try {
+            ImagePipeline.renderIdPhotoSheetJpeg(bytes, state, mask, outputScale = 1, sheetForPrinter = true)
+        } catch (e: IllegalStateException) {
+            if (e.message != ID_MASK_MSG_MISSING) throw e
+            ImagePipeline.renderIdPhotoSheetJpeg(
+                bytes,
+                state.copy(background = IdBackground.ORIGINAL.id),
+                null,
+                outputScale = 1,
+                sheetForPrinter = true,
+            )
         }
     }
 
@@ -426,11 +625,15 @@ class CatalogRepository @Inject constructor(
 
     private suspend fun deleteNow(id: String) {
         withContext(Dispatchers.IO) {
-            // Files first: a crash in between leaves a row with no files, which shows up as a
-            // failed thumbnail the user can delete again. The other order would leak files
-            // invisibly; pruneOrphans() mops up whatever slips through.
-            File(library, id).deleteRecursively()
-            db.photoDao().delete(id)
+            // Under rowLock so a late per-version write (a mask commit in particular) cannot
+            // recreate the folder or the row after the photo is gone.
+            rowLock.withLock {
+                // Files first: a crash in between leaves a row with no files, which shows up as a
+                // failed thumbnail the user can delete again. The other order would leak files
+                // invisibly; pruneOrphans() mops up whatever slips through.
+                File(library, id).deleteRecursively()
+                db.photoDao().delete(id)
+            }
             activityLog.record("catalog", "delete $id")
         }
     }
@@ -468,6 +671,7 @@ class CatalogRepository @Inject constructor(
         const val INBOX_MAX_AGE_MS = 10 * 60 * 1000L
         private const val ORPHAN_MIN_AGE_MS = 10 * 60 * 1000L
         private const val DELETE_PROGRESS_MIN = 10
+        private const val MASK_REV_LENGTH = 12
     }
 }
 
