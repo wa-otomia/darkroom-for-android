@@ -433,6 +433,52 @@ class IdPhotoMattingTest {
         }
     }
 
+    /**
+     * A row profile black → one grey px → white → one grey px → black, resampled bilinearly
+     * (render px centre mapped to mask coords, shifted by [offset] mask px) at [m] render px per
+     * mask px, then turned into α as compositeThroughMask does.
+     */
+    private fun resampledHardEdge(m: Double, grey: Int, offset: Double, h: Int): Pair<ByteArray, Int> {
+        val profile = IntArray(12) { 0 } + intArrayOf(grey) + IntArray(16) { 255 } + intArrayOf(grey) + IntArray(12) { 0 }
+        val w = (profile.size * m).toInt()
+        fun at(j: Int) = profile[j.coerceIn(0, profile.size - 1)]
+        val row = IntArray(w) { i ->
+            val x = (i + 0.5) / m - 0.5 + offset
+            val x0 = Math.floor(x).toInt()
+            val t = x - x0
+            idMaskLumaToAlpha(Math.round(at(x0) * (1 - t) + at(x0 + 1) * t).toInt())
+        }
+        return ByteArray(w * h) { i -> row[i % w].toByte() } to w
+    }
+
+    @Test
+    fun resampledHardEdgesStillFeatherInward() {
+        // EDID040-R07 硬边仍向内羽化: a one-grey-px hard edge stretched by the preview / export
+        // bilinear draw is still a rim at s = idMaskRimRadius(m), so it feathers exactly inward.
+        val h = 6
+        var oldRuleMisses = 0
+        for (m in listOf(0.3, 0.5, 0.7, 0.865, 1.0, 1.33, 1.5, 1.8, 2.5)) {
+            val s = idMaskRimRadius(m.toFloat())
+            for (grey in listOf(48, 64, 128, 192, 210)) {
+                for (k in 0 until 20) {
+                    val (a, w) = resampledHardEdge(m, grey, k / 20.0, h)
+                    assertTrue("m=$m grey=$grey k=$k", idMaskSoftAlpha(a, w, h, s).all { it.toInt() == 0 })
+                    for (r in listOf(2, 5)) {
+                        assertArrayEquals(
+                            "m=$m grey=$grey k=$k r=$r",
+                            featherAlphaInward(a, w, h, r),
+                            featherAlphaInwardKeepSoft(a, w, h, r, s),
+                        )
+                    }
+                    // The former one-mask-px rim, s = ceil(m), mistook some of these for hair.
+                    val oldS = Math.ceil(m - 1e-6).toInt().coerceAtLeast(1)
+                    if (idMaskSoftAlpha(a, w, h, oldS).any { it.toInt() != 0 }) oldRuleMisses++
+                }
+            }
+        }
+        assertTrue(oldRuleMisses > 0)
+    }
+
     @Test
     fun noDarkRingBetweenHairAndHead() {
         // Property 5: black → 12 px linear soft edge → white core, r = 10.
@@ -496,12 +542,15 @@ class IdPhotoMattingTest {
     }
 
     @Test
-    fun rimRadiusIsOneMaskPixelRoundedUp() {
+    fun rimRadiusIsTwoMaskPixelsRoundedUp() {
         assertEquals(1, idMaskRimRadius(0.2f))
-        assertEquals(1, idMaskRimRadius(1f))
-        assertEquals(2, idMaskRimRadius(1.2f))
-        assertEquals(2, idMaskRimRadius(2f))
-        assertEquals(4, idMaskRimRadius(3.5f))
+        assertEquals(1, idMaskRimRadius(0.5f))
+        assertEquals(2, idMaskRimRadius(0.865f))
+        assertEquals(2, idMaskRimRadius(1f))
+        assertEquals(3, idMaskRimRadius(1.2f))
+        assertEquals(4, idMaskRimRadius(1.8f))
+        assertEquals(4, idMaskRimRadius(2f))
+        assertEquals(7, idMaskRimRadius(3.5f))
         assertEquals(1, idMaskRimRadius(Float.NaN))
         assertEquals(1, idMaskRimRadius(-3f))
         assertEquals(1, idMaskRimRadius(Float.POSITIVE_INFINITY))

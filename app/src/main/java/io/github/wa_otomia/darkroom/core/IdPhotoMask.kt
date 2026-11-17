@@ -352,12 +352,15 @@ fun featherAlphaFor(
     }
 
 /**
- * Hard-edge rim radius in render px: one mask px spans [maskPxInRender] render px, so
- * s = max(1, ceil(that)). A non-finite or non-positive span gives 1.
+ * Hard-edge rim radius in render px: one mask px spans [maskPxInRender] = m render px. A hard
+ * edge with one grey mask px, once bilinearly resampled and thresholded by [idMaskLumaToAlpha],
+ * leaves a partial-α band up to about two mask px wide, so s = max(1, ceil(2·m)) keeps every
+ * px of that band within s of both an α 0 and an α 255 px. A non-finite or non-positive span
+ * gives 1.
  */
 fun idMaskRimRadius(maskPxInRender: Float): Int {
-    if (!maskPxInRender.isFinite() || maskPxInRender <= 1f) return 1
-    return ceil(maskPxInRender.toDouble() - 1e-6).toInt().coerceAtLeast(1)
+    if (!maskPxInRender.isFinite() || maskPxInRender <= 0.5f) return 1
+    return ceil(2.0 * maskPxInRender.toDouble() - 1e-6).toInt().coerceAtLeast(1)
 }
 
 /**

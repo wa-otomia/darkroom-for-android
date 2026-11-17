@@ -824,7 +824,7 @@ object ImagePipeline {
     /**
      * Draws [maskBitmap] through [maskMatrix] onto black at [target]'s size, turns its luma into
      * α, feathers α by [featherPx] in [target] px (inward when [featherInward], keeping hair
-     * soft edges; the rim radius is one mask px in [target] px) and composites
+     * soft edges; the rim radius is two mask px in [target] px) and composites
      * [target] over [background] in place. [maskBitmap] is recycled once drawn.
      */
     private fun compositeThroughMask(
@@ -849,7 +849,7 @@ object ImagePipeline {
         }
         recycle(maskBitmap)
         val alpha = ByteArray(w * h) { i -> idMaskLumaToAlpha(idMaskLuma(pixels[i])).toByte() }
-        // EDID040-R07: a stretched mask's hard edge spans about one mask px; that is the rim.
+        // EDID040-R07: a bilinearly stretched hard edge spans up to two mask px; that is the rim.
         val rimRadius = idMaskRimRadius(maskMatrix.mapRadius(1f))
         val feathered = featherAlphaFor(alpha, w, h, featherPx, featherInward, rimRadius)
         target.getPixels(pixels, 0, w, 0, 0, w, h)
