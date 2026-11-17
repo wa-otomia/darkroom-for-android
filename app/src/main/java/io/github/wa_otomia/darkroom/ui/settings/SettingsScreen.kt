@@ -988,6 +988,8 @@ fun SettingsScreen(
                                 is AiProbe.Timeout -> stringResource(R.string.settings_grok_test_timeout)
                                 is AiProbe.NoKey -> stringResource(R.string.settings_grok_test_nokey)
                                 is AiProbe.InvalidUrl -> stringResource(R.string.settings_grok_test_badurl)
+                                // Stage 2 gives this its own "not signed in" text; unreachable until then.
+                                is AiProbe.NotSignedIn -> stringResource(R.string.settings_grok_test_nokey)
                             }
                         }
                         val passed = probe is AiProbe.Ok && !modelMissing

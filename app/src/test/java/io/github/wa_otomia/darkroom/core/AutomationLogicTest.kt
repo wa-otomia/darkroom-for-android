@@ -14,6 +14,7 @@ class AutomationLogicTest {
         aiConfigured: Boolean = true,
         watermarkConfigured: Boolean = true,
         printerBound: Boolean = true,
+        aiReloginRequired: Boolean = false,
     ) = planAutomation(
         autoEdit = autoEdit,
         autoWatermark = autoWatermark,
@@ -22,6 +23,7 @@ class AutomationLogicTest {
         aiConfigured = aiConfigured,
         watermarkConfigured = watermarkConfigured,
         printerBound = printerBound,
+        aiReloginRequired = aiReloginRequired,
     )
 
     @Test
@@ -176,5 +178,36 @@ class AutomationLogicTest {
         assertFalse(got.edit)
         assertFalse(got.watermark)
         assertFalse(got.print)
+    }
+
+    @Test
+    fun reloginReplacesNoKeyInOrder() {
+        val got = plan(
+            autoEdit = true,
+            autoWatermark = true,
+            autoPrint = true,
+            presetId = AI_PRESET_NONE,
+            aiConfigured = false,
+            aiReloginRequired = true,
+        )
+        assertEquals(listOf(SKIP_EDIT_NO_PRESET, SKIP_EDIT_RELOGIN), got.skipped)
+        assertFalse(got.edit)
+        assertTrue(got.print)
+    }
+
+    @Test
+    fun reloginSkipKeepsPrintingOriginal() {
+        val got = plan(autoEdit = true, autoPrint = true, aiConfigured = false, aiReloginRequired = true)
+        assertEquals(listOf(SKIP_EDIT_RELOGIN), got.skipped)
+        assertFalse(got.skipped.contains(SKIP_EDIT_NO_KEY))
+        assertFalse(got.edit)
+        assertTrue(got.print)
+    }
+
+    @Test
+    fun reloginFlagIgnoredWhenReady() {
+        val got = plan(autoEdit = true, aiConfigured = true, aiReloginRequired = true)
+        assertTrue(got.edit)
+        assertTrue(got.skipped.isEmpty())
     }
 }

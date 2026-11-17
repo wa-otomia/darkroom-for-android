@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import io.github.wa_otomia.darkroom.core.AI_PRESET_NONE
+import io.github.wa_otomia.darkroom.core.AiAuthMode
+import io.github.wa_otomia.darkroom.core.AiCredentialState
 import io.github.wa_otomia.darkroom.core.AiPreset
 import io.github.wa_otomia.darkroom.core.AiPresetStore
 import io.github.wa_otomia.darkroom.core.AiProvider
@@ -15,7 +17,9 @@ import io.github.wa_otomia.darkroom.core.FgsPause
 import io.github.wa_otomia.darkroom.core.PrintFit
 import io.github.wa_otomia.darkroom.core.ProviderSettings
 import io.github.wa_otomia.darkroom.core.PublicAiSettings
+import io.github.wa_otomia.darkroom.core.SubscriptionSnapshot
 import io.github.wa_otomia.darkroom.core.WatermarkSettings
+import io.github.wa_otomia.darkroom.core.credentialState
 import io.github.wa_otomia.darkroom.core.defaultProviderSettings
 import io.github.wa_otomia.darkroom.core.mergeBuiltinPresets
 import io.github.wa_otomia.darkroom.core.mergeFgsPause
@@ -31,6 +35,7 @@ import io.github.wa_otomia.darkroom.core.printFitWire
 import io.github.wa_otomia.darkroom.core.seedAiPresets
 import io.github.wa_otomia.darkroom.core.toPublicAi
 import io.github.wa_otomia.darkroom.core.validateAiPresetFields
+import io.github.wa_otomia.darkroom.data.ai.KeystoreXaiTokenStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,6 +64,7 @@ data class AppSettings(
 @Singleton
 class SettingsRepository @Inject constructor(
     @ApplicationContext context: Context,
+    private val xaiTokens: KeystoreXaiTokenStore,
 ) {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
@@ -204,7 +210,55 @@ class SettingsRepository @Inject constructor(
         )
     }
 
-    fun aiConfigured(): Boolean = readAi().activeSettings.apiKey.isNotBlank()
+    fun aiConfigured(): Boolean = aiCredentialState() == AiCredentialState.READY
+
+    // --- xAI subscription sign-in (AIPV010-R04/R05, AIPV050) ---------------------------------
+    // Tokens live only in KeystoreXaiTokenStore; these keys hold non-secret state. Missing keys
+    // mean the defaults (API key mode, empty client ID, both flags false), so no migration.
+
+    fun grokAuthMode(): AiAuthMode = AiAuthMode.fromId(prefs.getString(KEY_GROK_AUTH_MODE, null))
+
+    /** Switching to API key: the caller cancels any sign-in in progress first. Keeps key and tokens. */
+    fun setGrokAuthMode(mode: AiAuthMode) {
+        prefs.edit().putString(KEY_GROK_AUTH_MODE, mode.id).commit()
+        publishAi()
+    }
+
+    fun grokClientId(): String = prefs.getString(KEY_GROK_CLIENT_ID, "").orEmpty().trim()
+
+    /** @return false (nothing written) while signed in: the client ID is read-only until sign-out. */
+    fun setGrokClientId(id: String): Boolean {
+        if (xaiTokens.hasCredential()) return false
+        prefs.edit().putString(KEY_GROK_CLIENT_ID, id.trim()).commit()
+        publishAi()
+        return true
+    }
+
+    fun isGrokReloginRequired(): Boolean = prefs.getBoolean(KEY_GROK_RELOGIN_REQUIRED, false)
+
+    fun setGrokReloginRequired(required: Boolean) {
+        prefs.edit().putBoolean(KEY_GROK_RELOGIN_REQUIRED, required).commit()
+        publishAi()
+    }
+
+    /** True while a device sign-in is running; still true after a restart means the process died mid-login. */
+    fun isLoginInProgress(): Boolean = prefs.getBoolean(KEY_GROK_LOGIN_IN_PROGRESS, false)
+
+    fun setLoginInProgress(inProgress: Boolean) {
+        prefs.edit().putBoolean(KEY_GROK_LOGIN_IN_PROGRESS, inProgress).commit()
+    }
+
+    /** The AI readiness gate for the active provider; no fallback between API key and subscription. */
+    fun aiCredentialState(): AiCredentialState {
+        val ai = readAi()
+        return credentialState(
+            provider = ai.active,
+            mode = grokAuthMode(),
+            apiKey = ai.activeSettings.apiKey,
+            hasSubscriptionCredential = xaiTokens.hasCredential(),
+            reloginRequired = isGrokReloginRequired(),
+        )
+    }
 
     fun updateProvider(
         provider: AiProvider,
@@ -279,13 +333,24 @@ class SettingsRepository @Inject constructor(
         _watermark.value = readWatermark()
     }
 
-    private fun publishAi() {
+    fun publishAi() {
         val settings = readAi()
         val cached = AiProvider.entries.associateWith { cachedModels(it) }
-        _ai.value = toPublicAi(settings, cached)
+        val stored = xaiTokens.load()
+        val grokAuth = SubscriptionSnapshot(
+            mode = grokAuthMode(),
+            clientId = grokClientId(),
+            hasCredential = stored != null,
+            reloginRequired = isGrokReloginRequired(),
+            accountLabel = stored?.tokens?.accountLabel,
+        )
+        _ai.value = toPublicAi(settings, cached, grokAuth)
     }
 
-    /** Restores device configuration to factory defaults. AI presets and the photo catalog are left untouched. */
+    /**
+     * Restores device configuration to factory defaults. AI presets and the photo catalog are left untouched.
+     * Subscription tokens are deleted and revoked by XaiCredentials.clearForReset() before this runs.
+     */
     fun resetAll() {
         prefs.edit()
             .putString(KEY_PRINTER_MAC, "")
@@ -316,6 +381,10 @@ class SettingsRepository @Inject constructor(
             .putString(KEY_OPENAI_MODELS, "[]")
             .putString(KEY_WATERMARK, json.encodeToString(WatermarkSettings()))
             .remove(KEY_ID_PHOTO_PRESET)
+            .putString(KEY_GROK_AUTH_MODE, AiAuthMode.API_KEY.id)
+            .putString(KEY_GROK_CLIENT_ID, "")
+            .putBoolean(KEY_GROK_RELOGIN_REQUIRED, false)
+            .putBoolean(KEY_GROK_LOGIN_IN_PROGRESS, false)
             .apply()
         _settings.value = readSettings()
         _watermark.value = readWatermark()
@@ -418,6 +487,10 @@ class SettingsRepository @Inject constructor(
         private const val KEY_WATERMARK = "watermark"
         private const val KEY_PRESETS = "presets"
         private const val KEY_ID_PHOTO_PRESET = "id_photo_preset"
+        private const val KEY_GROK_AUTH_MODE = "grok_auth_mode"
+        private const val KEY_GROK_CLIENT_ID = "grok_client_id"
+        private const val KEY_GROK_RELOGIN_REQUIRED = "grok_relogin_required"
+        private const val KEY_GROK_LOGIN_IN_PROGRESS = "grok_login_in_progress"
 
         fun generatePassword(): String {
             val alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"

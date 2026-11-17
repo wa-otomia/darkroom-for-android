@@ -1,19 +1,31 @@
 package io.github.wa_otomia.darkroom.data.ai
 
 import android.util.Base64
+import io.github.wa_otomia.darkroom.core.AiAuthMode
 import io.github.wa_otomia.darkroom.core.AiProvider
+import io.github.wa_otomia.darkroom.core.AuthAttempt
+import io.github.wa_otomia.darkroom.core.CredentialResult
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NEED_KEY
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NOT_SIGNED_IN
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_RELOGIN
 import io.github.wa_otomia.darkroom.core.ID_PHOTO_MASK_PROMPT
 import io.github.wa_otomia.darkroom.core.ProviderSettings
+import io.github.wa_otomia.darkroom.core.XAI_API_BASE
+import io.github.wa_otomia.darkroom.core.XAI_MSG_FORBIDDEN
+import io.github.wa_otomia.darkroom.core.XAI_MSG_QUOTA
+import io.github.wa_otomia.darkroom.core.XaiCredentialException
 import io.github.wa_otomia.darkroom.core.buildGrokEditJson
 import io.github.wa_otomia.darkroom.core.imagesEditsUrl
+import io.github.wa_otomia.darkroom.core.effectiveAuthMode
 import io.github.wa_otomia.darkroom.core.imagineErrorMessage
+import io.github.wa_otomia.darkroom.core.isAllowedApiUrl
 import io.github.wa_otomia.darkroom.core.modelsListFallbackUrl
 import io.github.wa_otomia.darkroom.core.modelsListUrl
 import io.github.wa_otomia.darkroom.core.normalizeAiBaseUrl
 import io.github.wa_otomia.darkroom.core.parseImageEditResponse
 import io.github.wa_otomia.darkroom.core.parseModelIds
 import io.github.wa_otomia.darkroom.core.sanitizeAiSecrets
+import io.github.wa_otomia.darkroom.core.xaiCredentialMessage
 import io.github.wa_otomia.darkroom.data.imaging.ImagePipeline
 import io.github.wa_otomia.darkroom.data.imaging.ImagePipeline.IdMaskUpload
 import io.github.wa_otomia.darkroom.data.settings.ActivityLog
@@ -64,6 +76,9 @@ sealed interface AiProbe {
     object Timeout : AiProbe
     object NoKey : AiProbe
     object InvalidUrl : AiProbe
+
+    /** Grok subscription mode without a usable sign-in; no request was sent (AIPV020-R04). */
+    object NotSignedIn : AiProbe
 }
 
 data class AiProgress(
@@ -88,6 +103,7 @@ class AiImageClient @Inject constructor(
     private val activityLog: ActivityLog,
     @Suppress("unused")
     @ApplicationScope private val appScope: CoroutineScope,
+    private val xaiCredentials: XaiCredentials,
 ) {
     private val http = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -103,11 +119,25 @@ class AiImageClient @Inject constructor(
             .build()
     }
 
+    // Subscription tokens must never follow a redirect to another host (AIPV060-R02).
+    private val subscriptionHttp: OkHttpClient by lazy {
+        http.newBuilder().followRedirects(false).followSslRedirects(false).build()
+    }
+
+    private val subscriptionProbeHttp: OkHttpClient by lazy {
+        probeHttp.newBuilder().followRedirects(false).followSslRedirects(false).build()
+    }
+
+    private fun grokSubscription(provider: AiProvider): Boolean =
+        provider == AiProvider.GROK &&
+            effectiveAuthMode(provider, settings.grokAuthMode()) == AiAuthMode.SUBSCRIPTION
+
     private val _progress = MutableSharedFlow<AiProgress>(extraBufferCapacity = 32)
     val progress: SharedFlow<AiProgress> = _progress
 
     suspend fun listModels(provider: AiProvider, baseUrl: String, apiKey: String): AiProbe =
         withContext(Dispatchers.IO) {
+            if (grokSubscription(provider)) return@withContext listModelsSubscription(provider)
             val stored = settings.readAi().byProvider[provider]
             val key = apiKey.trim().ifEmpty { stored?.apiKey.orEmpty() }
             if (key.isBlank()) return@withContext AiProbe.NoKey
@@ -130,6 +160,42 @@ class AiImageClient @Inject constructor(
             }
             outcome
         }
+
+    /**
+     * Grok subscription probe: fixed api.x.ai base, the same primary/fallback routes as the API key
+     * probe, the token from the shared refresh lock, and one forced refresh on 401. Ignores the
+     * key field and the base URL draft; with no sign-in it returns [AiProbe.NotSignedIn] offline.
+     */
+    private suspend fun listModelsSubscription(provider: AiProvider): AiProbe {
+        if (!xaiCredentials.hasCredential()) {
+            activityLog.record("ai", "listModels ${provider.id} GET -> not_signed_in auth=subscription", status = "error")
+            return AiProbe.NotSignedIn
+        }
+        val startedAt = System.currentTimeMillis()
+        fun elapsed() = System.currentTimeMillis() - startedAt
+        val primary = modelsListUrl(provider, XAI_API_BASE)
+        val raw = try {
+            xaiCredentials.withToken { token ->
+                val probe = probeUrl(primary, token, subscriptionProbeHttp) { body -> parseModelIds(provider, body) }
+                    ?: fallbackList(provider, XAI_API_BASE, token, subscriptionProbeHttp)
+                if (probe is AiProbe.Unauthorized && probe.status == 401) AuthAttempt.Unauthorized else AuthAttempt.Done(probe)
+            }
+        } catch (e: XaiCredentialException) {
+            when (e.result) {
+                CredentialResult.NotSignedIn, CredentialResult.ReloginRequired -> AiProbe.NotSignedIn
+                CredentialResult.Transient -> AiProbe.Unreachable
+                else -> AiProbe.Unauthorized(401)
+            }
+        }
+        val outcome = if (raw is AiProbe.Ok) raw.copy(elapsedMs = elapsed()) else raw
+        activityLog.record(
+            "ai",
+            "listModels ${provider.id} GET -> ${probeLabel(outcome)} ${elapsed()}ms auth=subscription",
+            status = if (outcome is AiProbe.Ok) "ok" else "error",
+        )
+        if (outcome is AiProbe.Ok) settings.cacheModels(provider, outcome.models)
+        return outcome
+    }
 
     suspend fun edit(
         image: ByteArray,
@@ -181,6 +247,13 @@ class AiImageClient @Inject constructor(
                 purpose = "mask",
                 missingKeyProgress = ID_MASK_MSG_NEED_KEY,
                 missingKeyMessage = ID_MASK_MSG_NEED_KEY,
+                credentialMessage = { result ->
+                    when (result) {
+                        CredentialResult.NotSignedIn -> ID_MASK_MSG_NOT_SIGNED_IN
+                        CredentialResult.ReloginRequired -> ID_MASK_MSG_RELOGIN
+                        else -> xaiCredentialMessage(result)
+                    }
+                },
                 onProgress = onProgress,
             ) { onBytes ->
                 val upload = ImagePipeline.idMaskUpload(image, padToCanvas = provider == AiProvider.OPENAI)
@@ -204,6 +277,10 @@ class AiImageClient @Inject constructor(
      * Shared transport for [edit] and [mask]: key check, activity log, request body built by
      * [buildBody] (upload preparation included, so its failures are logged like request failures),
      * upload/download progress, cancellation and sanitized failure logging.
+     *
+     * Grok in subscription mode (AIPV060) posts to the fixed api.x.ai endpoint with the
+     * subscription access token instead of the API key; a 401 forces one refresh and rebuilds and
+     * resends the body once. Credential failures happen before any upload.
      */
     private suspend fun execute(
         cfg: ProviderSettings,
@@ -212,6 +289,7 @@ class AiImageClient @Inject constructor(
         purpose: String,
         missingKeyProgress: String,
         missingKeyMessage: String,
+        credentialMessage: (CredentialResult) -> String = ::xaiCredentialMessage,
         onProgress: (AiProgress) -> Unit,
         buildBody: (onBytes: (Long, Long) -> Unit) -> RequestBody,
     ): ByteArray =
@@ -224,68 +302,33 @@ class AiImageClient @Inject constructor(
                 onProgress(update)
                 _progress.tryEmit(update)
             }
-            if (cfg.apiKey.isBlank()) {
+            val subscription = grokSubscription(provider)
+            if (!subscription && cfg.apiKey.isBlank()) {
                 emit("error", error = missingKeyProgress)
                 error(missingKeyMessage)
             }
             emit("preparing")
-            val url = imagesEditsUrl(cfg.baseUrl, provider.defaultBaseUrl)
+            val url = if (subscription) "$XAI_API_BASE/images/edits" else imagesEditsUrl(cfg.baseUrl, provider.defaultBaseUrl)
             activityLog.record(
                 "ai",
-                "POST $url ${provider.id} ${cfg.model} ${cfg.resolution}/${cfg.quality} photo=$photoId purpose=$purpose",
+                "POST $url ${provider.id} ${cfg.model} ${cfg.resolution}/${cfg.quality} photo=$photoId purpose=$purpose" +
+                    if (subscription) " auth=subscription" else "",
             )
             try {
-                val requestBody = buildBody { written, total ->
-                    emit("uploading", written, total)
-                    if (written >= total && total > 0) emit("processing")
-                }
-                val req = Request.Builder()
-                    .url(url)
-                    .header("Authorization", "Bearer ${cfg.apiKey}")
-                    .post(requestBody)
-                    .build()
-                val call = http.newCall(req)
-                val cancelOnCompletion = currentCoroutineContext().job.invokeOnCompletion { cause ->
-                    if (cause is CancellationException) call.cancel()
-                }
-                try {
-                    call.awaitResponse().use { res ->
-                        val raw = readBody(res) { phase, loaded, total, error -> emit(phase, loaded, total, error) }
-                        val parsed = parseImageEditResponse(String(raw, Charsets.UTF_8))
-                        if (!res.isSuccessful) error(imagineErrorMessage(parsed, res.code))
-                        val rawImage = when {
-                            parsed.b64.isNotBlank() -> Base64.decode(parsed.b64, Base64.DEFAULT)
-                            parsed.url.isNotBlank() -> {
-                                val imgCall = http.newCall(Request.Builder().url(parsed.url).build())
-                                val cancelImg = currentCoroutineContext().job.invokeOnCompletion { cause ->
-                                    if (cause is CancellationException) imgCall.cancel()
-                                }
-                                try {
-                                    imgCall.awaitResponse().use { img ->
-                                        if (!img.isSuccessful) error("无法下载返回的图片")
-                                        readBody(img) { phase, loaded, total, error ->
-                                            emit(phase, loaded, total, error)
-                                        }
-                                    }
-                                } catch (e: CancellationException) {
-                                    imgCall.cancel()
-                                    throw e
-                                } finally {
-                                    cancelImg.dispose()
-                                }
-                            }
-                            else -> error("没有返回图片")
-                        }
-                        emit("downloaded", rawImage.size.toLong(), rawImage.size.toLong())
-                        activityLog.record("ai", "ok ${rawImage.size}B")
-                        return@withContext rawImage
+                val rawImage = if (subscription) {
+                    check(isAllowedApiUrl(url)) { "subscription URL" }
+                    xaiCredentials.withToken(credentialMessage) { token ->
+                        sendEdit(url, token, subscription = true, buildBody = buildBody, emit = ::emit)
                     }
-                } catch (e: CancellationException) {
-                    call.cancel()
-                    throw e
-                } finally {
-                    cancelOnCompletion.dispose()
+                } else {
+                    when (val attempt = sendEdit(url, cfg.apiKey, subscription = false, buildBody = buildBody, emit = ::emit)) {
+                        is AuthAttempt.Done -> attempt.value
+                        AuthAttempt.Unauthorized -> error("unreachable")
+                    }
                 }
+                emit("downloaded", rawImage.size.toLong(), rawImage.size.toLong())
+                activityLog.record("ai", "ok ${rawImage.size}B")
+                return@withContext rawImage
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -298,6 +341,73 @@ class AiImageClient @Inject constructor(
                 throw e
             }
         }
+
+    /**
+     * One request/response round trip. [AuthAttempt.Unauthorized] only for a subscription 401, so
+     * the caller can refresh and resend; the body is rebuilt on every call.
+     */
+    private suspend fun sendEdit(
+        url: String,
+        credential: String,
+        subscription: Boolean,
+        buildBody: (onBytes: (Long, Long) -> Unit) -> RequestBody,
+        emit: (String, Long?, Long?, String?) -> Unit,
+    ): AuthAttempt<ByteArray> {
+        val requestBody = buildBody { written, total ->
+            emit("uploading", written, total, null)
+            if (written >= total && total > 0) emit("processing", null, null, null)
+        }
+        val req = Request.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $credential")
+            .post(requestBody)
+            .build()
+        val call = (if (subscription) subscriptionHttp else http).newCall(req)
+        val cancelOnCompletion = currentCoroutineContext().job.invokeOnCompletion { cause ->
+            if (cause is CancellationException) call.cancel()
+        }
+        try {
+            call.awaitResponse().use { res ->
+                if (subscription && res.code == 401) return AuthAttempt.Unauthorized
+                val raw = readBody(res) { phase, loaded, total, error -> emit(phase, loaded, total, error) }
+                val parsed = parseImageEditResponse(String(raw, Charsets.UTF_8))
+                if (!res.isSuccessful) {
+                    if (subscription && res.code == 403) error(XAI_MSG_FORBIDDEN)
+                    if (subscription && res.code == 429) error(XAI_MSG_QUOTA)
+                    error(imagineErrorMessage(parsed, res.code))
+                }
+                val rawImage = when {
+                    parsed.b64.isNotBlank() -> Base64.decode(parsed.b64, Base64.DEFAULT)
+                    parsed.url.isNotBlank() -> {
+                        val imgCall = http.newCall(Request.Builder().url(parsed.url).build())
+                        val cancelImg = currentCoroutineContext().job.invokeOnCompletion { cause ->
+                            if (cause is CancellationException) imgCall.cancel()
+                        }
+                        try {
+                            imgCall.awaitResponse().use { img ->
+                                if (!img.isSuccessful) error("无法下载返回的图片")
+                                readBody(img) { phase, loaded, total, error ->
+                                    emit(phase, loaded, total, error)
+                                }
+                            }
+                        } catch (e: CancellationException) {
+                            imgCall.cancel()
+                            throw e
+                        } finally {
+                            cancelImg.dispose()
+                        }
+                    }
+                    else -> error("没有返回图片")
+                }
+                return AuthAttempt.Done(rawImage)
+            }
+        } catch (e: CancellationException) {
+            call.cancel()
+            throw e
+        } finally {
+            cancelOnCompletion.dispose()
+        }
+    }
 
     private fun grokEditBody(
         cfg: io.github.wa_otomia.darkroom.core.ProviderSettings,
@@ -333,10 +443,15 @@ class AiImageClient @Inject constructor(
         return CountingRequestBody(multipart, onBytes)
     }
 
-    private suspend fun fallbackList(provider: AiProvider, base: String, key: String): AiProbe {
+    private suspend fun fallbackList(
+        provider: AiProvider,
+        base: String,
+        key: String,
+        client: OkHttpClient = probeHttp,
+    ): AiProbe {
         val fallback = modelsListFallbackUrl(provider, base)?.toHttpUrlOrNull()
             ?: return AiProbe.NotFound
-        return probeUrl(fallback.toString(), key) { body -> parseModelIds(provider, body) }
+        return probeUrl(fallback.toString(), key, client) { body -> parseModelIds(provider, body) }
             ?: AiProbe.NotFound
     }
 
@@ -344,14 +459,19 @@ class AiImageClient @Inject constructor(
      * Returns a verdict for [url], or null when Grok's primary listing route 404s so the caller
      * can try the OpenAI-compatible `/models` fallback.
      */
-    private suspend fun probeUrl(url: String, key: String, parse: (String) -> List<String>): AiProbe? {
+    private suspend fun probeUrl(
+        url: String,
+        key: String,
+        client: OkHttpClient = probeHttp,
+        parse: (String) -> List<String>,
+    ): AiProbe? {
         val httpUrl = url.toHttpUrlOrNull() ?: return AiProbe.InvalidUrl
         val request = Request.Builder()
             .url(httpUrl)
             .header("Authorization", "Bearer $key")
             .build()
         return try {
-            val res = probeHttp.newCall(request).awaitProbe()
+            val res = client.newCall(request).awaitProbe()
             when {
                 res.successful -> AiProbe.Ok(parse(res.body), 0)
                 res.code == 404 -> null
@@ -466,4 +586,5 @@ private fun probeLabel(probe: AiProbe): String = when (probe) {
     is AiProbe.Timeout -> "timeout"
     is AiProbe.NoKey -> "no_key"
     is AiProbe.InvalidUrl -> "invalid_url"
+    is AiProbe.NotSignedIn -> "not_signed_in"
 }

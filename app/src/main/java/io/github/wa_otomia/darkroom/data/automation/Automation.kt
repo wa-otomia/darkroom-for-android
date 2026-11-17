@@ -1,5 +1,6 @@
 package io.github.wa_otomia.darkroom.data.automation
 
+import io.github.wa_otomia.darkroom.core.AiCredentialState
 import io.github.wa_otomia.darkroom.core.SKIP_WATERMARK_NO_PRINT
 import io.github.wa_otomia.darkroom.core.isConfigured
 import io.github.wa_otomia.darkroom.core.planAutomation
@@ -20,7 +21,8 @@ class Automation @Inject constructor(
     fun onIngested(photoId: String, origin: String) {
         val app = settings.readSettings()
         val presetId = settings.readPresets().lastSelectedId
-        val aiConfigured = settings.aiConfigured()
+        val aiState = settings.aiCredentialState()
+        val aiConfigured = aiState == AiCredentialState.READY
         val watermarkConfigured = settings.readWatermark().isConfigured()
         val plan = planAutomation(
             autoEdit = app.autoEdit,
@@ -30,6 +32,7 @@ class Automation @Inject constructor(
             aiConfigured = aiConfigured,
             watermarkConfigured = watermarkConfigured,
             printerBound = app.printerMac.isNotBlank(),
+            aiReloginRequired = aiState == AiCredentialState.RELOGIN_REQUIRED,
         )
         for (reason in plan.skipped) {
             activityLog.record("automation", "$origin skipped $reason")

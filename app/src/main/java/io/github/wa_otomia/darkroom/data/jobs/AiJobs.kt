@@ -9,6 +9,9 @@ import io.github.wa_otomia.darkroom.core.combineGeneratePrompt
 import io.github.wa_otomia.darkroom.core.generatedPhotoFilename
 import io.github.wa_otomia.darkroom.core.resolvePhotoSource
 import io.github.wa_otomia.darkroom.core.sanitizeAiSecrets
+import io.github.wa_otomia.darkroom.core.AiCredentialState
+import io.github.wa_otomia.darkroom.core.aiNotReadyMessage
+import io.github.wa_otomia.darkroom.core.idMaskNotReadyMessage
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
 import io.github.wa_otomia.darkroom.data.ai.AiImageClient
 import io.github.wa_otomia.darkroom.data.imaging.ImagePipeline
@@ -114,7 +117,8 @@ class AiJobs @Inject constructor(
     /**
      * Starts a person-matte job for one version (EDID040, AIJB010-R04). Returns the job id, or null
      * when any AI job row for [photoId] exists (hidden or still in its finished/failed tail).
-     * Throws [IllegalStateException] with [ID_MASK_MSG_NEED_KEY] when no AI key is configured.
+     * Throws [IllegalStateException] with [ID_MASK_MSG_NEED_KEY] (or the subscription variant from
+     * [idMaskNotReadyMessage]) when the AI credential is not ready.
      *
      * The version key is frozen here, so switching versions later still stores the mask on the
      * originating version. The job never uses presets or extra prompts, never touches the last
@@ -123,7 +127,7 @@ class AiJobs @Inject constructor(
      */
     fun enqueueMask(photoId: String, source: String): String? {
         // D8 gate: no key means no job and no request. The job re-checks at execution time.
-        if (!settings.aiConfigured()) error(ID_MASK_MSG_NEED_KEY)
+        settings.aiCredentialState().takeIf { it != AiCredentialState.READY }?.let { error(idMaskNotReadyMessage(it)) }
         val versionKey = resolvePhotoSource(source)
         val id = UUID.randomUUID().toString()
         val row = AiJob(
@@ -159,7 +163,7 @@ class AiJobs @Inject constructor(
             val ticker = tracker.launchTicks(this) { publish(id, tracker) }
             var committed = false
             try {
-                if (!settings.aiConfigured()) error(ID_MASK_MSG_NEED_KEY)
+                settings.aiCredentialState().takeIf { it != AiCredentialState.READY }?.let { error(idMaskNotReadyMessage(it)) }
                 val raw = withContext(Dispatchers.IO) {
                     val file = catalog.sourceFile(photoId, versionKey)
                     if (!file.isFile) error(ID_MASK_MSG_VERSION_GONE)
@@ -253,7 +257,9 @@ class AiJobs @Inject constructor(
                 val preset = store.presets.find { it.id == presetId }
                 val presetPrompt = preset?.prompt.orEmpty()
                 val combined = combineGeneratePrompt(presetPrompt, prompt)
-                if (!settings.aiConfigured()) error("未配置 AI 钥匙。去设置页填入 API key 后再${if (kind == AiKind.Generate) "生成" else "修图"}。")
+                settings.aiCredentialState().takeIf { it != AiCredentialState.READY }?.let {
+                    error(aiNotReadyMessage(it, if (kind == AiKind.Generate) "生成" else "修图"))
+                }
                 val file = catalog.sourceFile(photoId, resolvePhotoSource(source))
                 val raw = file.readBytes()
                 val upload = if (appliedFraming != null) {
@@ -309,7 +315,7 @@ class AiJobs @Inject constructor(
                 _jobs.update { list -> list.filter { it.id != id } }
                 _events.tryEmit(StudioJobEvent.Failed(photoId, kind.action, ""))
             } catch (e: Exception) {
-                val message = e.message ?: e.toString()
+                val message = sanitizeAiSecrets(e.message ?: e.toString())
                 tracker.fail(message)
                 publish(id, tracker)
                 _events.tryEmit(StudioJobEvent.Failed(photoId, kind.action, message))
