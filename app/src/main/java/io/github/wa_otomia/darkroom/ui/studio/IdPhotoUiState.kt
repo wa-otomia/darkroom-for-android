@@ -11,6 +11,7 @@ internal data class CutoutKey(
     val maskRev: String,
     val argb: Int,
     val feather: String,
+    val featherInward: Boolean,
     val cellWidth: Int,
     val cellHeight: Int,
     val zoomStep: Int,
@@ -48,6 +49,63 @@ internal fun cutoutStart(
     val zoomMoving = (lastRequested != null && lastRequested.zoomStep != key.zoomStep) ||
         (held != null && held.copy(zoomStep = key.zoomStep) == key)
     return if (zoomMoving) CutoutStart.Debounced else CutoutStart.Now
+}
+
+/** How the preview moves from the cut-out on screen to the one the current inputs want (D3). */
+internal enum class CutoutTransition {
+    /** The cut-out on screen already matches. */
+    NONE,
+
+    /** Background, feather, inward feather or mask revision changed: freeze until the new one lands. */
+    FREEZE,
+
+    /**
+     * Only the feather scale changed (zoom step or cell size): keep the old cut-out, never freeze.
+     * The cell size only rescales the feather radius, like the zoom step.
+     */
+    ZOOM_ONLY,
+
+    /** No composite is wanted (original background or no mask): show the source at once. */
+    ORIGINAL,
+}
+
+/**
+ * [prev] is the key of the cut-out on screen (null when none), [next] the key the current inputs
+ * want (null when the background is the original or there is no mask).
+ */
+internal fun cutoutTransition(prev: CutoutKey?, next: CutoutKey?): CutoutTransition = when {
+    next == null -> CutoutTransition.ORIGINAL
+    prev == next -> CutoutTransition.NONE
+    prev != null && prev.copy(cellWidth = next.cellWidth, cellHeight = next.cellHeight, zoomStep = next.zoomStep) == next ->
+        CutoutTransition.ZOOM_ONLY
+    else -> CutoutTransition.FREEZE
+}
+
+/** What the preview shows: the held cut-out or the source, and whether the controls are frozen. */
+internal data class CutoutView(val showHeld: Boolean, val frozen: Boolean)
+
+/**
+ * The preview state for [key] while [held] is the finished cut-out kept on screen (D3,
+ * EDID040-R08). A held cut-out of another source file is never shown. A freeze ends when the new
+ * cut-out lands, when this mask revision is known missing or undecodable ([failedMask]; the
+ * source is shown with the missing-mask note) or when the bounded retries for [key] are used up
+ * ([gaveUp]; the source is shown rather than an old colour).
+ */
+internal fun cutoutView(
+    held: CutoutKey?,
+    key: CutoutKey?,
+    failedMask: CutoutKey?,
+    gaveUp: CutoutKey?,
+): CutoutView {
+    val shown = held?.takeIf { key != null && it.file == key.file }
+    return when (cutoutTransition(shown, key)) {
+        CutoutTransition.ORIGINAL -> CutoutView(showHeld = false, frozen = false)
+        CutoutTransition.NONE, CutoutTransition.ZOOM_ONLY -> CutoutView(showHeld = true, frozen = false)
+        CutoutTransition.FREEZE -> {
+            val settled = key != null && ((failedMask != null && failedMask.sameMask(key)) || gaveUp == key)
+            CutoutView(showHeld = shown != null && !settled, frozen = !settled)
+        }
+    }
 }
 
 /** Backoff before re-rendering a cut-out after a transient (non-mask) failure. */

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -40,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
@@ -53,6 +55,7 @@ import coil.request.ImageRequest
 import coil.size.Precision
 import coil.size.Scale
 import coil.size.Size
+import io.github.wa_otomia.darkroom.R
 import io.github.wa_otomia.darkroom.core.ID_CUT_LINE_COLOR
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_MISSING
 import io.github.wa_otomia.darkroom.core.IdBackground
@@ -132,6 +135,7 @@ internal fun IdPhotoSheetPreview(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     note: String? = null,
+    compositing: Boolean = false,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -332,6 +336,18 @@ internal fun IdPhotoSheetPreview(
                         height = 3.dp,
                     )
                 }
+                if (compositing) {
+                    // EDID040-R08: the controls are frozen until the new composite lands.
+                    val busy = stringResource(R.string.studio_id_compositing)
+                    CircularProgressIndicator(
+                        color = Amber,
+                        strokeWidth = 3.dp,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(40.dp)
+                            .semantics { contentDescription = busy },
+                    )
+                }
                 if (note != null) {
                     Text(
                         note,
@@ -438,8 +454,17 @@ private fun IdPhotoPose.sameAs(other: IdPhotoPose): Boolean =
         abs(panY - other.panY) < 1e-5f &&
         abs(rotation - other.rotation) < 1e-3f
 
-/** What [rememberIdPreviewCutout] has for the current inputs. */
-internal data class IdPreviewCutout(val bitmap: ImageBitmap?, val failed: Boolean)
+/**
+ * What [rememberIdPreviewCutout] has for the current inputs. [argb] is the background of [bitmap]
+ * (it may still be the previous colour while [compositing]). [compositing] means a new cut-out is
+ * being built and the ID controls are frozen (EDID040-R08).
+ */
+internal data class IdPreviewCutout(
+    val bitmap: ImageBitmap?,
+    val argb: Int?,
+    val failed: Boolean,
+    val compositing: Boolean,
+)
 
 /** Last render request of one preview; plain (not snapshot) state, read only by the effect. */
 private class CutoutRequestMemo {
@@ -456,11 +481,13 @@ private val cutoutRenderLock = Mutex()
 /**
  * The orientation-corrected background swap for the preview (D7), built off the main thread by
  * [ImagePipeline.renderIdPreviewCutout] and cached per (source, mask revision, colour, feather,
- * zoom step). A zoom step change is debounced (also before the first cut-out is ready) and
- * renders run one at a time; the last cut-out stays on screen meanwhile. A mask revision found
- * missing or undecodable is not retried until the revision changes, and stays reported across
- * zoom, feather and size changes.
- * Null bitmap while nothing matching is ready, or when the background is the original.
+ * inward feather, zoom step). A zoom step change is debounced (also before the first cut-out is
+ * ready) and renders run one at a time. The last finished cut-out stays on screen until the new
+ * one lands, so a colour or feather change never flashes the source (EDID040-R08); such a change
+ * reports [IdPreviewCutout.compositing] until then, a zoom-only change never does. A mask revision
+ * found missing or undecodable is not retried until the revision changes, and stays reported
+ * across zoom, feather and size changes.
+ * Null bitmap when the background is the original, or while the first cut-out is built.
  * Nothing here is saved state: bitmaps never reach the saved-instance bundle.
  */
 @Composable
@@ -472,6 +499,7 @@ internal fun rememberIdPreviewCutout(
     maskRev: String?,
     background: IdBackground,
     feather: IdFeather,
+    featherInward: Boolean,
     zoom: Float,
     layout: IdPhotoLayout,
     imageWidth: Int,
@@ -484,6 +512,7 @@ internal fun rememberIdPreviewCutout(
             maskRev = maskRev,
             argb = argb,
             feather = feather.id,
+            featherInward = featherInward,
             cellWidth = layout.cellWidth,
             cellHeight = layout.cellHeight,
             zoomStep = Math.round(zoom / CUTOUT_ZOOM_STEP),
@@ -493,6 +522,8 @@ internal fun rememberIdPreviewCutout(
     }
     var held by remember(photoId, source) { mutableStateOf<Pair<CutoutKey, ImageBitmap>?>(null) }
     var failedKey by remember(photoId, source) { mutableStateOf<CutoutKey?>(null) }
+    // Key whose transient retries are used up: it no longer holds the controls frozen.
+    var gaveUpKey by remember(photoId, source) { mutableStateOf<CutoutKey?>(null) }
     val memo = remember(photoId, source) { CutoutRequestMemo() }
     LaunchedEffect(key, imageWidth, imageHeight) {
         if (key == null) {
@@ -504,6 +535,7 @@ internal fun rememberIdPreviewCutout(
         val start = cutoutStart(key, held?.first, memo.lastRequested, failedKey)
         if (start == CutoutStart.Skip) return@LaunchedEffect
         memo.lastRequested = key
+        gaveUpKey = null
         if (start == CutoutStart.Debounced) delay(CUTOUT_ZOOM_DEBOUNCE_MS)
         val featherSourcePx = idFeatherSourcePx(
             feather.radiusPx(1),
@@ -527,7 +559,7 @@ internal fun rememberIdPreviewCutout(
                             mask,
                             key.argb,
                             featherSourcePx,
-                            featherInward = true,
+                            featherInward = key.featherInward,
                         ).asImageBitmap()
                     }
                 }
@@ -549,23 +581,25 @@ internal fun rememberIdPreviewCutout(
                 // note, the held cut-out stays (so the next zoom-only change is still debounced), and
                 // the same key is rendered again after a short, bounded backoff, since nothing else
                 // re-runs this effect while the inputs are unchanged.
-                val wait = cutoutRetryDelayMs(attempt++) ?: return@LaunchedEffect
+                val wait = cutoutRetryDelayMs(attempt++)
+                if (wait == null) {
+                    gaveUpKey = key
+                    return@LaunchedEffect
+                }
                 delay(wait)
             }
         }
     }
     val current = held
-    // A held cut-out is shown while a newer feather, size or zoom step is computed; a different
-    // mask, colour or source never borrows the old one.
-    val usable = current?.takeIf {
-        key != null &&
-            it.first.copy(
-                feather = key.feather,
-                cellWidth = key.cellWidth,
-                cellHeight = key.cellHeight,
-                zoomStep = key.zoomStep,
-            ) == key
-    }
+    // The held cut-out stays on screen while a newer one is computed (frozen unless only the
+    // zoom step or cell size moved); another source file never borrows it.
+    val view = cutoutView(current?.first, key, failedKey, gaveUpKey)
+    val shown = current?.takeIf { view.showHeld }
     val failed = key != null && failedKey?.sameMask(key) == true
-    return IdPreviewCutout(bitmap = usable?.second, failed = failed)
+    return IdPreviewCutout(
+        bitmap = shown?.second,
+        argb = shown?.first?.argb,
+        failed = failed,
+        compositing = view.frozen,
+    )
 }

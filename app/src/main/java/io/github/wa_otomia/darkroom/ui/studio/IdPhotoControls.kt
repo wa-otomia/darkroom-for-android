@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -38,6 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
@@ -47,6 +51,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import coil.size.Precision
+import coil.size.Scale
+import coil.size.Size
 import io.github.wa_otomia.darkroom.R
 import io.github.wa_otomia.darkroom.core.ID_PHOTO_PRESETS
 import io.github.wa_otomia.darkroom.core.IdBackground
@@ -68,6 +80,7 @@ import io.github.wa_otomia.darkroom.ui.theme.Ink
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
 import io.github.wa_otomia.darkroom.ui.theme.PaperFaint
+import java.io.File
 
 // ---------------------------------------------------------------------------------------------
 // Pure helpers (no Compose), kept here so the labels and the resource mapping stay in one place.
@@ -271,8 +284,10 @@ internal fun IdMaskJobRow(job: IdMaskJobUi, elsewhere: String?) {
 
 /**
  * Replaces the AI generate block in ID mode: what the AI does, the cut-out button and its gate,
- * the running job, the last failure, the palette and the feather selector.
- * Side-effect free: every action is a callback.
+ * the running job, the last failure (with "view returned mask" when [onViewFailedMask] is set,
+ * EDID040-R09), the palette, the feather selector and the inward feather switch (EDID040-R07).
+ * [compositing] freezes the cut-out button, palette, feather and inward switch while the preview
+ * builds a new composite (EDID040-R08). Side-effect free: every action is a callback.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -281,6 +296,8 @@ internal fun IdPhotoProcessSection(
     hasMask: Boolean,
     background: IdBackground,
     feather: IdFeather,
+    featherInward: Boolean,
+    compositing: Boolean,
     canCutOut: Boolean,
     maskJob: IdMaskJobUi?,
     maskJobElsewhere: String?,
@@ -289,6 +306,8 @@ internal fun IdPhotoProcessSection(
     onOpenSettings: () -> Unit,
     onBackground: (IdBackground) -> Unit,
     onFeather: (IdFeather) -> Unit,
+    onFeatherInward: (Boolean) -> Unit,
+    onViewFailedMask: (() -> Unit)?,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.fillMaxWidth()) {
@@ -307,7 +326,7 @@ internal fun IdPhotoProcessSection(
         }
         PaperButton(
             stringResource(if (hasMask) R.string.studio_id_recut else R.string.studio_id_cutout),
-            enabled = canCutOut,
+            enabled = canCutOut && !compositing,
             onClick = onCutOut,
         )
         if (maskJob != null) {
@@ -315,9 +334,16 @@ internal fun IdPhotoProcessSection(
         }
         if (!maskError.isNullOrBlank()) {
             UserErrorMessage(maskError)
+            if (onViewFailedMask != null) {
+                GhostButton(
+                    stringResource(R.string.studio_id_view_failed_mask),
+                    fillMaxWidth = false,
+                    onClick = onViewFailedMask,
+                )
+            }
         }
 
-        val paletteEnabled = hasMask && maskJob == null
+        val paletteEnabled = hasMask && maskJob == null && !compositing
         Column(Modifier.fillMaxWidth()) {
             SectionLabel(stringResource(R.string.studio_id_background))
             if (!hasMask) {
@@ -340,18 +366,31 @@ internal fun IdPhotoProcessSection(
         Column(Modifier.fillMaxWidth()) {
             SectionLabel(stringResource(R.string.studio_id_feather))
             FlowRow(
-                Modifier.fillMaxWidth().selectableGroup(),
+                Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                IdFeather.entries.forEach { option ->
-                    IdFeatherChip(
-                        label = stringResource(idFeatherLabelRes(option)),
-                        selected = hasMask && option == feather,
-                        enabled = featherEnabled,
-                        onClick = { onFeather(option) },
-                    )
+                FlowRow(
+                    Modifier.selectableGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    IdFeather.entries.forEach { option ->
+                        IdFeatherChip(
+                            label = stringResource(idFeatherLabelRes(option)),
+                            selected = hasMask && option == feather,
+                            enabled = featherEnabled,
+                            onClick = { onFeather(option) },
+                        )
+                    }
                 }
+                // Outside the radio group; no effect without a feather radius.
+                StudioToggleChip(
+                    label = stringResource(R.string.studio_id_feather_inward),
+                    checked = featherInward,
+                    enabled = featherEnabled && feather != IdFeather.NONE,
+                    onCheckedChange = onFeatherInward,
+                )
             }
         }
     }
@@ -452,3 +491,52 @@ private fun IdFeatherChip(label: String, selected: Boolean, enabled: Boolean, on
         )
     }
 }
+
+/**
+ * Full-screen view of the reply that failed mask validation (EDID040-R09): the image as returned,
+ * decoded bounded (long edge at most 2048 px) and never cached, the failure reason and Close.
+ * The file lives only in the app cache; nothing here uploads or logs it.
+ */
+@Composable
+internal fun IdFailedMaskViewer(file: File, reason: String, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    // The file is overwritten in place by a later failure, so never serve it from a cache.
+    val request = remember(file) {
+        ImageRequest.Builder(context)
+            .data(file)
+            .size(Size(FAILED_MASK_MAX_EDGE, FAILED_MASK_MAX_EDGE))
+            .precision(Precision.INEXACT)
+            .scale(Scale.FIT)
+            .memoryCachePolicy(CachePolicy.DISABLED)
+            .diskCachePolicy(CachePolicy.DISABLED)
+            .build()
+    }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(Ink)
+                .systemBarsPadding()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SectionLabel(stringResource(R.string.studio_id_failed_mask_title))
+            AsyncImage(
+                model = request,
+                contentDescription = stringResource(R.string.studio_id_failed_mask_title),
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(Color.Black),
+            )
+            UserErrorMessage(reason)
+            GhostButton(stringResource(R.string.studio_id_failed_mask_close), onClick = onDismiss)
+        }
+    }
+}
+
+private const val FAILED_MASK_MAX_EDGE = 2048

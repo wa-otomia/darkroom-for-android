@@ -14,7 +14,7 @@
 
     <string name="studio_id_preset_35x45">ICAO 通用：申根/欧盟、英国、澳大利亚、新加坡、日本护照、韩国护照等</string>
     <string name="studio_id_preset_kr_visa">韩国签证</string>
-    <string name="studio_id_preset_jp_visa">日本签证</string>
+    <string name="studio_id_preset_jp_visa">日本签证（日本驻华使领馆）</string>
     <string name="studio_id_preset_33x48">中国护照、中国签证</string>
     <string name="studio_id_preset_25x35">中国一寸（简历、证书、报名）</string>
     <string name="studio_id_preset_22x32">中国小一寸（驾驶证等）</string>
@@ -59,6 +59,17 @@
     <string name="studio_id_feather_weak">弱</string>
     <string name="studio_id_feather_medium">中</string>
     <string name="studio_id_feather_strong">强</string>
+    <string name="studio_id_feather_inward">向内羽化</string>
+    <string name="studio_id_compositing">正在合成新背景…</string>
+
+    <!-- Failed mask viewer (EDID040-R09) -->
+    <string name="studio_id_view_failed_mask">查看返回的蒙版</string>
+    <string name="studio_id_failed_mask_title">AI 返回的蒙版</string>
+    <string name="studio_id_failed_mask_close">关闭</string>
+
+    <!-- On/off state of square switch chips (ID photo, inward feather) -->
+    <string name="studio_toggle_on">开</string>
+    <string name="studio_toggle_off">关</string>
 
     <!-- 输出标签 -->
     <string name="studio_id_preset_print_off">证件照模式下不能使用“按预设修图并加入队列”。</string>

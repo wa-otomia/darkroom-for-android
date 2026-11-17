@@ -232,6 +232,13 @@ fun StudioScreen(
     // an older row value happens to equal the latest tap.
     var idBgPending by remember(photoId, source) { mutableStateOf(PendingIdChoice()) }
     var idFeatherPending by remember(photoId, source) { mutableStateOf(PendingIdChoice()) }
+    var idInwardPending by remember(photoId, source) { mutableStateOf(PendingIdChoice()) }
+    // EDID040-R08: the preview is building a new composite; the ID controls wait for it.
+    // Reported by the preview while it is composed, false for every new version.
+    var idCompositing by remember(photoId, source) { mutableStateOf(false) }
+    // EDID040-R09: this version's failure kept the reply that failed validation.
+    var idFailedMaskKept by remember(photoId, source) { mutableStateOf(false) }
+    var idFailedMaskOpen by remember(photoId, source) { mutableStateOf(false) }
     // Mask job failure for the ID section; already sanitized by AiJobs. Recorded with the version
     // (framing version key) it belongs to and shown only on that version.
     var maskError by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
@@ -607,6 +614,7 @@ fun StudioScreen(
     val idHasMask = idStored?.hasMask == true
     val idBg = idBackground(idBgPending.value ?: idStored?.background)
     val idFeatherChoice = idFeather(idFeatherPending.value ?: idStored?.feather)
+    val idFeatherInward = idInwardPending.value?.toBooleanStrictOrNull() ?: idStored?.featherInward ?: true
     // Backstop for the load above: a first entry written by a composition that is already gone
     // (left and reopened at once) can land after the load found nothing. Adopt it when it shows,
     // so the screen never shows ordinary framing while the row (and so a print) has ID mode on.
@@ -626,6 +634,9 @@ fun StudioScreen(
     }
     LaunchedEffect(idStored?.feather, idFeatherPending) {
         idFeatherPending = idFeatherPending.settle(idStored?.feather)
+    }
+    LaunchedEffect(idStored?.featherInward, idInwardPending) {
+        idInwardPending = idInwardPending.settle(idStored?.featherInward?.toString())
     }
     val setIdPose: (IdPhotoPose) -> Unit = { p ->
         idZoom = p.zoom
@@ -714,6 +725,15 @@ fun StudioScreen(
         val token = idFeatherPending.seq
         writeIdChoice({ catalog.setIdPhotoFeather(id, src, f.id) }) { ok ->
             idFeatherPending = idFeatherPending.finish(token, ok)
+        }
+    }
+    val onIdFeatherInward: (Boolean) -> Unit = { inward ->
+        val id = photo.id
+        val src = source
+        idInwardPending = idInwardPending.begin(inward.toString())
+        val token = idInwardPending.seq
+        writeIdChoice({ catalog.setIdPhotoFeatherInward(id, src, inward) }) { ok ->
+            idInwardPending = idInwardPending.finish(token, ok)
         }
     }
 
@@ -898,6 +918,13 @@ fun StudioScreen(
         }
     }
     val maskErrorHere = maskErrorFor(maskError, maskErrorVersion, currentVersionKey)
+    // The mask job keeps the reply before it reports the failure, so a check on each shown
+    // failure finds it; a new cut-out clears the failure (and the file) first.
+    LaunchedEffect(photo.id, source, maskErrorHere) {
+        idFailedMaskKept = maskErrorHere != null &&
+            withContext(Dispatchers.IO) { runCatching { catalog.hasIdMaskFailure(photo.id, source) }.getOrDefault(false) }
+        if (!idFailedMaskKept) idFailedMaskOpen = false
+    }
 
     val composePanel: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -934,10 +961,11 @@ fun StudioScreen(
                         }
                     },
                 )
-                StudioSwitchRow(
+                StudioToggleChip(
                     label = stringResource(R.string.studio_id_photo),
                     checked = idActive,
                     enabled = !cropLocked && framingReady,
+                    modifier = Modifier.padding(top = 6.dp),
                     onCheckedChange = onIdToggle,
                 )
                 if (idActive) {
@@ -1037,6 +1065,8 @@ fun StudioScreen(
                     hasMask = idHasMask,
                     background = idBg,
                     feather = idFeatherChoice,
+                    featherInward = idFeatherInward,
+                    compositing = idCompositing,
                     canCutOut = grokPub.keySet && !aiBusy,
                     maskJob = maskJobUi,
                     maskJobElsewhere = maskJobElsewhereLabel,
@@ -1045,6 +1075,12 @@ fun StudioScreen(
                     onOpenSettings = { onSettings("grok") },
                     onBackground = onIdBackground,
                     onFeather = onIdFeather,
+                    onFeatherInward = onIdFeatherInward,
+                    onViewFailedMask = if (idFailedMaskKept) {
+                        { idFailedMaskOpen = true }
+                    } else {
+                        null
+                    },
                 )
             } else {
                 if (maskJobUi != null) {
@@ -1238,6 +1274,7 @@ fun StudioScreen(
                 maskRev = idStored?.maskRev,
                 background = idBg,
                 feather = idFeatherChoice,
+                featherInward = idFeatherInward,
                 zoom = idZoom,
                 layout = idLayout,
                 imageWidth = orientedW,
@@ -1245,6 +1282,12 @@ fun StudioScreen(
             )
             val perSheet = pluralStringResource(R.plurals.studio_id_per_sheet, idLayout.count, idLayout.count)
             val swapped = idBg.argb?.takeIf { idHasMask }
+            // Reported up for the process tab; reset when the preview leaves (ID mode off).
+            val compositing = cutout.compositing
+            DisposableEffect(compositing) {
+                idCompositing = compositing
+                onDispose { idCompositing = false }
+            }
             IdPhotoSheetPreview(
                 model = imageFile,
                 imageWidth = orientedW,
@@ -1252,7 +1295,9 @@ fun StudioScreen(
                 layout = idLayout,
                 pose = idPose,
                 onPoseChange = setIdPose,
-                cellBackground = swapped?.let { Color(it) } ?: Color.White,
+                // The blank cell area follows the composite on screen, so it keeps the old colour
+                // until the new composite lands.
+                cellBackground = (cutout.argb ?: swapped)?.let { Color(it) } ?: Color.White,
                 cutout = cutout.bitmap,
                 overlay = idSheetLabel(idPreset, idLayout),
                 description = stringResource(
@@ -1261,8 +1306,9 @@ fun StudioScreen(
                 ),
                 snapState = snapState,
                 modifier = cropModifier,
-                enabled = !cropLocked,
+                enabled = !cropLocked && !compositing,
                 note = if (cutout.failed) stringResource(R.string.studio_id_mask_missing) else null,
+                compositing = compositing,
             )
         } else {
             WatermarkOverlay(
@@ -1388,6 +1434,14 @@ fun StudioScreen(
                 prompt = it
                 extraPromptOpen = false
             },
+        )
+    }
+
+    if (idFailedMaskOpen && idFailedMaskKept && maskErrorHere != null) {
+        IdFailedMaskViewer(
+            file = catalog.idMaskFailureFile(photo.id, source),
+            reason = maskErrorHere,
+            onDismiss = { idFailedMaskOpen = false },
         )
     }
 

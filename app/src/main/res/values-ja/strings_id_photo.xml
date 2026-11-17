@@ -14,7 +14,7 @@
 
     <string name="studio_id_preset_35x45">ICAO 標準：シェンゲン/EU、英国、オーストラリア、シンガポール、日本・韓国のパスポートなど</string>
     <string name="studio_id_preset_kr_visa">韓国ビザ</string>
-    <string name="studio_id_preset_jp_visa">日本ビザ</string>
+    <string name="studio_id_preset_jp_visa">日本ビザ（在中国の日本大使館・総領事館）</string>
     <string name="studio_id_preset_33x48">中国のパスポート・ビザ</string>
     <string name="studio_id_preset_25x35">中国の一寸（履歴書・証明書・出願）</string>
     <string name="studio_id_preset_22x32">中国の小一寸（運転免許など）</string>
@@ -59,6 +59,17 @@
     <string name="studio_id_feather_weak">弱</string>
     <string name="studio_id_feather_medium">中</string>
     <string name="studio_id_feather_strong">強</string>
+    <string name="studio_id_feather_inward">内側にぼかす</string>
+    <string name="studio_id_compositing">新しい背景を合成中…</string>
+
+    <!-- Failed mask viewer (EDID040-R09) -->
+    <string name="studio_id_view_failed_mask">返されたマスクを見る</string>
+    <string name="studio_id_failed_mask_title">AI が返したマスク</string>
+    <string name="studio_id_failed_mask_close">閉じる</string>
+
+    <!-- On/off state of square switch chips (ID photo, inward feather) -->
+    <string name="studio_toggle_on">オン</string>
+    <string name="studio_toggle_off">オフ</string>
 
     <!-- 出力タブ -->
     <string name="studio_id_preset_print_off">証明写真モードでは「プリセットで編集してキューに追加」は使えません。</string>

@@ -1,7 +1,9 @@
 package io.github.wa_otomia.darkroom.ui.studio
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class IdPhotoUiStateTest {
@@ -10,6 +12,7 @@ class IdPhotoUiStateTest {
         maskRev = "rev1",
         argb = 0xFF1F3A68.toInt(),
         feather = "weak",
+        featherInward = true,
         cellWidth = 413,
         cellHeight = 531,
         zoomStep = 10,
@@ -116,5 +119,75 @@ class IdPhotoUiStateTest {
         assertNull(maskErrorFor("boom", null, "original"))
         assertNull(maskErrorFor("", "e1", "e1"))
         assertNull(maskErrorFor(null, "e1", "e1"))
+    }
+
+    @Test
+    fun transitionFreezesOnLookChanges() {
+        assertEquals(CutoutTransition.FREEZE, cutoutTransition(navy10, navy10.copy(argb = -1)))
+        assertEquals(CutoutTransition.FREEZE, cutoutTransition(navy10, navy10.copy(feather = "strong")))
+        assertEquals(CutoutTransition.FREEZE, cutoutTransition(navy10, navy10.copy(featherInward = false)))
+        assertEquals(CutoutTransition.FREEZE, cutoutTransition(navy10, navy10.copy(maskRev = "rev2")))
+        // A look change together with a zoom step still freezes.
+        assertEquals(CutoutTransition.FREEZE, cutoutTransition(navy10, navy10.copy(argb = -1, zoomStep = 12)))
+        // Nothing on screen yet (first open, fresh cut-out): freeze on the source.
+        assertEquals(CutoutTransition.FREEZE, cutoutTransition(null, navy10))
+    }
+
+    @Test
+    fun transitionKeepsOldCutoutOnZoomOnly() {
+        assertEquals(CutoutTransition.ZOOM_ONLY, cutoutTransition(navy10, navy10.copy(zoomStep = 13)))
+        assertEquals(CutoutTransition.ZOOM_ONLY, cutoutTransition(navy10, navy10.copy(cellWidth = 717, cellHeight = 921)))
+        assertEquals(CutoutTransition.NONE, cutoutTransition(navy10, navy10))
+    }
+
+    @Test
+    fun transitionToOriginalIsImmediate() {
+        assertEquals(CutoutTransition.ORIGINAL, cutoutTransition(navy10, null))
+        assertEquals(CutoutTransition.ORIGINAL, cutoutTransition(null, null))
+        assertEquals(CutoutView(showHeld = false, frozen = false), cutoutView(navy10, null, null, null))
+    }
+
+    @Test
+    fun colourChangeKeepsHeldCutoutAndFreezes() {
+        val red = navy10.copy(argb = 0xFFFF0000.toInt())
+        assertEquals(CutoutView(showHeld = true, frozen = true), cutoutView(navy10, red, null, null))
+        // Landed: the new one is held, nothing frozen.
+        assertEquals(CutoutView(showHeld = true, frozen = false), cutoutView(red, red, null, null))
+    }
+
+    @Test
+    fun firstCompositeFreezesOnTheSource() {
+        assertEquals(CutoutView(showHeld = false, frozen = true), cutoutView(null, navy10, null, null))
+    }
+
+    @Test
+    fun zoomOnlyNeverFreezes() {
+        val view = cutoutView(navy10, navy10.copy(zoomStep = 14), null, null)
+        assertTrue(view.showHeld)
+        assertFalse(view.frozen)
+    }
+
+    @Test
+    fun heldCutoutOfAnotherFileIsNeverShown() {
+        val other = navy10.copy(file = "/lib/p/edit1.jpg")
+        assertEquals(CutoutView(showHeld = false, frozen = true), cutoutView(navy10, other, null, null))
+    }
+
+    @Test
+    fun missingMaskUnfreezesAndShowsTheSource() {
+        val white = navy10.copy(argb = -1)
+        assertEquals(CutoutView(showHeld = false, frozen = false), cutoutView(null, white, failedMask = white, gaveUp = null))
+        // Remembered by mask revision: a feather change after the failure does not freeze again.
+        assertFalse(cutoutView(null, white.copy(feather = "strong"), failedMask = white, gaveUp = null).frozen)
+        // A new revision is tried again, frozen.
+        assertTrue(cutoutView(null, white.copy(maskRev = "rev2"), failedMask = white, gaveUp = null).frozen)
+    }
+
+    @Test
+    fun exhaustedRetriesUnfreezeWithoutShowingTheOldColour() {
+        val white = navy10.copy(argb = -1)
+        assertEquals(CutoutView(showHeld = false, frozen = false), cutoutView(navy10, white, null, gaveUp = white))
+        // Only for that key: the next change freezes again.
+        assertTrue(cutoutView(navy10, white.copy(feather = "medium"), null, gaveUp = white).frozen)
     }
 }

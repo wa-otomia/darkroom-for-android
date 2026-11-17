@@ -15,7 +15,7 @@
 
     <string name="studio_id_preset_35x45">ICAO standard: Schengen/EU, UK, Australia, Singapore, Japanese and Korean passports</string>
     <string name="studio_id_preset_kr_visa">Korean visa</string>
-    <string name="studio_id_preset_jp_visa">Japanese visa</string>
+    <string name="studio_id_preset_jp_visa">Japanese visa (Japanese missions in China)</string>
     <string name="studio_id_preset_33x48">Chinese passport and visa</string>
     <string name="studio_id_preset_25x35">Chinese 1-inch (résumé, certificates, applications)</string>
     <string name="studio_id_preset_22x32">Chinese small 1-inch (driving licence, etc.)</string>
@@ -60,6 +60,17 @@
     <string name="studio_id_feather_weak">Weak</string>
     <string name="studio_id_feather_medium">Medium</string>
     <string name="studio_id_feather_strong">Strong</string>
+    <string name="studio_id_feather_inward">Soften inward</string>
+    <string name="studio_id_compositing">Applying the new background…</string>
+
+    <!-- Failed mask viewer (EDID040-R09) -->
+    <string name="studio_id_view_failed_mask">View returned mask</string>
+    <string name="studio_id_failed_mask_title">Mask returned by the AI</string>
+    <string name="studio_id_failed_mask_close">Close</string>
+
+    <!-- On/off state of square switch chips (ID photo, inward feather) -->
+    <string name="studio_toggle_on">On</string>
+    <string name="studio_toggle_off">Off</string>
 
     <!-- Output tab -->
     <string name="studio_id_preset_print_off">Edit with preset and queue is not available for ID photos.</string>
