@@ -63,6 +63,7 @@ All Apache License 2.0. The in-app About screen lists the same set; keep it, thi
 | AndroidX DataStore — Google | Apache-2.0 |
 | AndroidX Security Crypto — Google | Apache-2.0 |
 | AndroidX ExifInterface — Google | Apache-2.0 |
+| AndroidX Browser (Custom Tabs) — Google | Apache-2.0 |
 | Dagger and Hilt — Google | Apache-2.0 |
 | OkHttp — Square | Apache-2.0 |
 | Okio — Square | Apache-2.0 |

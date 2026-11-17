@@ -299,4 +299,14 @@
     <string name="settings_keep_alive_hint">保持应用在后台运行，以便 FTP 与自动打印持续工作。</string>
     <string name="keep_alive_channel">保活</string>
     <string name="keep_alive_notification">保持 Darkroom 运行中</string>
+
+    <!-- AI readiness: xAI subscription not signed in / sign-in expired, and their job errors -->
+    <string name="ai_need_subscription_login">xAI 订阅未登录。请在设置的「AI 图片处理」中登录。</string>
+    <string name="ai_need_relogin">xAI 订阅登录已失效，请在设置中重新登录。</string>
+    <string name="error_xai_not_signed_in">xAI 订阅未登录。请在设置中登录后再试。</string>
+    <string name="error_xai_relogin">xAI 订阅登录已失效，请在设置中重新登录。</string>
+    <string name="error_xai_rejected">xAI 拒绝了订阅凭据，请稍后重试或重新登录。</string>
+    <string name="error_xai_refresh_network">无法更新 xAI 订阅凭据：网络不可用或服务暂时不可用。</string>
+    <string name="error_xai_forbidden">xAI 拒绝了订阅请求（403）：订阅层级不支持，或账号、client ID 未获授权。</string>
+    <string name="error_xai_quota">xAI 订阅用量已用尽或受限（429）。</string>
 </resources>

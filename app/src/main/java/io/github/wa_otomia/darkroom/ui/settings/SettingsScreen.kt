@@ -128,9 +128,12 @@ import io.github.wa_otomia.darkroom.BuildConfig
 import io.github.wa_otomia.darkroom.R
 import io.github.wa_otomia.darkroom.core.AI_PRESET_NONE
 import io.github.wa_otomia.darkroom.core.ActivityEntry
+import io.github.wa_otomia.darkroom.core.AiAuthMode
+import io.github.wa_otomia.darkroom.core.AiCredentialState
 import io.github.wa_otomia.darkroom.core.AiProvider
 import io.github.wa_otomia.darkroom.core.GROK_MODELS
 import io.github.wa_otomia.darkroom.core.PrintFit
+import io.github.wa_otomia.darkroom.core.XAI_API_BASE
 import io.github.wa_otomia.darkroom.core.SnsLogo
 import io.github.wa_otomia.darkroom.core.withAnchor
 import io.github.wa_otomia.darkroom.core.withDateScale
@@ -178,8 +181,10 @@ import io.github.wa_otomia.darkroom.ui.theme.Room
 import io.github.wa_otomia.darkroom.ui.theme.SurfaceLow
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -216,6 +221,11 @@ fun SettingsScreen(
 ) {
     val cfg by settings.settings.collectAsState()
     val ai by settings.ai.collectAsState()
+    // xAI sign-in state lives in app-wide singletons, never in saved-instance state (SYCF020-R04).
+    val xaiUi = rememberXaiUi()
+    val xaiLogin = remember(xaiUi) { xaiUi.xaiLogin() }
+    val xaiCredentials = remember(xaiUi) { xaiUi.xaiCredentials() }
+    val xaiLoginState by xaiLogin.state.collectAsState()
     val watermark by settings.watermark.collectAsState()
     val photos by catalog.photos.collectAsState(initial = emptyList())
     val presets by settings.presets.collectAsState()
@@ -255,6 +265,8 @@ fun SettingsScreen(
             ),
         )
     }
+    // The client ID is not a secret, but it follows the AI form's save/discard rules (SYCF020-R04).
+    var grokClientIdDraft by remember { mutableStateOf(grokStored?.clientId.orEmpty()) }
     var modelMenuOpen by remember { mutableStateOf(false) }
     var modelRefreshFailed by remember { mutableStateOf(false) }
     var ftpUser by rememberSaveable { mutableStateOf(cfg.ftpUser) }
@@ -291,6 +303,7 @@ fun SettingsScreen(
     var probeResult by remember { mutableStateOf<AiProbe?>(null) }
     var probeTarget by remember { mutableStateOf("") }
     var probeUsedSavedKey by remember { mutableStateOf(false) }
+    var probeSubscription by remember { mutableStateOf(false) }
 
     // Saving is confirmed next to the button that did it rather than in a snackbar at the far edge
     // of the screen. The text is held alongside the state because the wording depends on what
@@ -338,7 +351,14 @@ fun SettingsScreen(
     val logCleared = stringResource(R.string.settings_log_cleared)
     val logShareTitle = stringResource(R.string.settings_log_share_title)
     val needPrinterText = stringResource(R.string.settings_autoprint_need_printer)
-    val needKeyText = stringResource(R.string.settings_automation_need_key)
+    val needKeyText = when (ai.credential) {
+        AiCredentialState.NOT_SIGNED_IN -> stringResource(R.string.ai_need_subscription_login)
+        AiCredentialState.RELOGIN_REQUIRED -> stringResource(R.string.ai_need_relogin)
+        else -> stringResource(R.string.settings_automation_need_key)
+    }
+    val xaiSignedOut = stringResource(R.string.settings_xai_signed_out_local)
+    val xaiCodeCopied = stringResource(R.string.settings_xai_code_copied)
+    val xaiBrowserUnavailable = stringResource(R.string.settings_xai_browser_unavailable)
     val needPresetText = stringResource(R.string.settings_automation_need_preset)
     val needWatermarkText = stringResource(R.string.settings_automation_need_watermark)
 
@@ -490,10 +510,14 @@ fun SettingsScreen(
 
     val currentDraft = if (formProvider == AiProvider.GROK) grokDraft else openaiDraft
     val storedForm = ai.byProvider[formProvider]
+    // Grok subscription mode: fixed api.x.ai, no API key or base URL (AIPV010-R05). In this mode the
+    // credential is READY exactly when a sign-in is stored.
+    val grokSubscription = formProvider == AiProvider.GROK && storedForm?.authMode == AiAuthMode.SUBSCRIPTION
+    val grokSignedIn = grokSubscription && storedForm?.credential == AiCredentialState.READY
 
-    LaunchedEffect(openGrok, formProvider, storedForm?.keySet, ai.cachedModels[formProvider]) {
+    LaunchedEffect(openGrok, formProvider, storedForm?.credential, ai.cachedModels[formProvider]) {
         if (!openGrok) return@LaunchedEffect
-        if (storedForm?.keySet != true) return@LaunchedEffect
+        if (storedForm?.credential != AiCredentialState.READY) return@LaunchedEffect
         if (!ai.cachedModels[formProvider].isNullOrEmpty()) return@LaunchedEffect
         if (probeJob != null) return@LaunchedEffect
         probeJob = scope.launch {
@@ -509,7 +533,8 @@ fun SettingsScreen(
         currentDraft.key.isNotBlank() ||
         currentDraft.model != storedForm?.model ||
         (formProvider == AiProvider.GROK && currentDraft.resolution != storedForm?.resolution) ||
-        currentDraft.quality != storedForm?.quality
+        currentDraft.quality != storedForm?.quality ||
+        (formProvider == AiProvider.GROK && grokClientIdDraft.trim() != storedForm?.clientId.orEmpty())
     val normalizedGrokUrl = normalizeAiBaseUrl(currentDraft.url, formProvider.defaultBaseUrl)
 
     val portValue = ftpPort.toIntOrNull()
@@ -565,7 +590,7 @@ fun SettingsScreen(
 
     val printerBound = cfg.printerMac.isNotBlank()
     val autoHasPreset = presets.lastSelectedId != AI_PRESET_NONE
-    val autoAiReady = ai.keySet
+    val autoAiReady = ai.credentialReady
     val autoParts = buildList {
         if (cfg.autoEdit) add(stringResource(R.string.chip_automation_edit))
         if (cfg.autoWatermark) add(stringResource(R.string.chip_automation_watermark))
@@ -701,12 +726,106 @@ fun SettingsScreen(
                             }
                         }
                     }
+                    if (formProvider == AiProvider.GROK) {
+                        val currentMode = storedForm?.authMode ?: AiAuthMode.API_KEY
+                        Text(
+                            stringResource(R.string.settings_ai_auth_mode),
+                            color = PaperDim,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+                            listOf(AiAuthMode.API_KEY, AiAuthMode.SUBSCRIPTION).forEachIndexed { index, mode ->
+                                SegmentedButton(
+                                    selected = currentMode == mode,
+                                    onClick = {
+                                        if (currentMode != mode) {
+                                            // Switching away cancels a pending sign-in (AIPV050-R06);
+                                            // the API key and stored tokens are both kept.
+                                            if (mode == AiAuthMode.API_KEY) xaiLogin.cancel()
+                                            settings.setGrokAuthMode(mode)
+                                            probeResult = null
+                                            modelRefreshFailed = false
+                                        }
+                                    },
+                                    shape = SegmentedButtonDefaults.itemShape(index, 2),
+                                    colors = darkroomSegmentedColors(),
+                                ) {
+                                    Text(
+                                        stringResource(
+                                            if (mode == AiAuthMode.API_KEY) {
+                                                R.string.settings_ai_auth_api_key
+                                            } else {
+                                                R.string.settings_ai_auth_subscription
+                                            },
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            stringResource(R.string.settings_ai_openai_no_subscription),
+                            color = PaperDim,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
                     Text(
                         stringResource(R.string.settings_grok_save_hint),
                         color = PaperDim,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(bottom = 12.dp),
                     )
+                    if (grokSubscription) {
+                        Text(
+                            stringResource(R.string.settings_xai_fixed_endpoint, XAI_API_BASE),
+                            color = Amber,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 12.dp),
+                        )
+                        SettingsField(
+                            label = stringResource(R.string.settings_xai_client_id),
+                            value = grokClientIdDraft,
+                            supporting = if (grokSignedIn) stringResource(R.string.settings_xai_client_id_locked) else null,
+                            enabled = !grokSignedIn,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Ascii,
+                                autoCorrectEnabled = false,
+                                imeAction = ImeAction.Done,
+                            ),
+                            onValueChange = { grokClientIdDraft = it },
+                        )
+                        XaiLoginCard(
+                            state = xaiLoginState,
+                            clientIdSaved = storedForm?.clientId.orEmpty().isNotBlank(),
+                            signedIn = grokSignedIn,
+                            accountLabel = storedForm?.accountLabel,
+                            reloginRequired = storedForm?.credential == AiCredentialState.RELOGIN_REQUIRED,
+                            onStart = {
+                                probeResult = null
+                                xaiLogin.start()
+                            },
+                            onCancel = { xaiLogin.cancel() },
+                            onSignOut = {
+                                scope.launch {
+                                    withContext(NonCancellable) { xaiCredentials.signOut() }
+                                    xaiLogin.acknowledge()
+                                    probeResult = null
+                                    snackbar.showSnackbar(xaiSignedOut)
+                                }
+                            },
+                            onOpenUri = { uri ->
+                                if (!openXaiVerificationPage(context, uri)) {
+                                    scope.launch { snackbar.showSnackbar(xaiBrowserUnavailable) }
+                                }
+                            },
+                            onCopyCode = { code ->
+                                if (copyXaiUserCode(context, code)) {
+                                    scope.launch { snackbar.showSnackbar(xaiCodeCopied) }
+                                }
+                            },
+                        )
+                    }
                     SettingsField(
                         label = stringResource(R.string.grok_url),
                         value = draft.url,
@@ -715,6 +834,7 @@ fun SettingsScreen(
                         } else {
                             null
                         },
+                        enabled = !grokSubscription,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
                         onValueChange = {
                             setCurrentDraft(draft.copy(url = it))
@@ -743,6 +863,7 @@ fun SettingsScreen(
                             )
                         },
                         secret = true,
+                        enabled = !grokSubscription,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                         onValueChange = {
                             setCurrentDraft(draft.copy(key = it))
@@ -752,6 +873,7 @@ fun SettingsScreen(
                     if (formKeySet) {
                         GhostButton(
                             text = stringResource(R.string.settings_grok_key_clear),
+                            enabled = !grokSubscription,
                             fillMaxWidth = false,
                             onClick = { showClearKey = true },
                         )
@@ -801,11 +923,17 @@ fun SettingsScreen(
                     ) {
                         GhostButton(
                             text = stringResource(R.string.settings_ai_refresh_models),
-                            enabled = (draft.key.isNotBlank() || formKeySet) && probeJob == null,
+                            enabled = (if (grokSubscription) grokSignedIn else draft.key.isNotBlank() || formKeySet) &&
+                                probeJob == null,
                             fillMaxWidth = false,
                         ) {
                             probeUsedSavedKey = draft.key.isBlank()
-                            probeTarget = normalizeAiBaseUrl(draft.url, formProvider.defaultBaseUrl)
+                            probeSubscription = grokSubscription
+                            probeTarget = if (grokSubscription) {
+                                XAI_API_BASE
+                            } else {
+                                normalizeAiBaseUrl(draft.url, formProvider.defaultBaseUrl)
+                            }
                             probeResult = null
                             probeJob = scope.launch {
                                 val started = System.currentTimeMillis()
@@ -877,9 +1005,14 @@ fun SettingsScreen(
                             if (formProvider == AiProvider.GROK) draft.resolution else null,
                             draft.quality,
                         )
+                        if (formProvider == AiProvider.GROK && grokClientIdDraft.trim() != settings.grokClientId()) {
+                            // Refused (and the field read-only) while signed in.
+                            settings.setGrokClientId(grokClientIdDraft)
+                        }
                         val saved = settings.readAi().byProvider.getValue(formProvider)
                         val next = AiDraft(url = saved.baseUrl, model = saved.model, resolution = saved.resolution, quality = saved.quality)
                         setCurrentDraft(next)
+                        if (formProvider == AiProvider.GROK) grokClientIdDraft = settings.grokClientId()
                         grokConfirmText = if (saved.baseUrl != typed) {
                             context.getString(R.string.settings_grok_url_saved, saved.baseUrl)
                         } else {
@@ -907,6 +1040,7 @@ fun SettingsScreen(
                                                 quality = it.quality,
                                             ),
                                         )
+                                        if (formProvider == AiProvider.GROK) grokClientIdDraft = it.clientId
                                     }
                                     probeResult = null
                                 }
@@ -937,10 +1071,17 @@ fun SettingsScreen(
                         if (probeJob == null) {
                             GhostButton(
                                 text = stringResource(R.string.settings_grok_test),
-                                enabled = draft.key.isNotBlank() || formKeySet,
+                                // Subscription mode: testing while signed out answers "not signed in"
+                                // offline and never falls back to the key field (AIPV020-R04).
+                                enabled = grokSubscription || draft.key.isNotBlank() || formKeySet,
                                 fillMaxWidth = false,
                             ) {
-                                probeTarget = normalizeAiBaseUrl(draft.url, formProvider.defaultBaseUrl)
+                                probeSubscription = grokSubscription
+                                probeTarget = if (grokSubscription) {
+                                    XAI_API_BASE
+                                } else {
+                                    normalizeAiBaseUrl(draft.url, formProvider.defaultBaseUrl)
+                                }
                                 probeUsedSavedKey = draft.key.isBlank()
                                 probeResult = null
                                 probeJob = scope.launch {
@@ -981,20 +1122,25 @@ fun SettingsScreen(
                         } else {
                             when (probe) {
                                 is AiProbe.Ok -> stringResource(R.string.settings_grok_test_ok, probe.elapsedMs)
-                                is AiProbe.Unauthorized -> stringResource(R.string.settings_grok_test_auth, probe.status)
+                                is AiProbe.Unauthorized -> if (probeSubscription) {
+                                    stringResource(R.string.settings_xai_probe_rejected, probe.status)
+                                } else {
+                                    stringResource(R.string.settings_grok_test_auth, probe.status)
+                                }
                                 is AiProbe.NotFound -> stringResource(R.string.settings_grok_test_notfound)
                                 is AiProbe.HttpError -> stringResource(R.string.settings_grok_test_http, probe.status)
                                 is AiProbe.Unreachable -> stringResource(R.string.settings_grok_test_unreachable)
                                 is AiProbe.Timeout -> stringResource(R.string.settings_grok_test_timeout)
                                 is AiProbe.NoKey -> stringResource(R.string.settings_grok_test_nokey)
                                 is AiProbe.InvalidUrl -> stringResource(R.string.settings_grok_test_badurl)
-                                // Stage 2 gives this its own "not signed in" text; unreachable until then.
-                                is AiProbe.NotSignedIn -> stringResource(R.string.settings_grok_test_nokey)
+                                is AiProbe.NotSignedIn -> stringResource(R.string.settings_xai_probe_not_signed_in)
                             }
                         }
                         val passed = probe is AiProbe.Ok && !modelMissing
                         val keySource = stringResource(
-                            if (probeUsedSavedKey) {
+                            if (probeSubscription) {
+                                R.string.settings_xai_probe_credential
+                            } else if (probeUsedSavedKey) {
                                 R.string.settings_grok_test_key_saved
                             } else {
                                 R.string.settings_grok_test_key_draft
@@ -1009,6 +1155,15 @@ fun SettingsScreen(
                                 .semantics { liveRegion = LiveRegionMode.Polite },
                         ) {
                             Text(text, color = if (passed) Paper else Amber, fontSize = 13.sp, lineHeight = 18.sp)
+                            if (probeSubscription && probe is AiProbe.Ok) {
+                                Text(
+                                    stringResource(R.string.settings_xai_probe_unverified_images),
+                                    color = PaperDim,
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp,
+                                    modifier = Modifier.padding(top = 6.dp),
+                                )
+                            }
                             Text(
                                 stringResource(R.string.settings_grok_test_target, probeTarget, keySource),
                                 color = PaperDim,
@@ -1981,25 +2136,33 @@ fun SettingsScreen(
             text = { Text(stringResource(R.string.settings_reset_text)) },
             confirmButton = {
                 TextButton(onClick = {
-                    settings.resetAll()
-                    KeepAliveService.stop(context)
-                    val nextCfg = settings.readSettings()
-                    val nextAi = settings.readAi()
-                    ftpUser = nextCfg.ftpUser
-                    ftpPort = nextCfg.ftpPort.toString()
-                    pasvMin = nextCfg.ftpPasvMin.toString()
-                    pasvMax = nextCfg.ftpPasvMax.toString()
-                    ftpPassword = ""
-                    formProviderId = nextAi.active.id
-                    nextAi.byProvider[AiProvider.GROK]?.let {
-                        grokDraft = AiDraft(url = it.baseUrl, model = it.model, resolution = it.resolution, quality = it.quality)
-                    }
-                    nextAi.byProvider[AiProvider.OPENAI]?.let {
-                        openaiDraft = AiDraft(url = it.baseUrl, model = it.model, resolution = it.resolution, quality = it.quality)
-                    }
-                    probeResult = null
                     showReset = false
-                    scope.launch { snackbar.showSnackbar(resetDone) }
+                    scope.launch {
+                        // SYCF030-R04: cancel any sign-in, delete the tokens and revoke them with the
+                        // pre-reset client ID before resetAll() clears it.
+                        withContext(NonCancellable) {
+                            xaiCredentials.clearForReset()
+                            settings.resetAll()
+                        }
+                        KeepAliveService.stop(context)
+                        val nextCfg = settings.readSettings()
+                        val nextAi = settings.readAi()
+                        ftpUser = nextCfg.ftpUser
+                        ftpPort = nextCfg.ftpPort.toString()
+                        pasvMin = nextCfg.ftpPasvMin.toString()
+                        pasvMax = nextCfg.ftpPasvMax.toString()
+                        ftpPassword = ""
+                        formProviderId = nextAi.active.id
+                        nextAi.byProvider[AiProvider.GROK]?.let {
+                            grokDraft = AiDraft(url = it.baseUrl, model = it.model, resolution = it.resolution, quality = it.quality)
+                        }
+                        nextAi.byProvider[AiProvider.OPENAI]?.let {
+                            openaiDraft = AiDraft(url = it.baseUrl, model = it.model, resolution = it.resolution, quality = it.quality)
+                        }
+                        probeResult = null
+                        grokClientIdDraft = ""
+                        snackbar.showSnackbar(resetDone)
+                    }
                 }) { Text(stringResource(R.string.settings_reset_confirm)) }
             },
             dismissButton = {

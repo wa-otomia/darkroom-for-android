@@ -72,4 +72,8 @@
     <string name="id_error_mask_version_gone">Cut-out discarded: this version was deleted.</string>
     <string name="id_error_mask_missing">The ID photo mask is missing or damaged. Cut out again, or choose the original background.</string>
     <string name="id_error_mask_save">Couldn\'t save the cut-out mask. Check free storage and try again.</string>
+
+    <!-- ID photo cut-out gate: xAI subscription -->
+    <string name="studio_id_need_subscription_login">Cut-out needs the xAI subscription sign-in. Sign in in Settings.</string>
+    <string name="studio_id_need_relogin">The xAI subscription sign-in has expired. Sign in again in Settings to cut out.</string>
 </resources>

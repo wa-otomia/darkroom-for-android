@@ -299,4 +299,14 @@
     <string name="settings_keep_alive_hint">FTP と自動印刷が継続できるよう、アプリをバックグラウンドで維持します。</string>
     <string name="keep_alive_channel">常駐</string>
     <string name="keep_alive_notification">Darkroom を実行中に保ちます</string>
+
+    <!-- AI readiness: xAI subscription not signed in / sign-in expired, and their job errors -->
+    <string name="ai_need_subscription_login">xAI サブスクリプションにサインインしていません。設定の「AI 画像処理」でサインインしてください。</string>
+    <string name="ai_need_relogin">xAI サブスクリプションのサインインが無効になりました。設定でもう一度サインインしてください。</string>
+    <string name="error_xai_not_signed_in">xAI サブスクリプションにサインインしていません。設定でサインインしてから再試行してください。</string>
+    <string name="error_xai_relogin">xAI サブスクリプションのサインインが無効になりました。設定でもう一度サインインしてください。</string>
+    <string name="error_xai_rejected">xAI がサブスクリプションの認証情報を拒否しました。しばらくしてから再試行するか、もう一度サインインしてください。</string>
+    <string name="error_xai_refresh_network">xAI サブスクリプションの認証情報を更新できませんでした。ネットワークまたはサービスが利用できません。</string>
+    <string name="error_xai_forbidden">xAI がサブスクリプションのリクエストを拒否しました（403）。プランが対応していないか、アカウントまたは client ID が認可されていません。</string>
+    <string name="error_xai_quota">xAI サブスクリプションの利用量が上限に達したか、制限されています（429）。</string>
 </resources>

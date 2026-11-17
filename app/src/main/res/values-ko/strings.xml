@@ -299,4 +299,14 @@
     <string name="settings_keep_alive_hint">FTP와 자동 인쇄가 계속되도록 앱을 백그라운드에서 유지합니다.</string>
     <string name="keep_alive_channel">유지</string>
     <string name="keep_alive_notification">Darkroom을 실행 중으로 유지</string>
+
+    <!-- AI readiness: xAI subscription not signed in / sign-in expired, and their job errors -->
+    <string name="ai_need_subscription_login">xAI 구독에 로그인하지 않았습니다. 설정의 「AI 이미지 처리」에서 로그인하세요.</string>
+    <string name="ai_need_relogin">xAI 구독 로그인이 만료되었습니다. 설정에서 다시 로그인하세요.</string>
+    <string name="error_xai_not_signed_in">xAI 구독에 로그인하지 않았습니다. 설정에서 로그인한 뒤 다시 시도하세요.</string>
+    <string name="error_xai_relogin">xAI 구독 로그인이 만료되었습니다. 설정에서 다시 로그인하세요.</string>
+    <string name="error_xai_rejected">xAI가 구독 자격 증명을 거부했습니다. 잠시 후 다시 시도하거나 다시 로그인하세요.</string>
+    <string name="error_xai_refresh_network">xAI 구독 자격 증명을 갱신하지 못했습니다. 네트워크 또는 서비스를 사용할 수 없습니다.</string>
+    <string name="error_xai_forbidden">xAI가 구독 요청을 거부했습니다(403). 구독 등급이 지원하지 않거나 계정 또는 client ID가 승인되지 않았습니다.</string>
+    <string name="error_xai_quota">xAI 구독 사용량이 소진되었거나 제한되었습니다(429).</string>
 </resources>

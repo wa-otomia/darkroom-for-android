@@ -71,4 +71,8 @@
     <string name="id_error_mask_version_gone">抠图结果已丢弃：该版本已删除。</string>
     <string name="id_error_mask_missing">证件照蒙版缺失或损坏。请重新抠图，或改选原背景。</string>
     <string name="id_error_mask_save">无法保存抠图蒙版。请检查剩余存储空间后重试。</string>
+
+    <!-- ID photo cut-out gate: xAI subscription -->
+    <string name="studio_id_need_subscription_login">抠图需要登录 xAI 订阅，请在设置中登录。</string>
+    <string name="studio_id_need_relogin">xAI 订阅登录已失效，请在设置中重新登录后再抠图。</string>
 </resources>

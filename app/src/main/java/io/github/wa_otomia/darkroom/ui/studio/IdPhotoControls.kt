@@ -48,6 +48,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.wa_otomia.darkroom.R
+import io.github.wa_otomia.darkroom.core.AiCredentialState
 import io.github.wa_otomia.darkroom.core.ID_PHOTO_PRESETS
 import io.github.wa_otomia.darkroom.core.IdBackground
 import io.github.wa_otomia.darkroom.core.IdFeather
@@ -275,7 +276,7 @@ internal fun IdMaskJobRow(job: IdMaskJobUi, elsewhere: String?) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun IdPhotoProcessSection(
-    keySet: Boolean,
+    credential: AiCredentialState,
     hasMask: Boolean,
     background: IdBackground,
     feather: IdFeather,
@@ -292,9 +293,15 @@ internal fun IdPhotoProcessSection(
         Column(Modifier.fillMaxWidth()) {
             SectionLabel(stringResource(R.string.studio_id_section))
             StudioNote(stringResource(R.string.studio_id_explain), topPadding = 0)
-            if (!keySet) {
+            if (credential != AiCredentialState.READY) {
                 Text(
-                    stringResource(R.string.grok_need_key),
+                    stringResource(
+                        when (credential) {
+                            AiCredentialState.NOT_SIGNED_IN -> R.string.studio_id_need_subscription_login
+                            AiCredentialState.RELOGIN_REQUIRED -> R.string.studio_id_need_relogin
+                            else -> R.string.grok_need_key
+                        },
+                    ),
                     color = Amber,
                     modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
                 )

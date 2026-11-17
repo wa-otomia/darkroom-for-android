@@ -24,7 +24,15 @@ import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NOT_BINARY
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NO_BACKGROUND
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NO_PERSON
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_UNDECODABLE
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NOT_SIGNED_IN
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_RELOGIN
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_VERSION_GONE
+import io.github.wa_otomia.darkroom.core.XAI_MSG_FORBIDDEN
+import io.github.wa_otomia.darkroom.core.XAI_MSG_NOT_SIGNED_IN
+import io.github.wa_otomia.darkroom.core.XAI_MSG_QUOTA
+import io.github.wa_otomia.darkroom.core.XAI_MSG_REFRESH_NETWORK
+import io.github.wa_otomia.darkroom.core.XAI_MSG_REJECTED
+import io.github.wa_otomia.darkroom.core.XAI_MSG_RELOGIN
 import io.github.wa_otomia.darkroom.ui.theme.Amber
 import io.github.wa_otomia.darkroom.ui.theme.Danger
 import io.github.wa_otomia.darkroom.ui.theme.MonoFont
@@ -88,6 +96,16 @@ private val RULES: List<Rule> = listOf(
     Rule(R.string.id_error_mask_need_key, ID_MASK_MSG_NEED_KEY),
     Rule(R.string.id_error_mask_version_gone, ID_MASK_MSG_VERSION_GONE),
     Rule(R.string.id_error_mask_missing, ID_MASK_MSG_MISSING),
+    // xAI subscription credential and request failures: core/AiCredential.kt XAI_MSG_* and
+    // ID_MASK_MSG_NOT_SIGNED_IN / ID_MASK_MSG_RELOGIN, thrown by data/ai/AiImageClient.kt,
+    // data/jobs/AiJobs.kt and data/printer/PrintQueue.kt. They MUST precede error_grok_key,
+    // ds_error_grok_auth and ds_error_grok_rate_limit, and are matched on the whole constant.
+    Rule(R.string.error_xai_not_signed_in, XAI_MSG_NOT_SIGNED_IN, ID_MASK_MSG_NOT_SIGNED_IN),
+    Rule(R.string.error_xai_relogin, XAI_MSG_RELOGIN, ID_MASK_MSG_RELOGIN),
+    Rule(R.string.error_xai_rejected, XAI_MSG_REJECTED),
+    Rule(R.string.error_xai_refresh_network, XAI_MSG_REFRESH_NETWORK),
+    Rule(R.string.error_xai_forbidden, XAI_MSG_FORBIDDEN),
+    Rule(R.string.error_xai_quota, XAI_MSG_QUOTA),
     // data/catalog/CatalogRepository.kt mask rename, data/imaging/ImagePipeline.kt
     // encodeIdMaskPng.
     Rule(R.string.id_error_mask_save, "无法保存证件照蒙版", "png 编码失败"),

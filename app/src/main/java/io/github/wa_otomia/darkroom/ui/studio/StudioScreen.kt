@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.wa_otomia.darkroom.R
+import io.github.wa_otomia.darkroom.core.AiCredentialState
 import io.github.wa_otomia.darkroom.core.AppliedFraming
 import io.github.wa_otomia.darkroom.core.DEFAULT_ID_PHOTO_PRESET_ID
 import io.github.wa_otomia.darkroom.core.Framing
@@ -420,9 +421,9 @@ fun StudioScreen(
     val cropLocked = aiBlocking
     val printerReady = appSettings.printerMac.isNotBlank()
     val hasInstructions = presetId.isNotEmpty() || prompt.isNotBlank()
-    val canGenerate = !aiBusy && grokPub.keySet && hasInstructions
+    val canGenerate = !aiBusy && grokPub.credentialReady && hasInstructions
     val canPrintDirect = printerReady && !alreadyQueued
-    val canPrintWithPreset = printerReady && grokPub.keySet && hasInstructions && !alreadyQueued
+    val canPrintWithPreset = printerReady && grokPub.credentialReady && hasInstructions && !alreadyQueued
     val queuedIds = printJobs.filter { jobFieldKey(it.state) == "queued" }.map { it.id }
     val queueIndex = myPrint?.let { queuedIds.indexOf(it.id) }?.let { if (it >= 0) it + 1 else 0 } ?: 0
     LaunchedEffect(myPrint?.id) { printStripCollapsed = false }
@@ -1033,11 +1034,11 @@ fun StudioScreen(
 
             if (idActive) {
                 IdPhotoProcessSection(
-                    keySet = grokPub.keySet,
+                    credential = grokPub.credential,
                     hasMask = idHasMask,
                     background = idBg,
                     feather = idFeatherChoice,
-                    canCutOut = grokPub.keySet && !aiBusy,
+                    canCutOut = grokPub.credentialReady && !aiBusy,
                     maskJob = maskJobUi,
                     maskJobElsewhere = maskJobElsewhereLabel,
                     maskError = maskErrorHere,
@@ -1052,8 +1053,13 @@ fun StudioScreen(
                 }
                 Column {
                     SectionLabel(stringResource(R.string.grok_title))
-                    if (!grokPub.keySet) {
-                        Text(stringResource(R.string.grok_need_key), color = Amber, modifier = Modifier.padding(bottom = 8.dp))
+                    if (!grokPub.credentialReady) {
+                        val needText = when (grokPub.credential) {
+                            AiCredentialState.NOT_SIGNED_IN -> R.string.ai_need_subscription_login
+                            AiCredentialState.RELOGIN_REQUIRED -> R.string.ai_need_relogin
+                            else -> R.string.grok_need_key
+                        }
+                        Text(stringResource(needText), color = Amber, modifier = Modifier.padding(bottom = 8.dp))
                         TextButton(onClick = { onSettings("grok") }) { Text(stringResource(R.string.nav_settings), color = Amber) }
                     }
                     Row(

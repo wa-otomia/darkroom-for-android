@@ -61,6 +61,7 @@ private val COMPONENTS = listOf(
     Component("AndroidX DataStore — Google", APACHE_2),
     Component("AndroidX Security Crypto — Google", APACHE_2),
     Component("AndroidX ExifInterface — Google", APACHE_2),
+    Component("AndroidX Browser (Custom Tabs) — Google", APACHE_2),
     Component("Dagger and Hilt — Google", APACHE_2),
     Component("OkHttp — Square", APACHE_2),
     Component("Okio — Square", APACHE_2),
