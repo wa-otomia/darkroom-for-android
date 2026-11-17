@@ -17,6 +17,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.wa_otomia.darkroom.R
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_ASPECT
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_MISSING
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NEED_KEY
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NOT_BINARY
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NO_BACKGROUND
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NO_PERSON
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_UNDECODABLE
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_VERSION_GONE
 import io.github.wa_otomia.darkroom.ui.theme.Amber
 import io.github.wa_otomia.darkroom.ui.theme.Danger
 import io.github.wa_otomia.darkroom.ui.theme.MonoFont
@@ -68,6 +76,21 @@ private val RULES: List<Rule> = listOf(
     // data/jobs/AiJobs.kt cancel emits Failed(..., "") — Studio maps that to
     // 已取消生成. Must precede the print-cancel needle, which is a prefix.
     Rule(R.string.ai_cancelled, "已取消生成", "已取消修图", "ai cancelled"),
+    // ID photo mask: core/IdPhoto.kt ID_MASK_MSG_* thrown by data/jobs/AiJobs.kt,
+    // data/imaging/ImagePipeline.kt, data/printer/PrintQueue.kt and the Studio export.
+    // These MUST precede print_cancelled (prefix needles), error_grok_key ("未配置 AI"),
+    // error_decode_jpeg and ds_error_storage, which would otherwise claim them.
+    Rule(R.string.id_error_mask_aspect, ID_MASK_MSG_ASPECT),
+    Rule(R.string.id_error_mask_not_binary, ID_MASK_MSG_NOT_BINARY),
+    Rule(R.string.id_error_mask_no_person, ID_MASK_MSG_NO_PERSON),
+    Rule(R.string.id_error_mask_no_background, ID_MASK_MSG_NO_BACKGROUND),
+    Rule(R.string.id_error_mask_undecodable, ID_MASK_MSG_UNDECODABLE),
+    Rule(R.string.id_error_mask_need_key, ID_MASK_MSG_NEED_KEY),
+    Rule(R.string.id_error_mask_version_gone, ID_MASK_MSG_VERSION_GONE),
+    Rule(R.string.id_error_mask_missing, ID_MASK_MSG_MISSING),
+    // data/catalog/CatalogRepository.kt mask rename, data/imaging/ImagePipeline.kt
+    // encodeIdMaskPng.
+    Rule(R.string.id_error_mask_save, "无法保存证件照蒙版", "png 编码失败"),
     // data/printer/PrintQueue.kt, data/printer/XiaomiPrinter.kt error("已取消"),
     // core/Protocol.kt JOB_STATE_USER_MESSAGE["cancelled"|"cancel"].
     Rule(R.string.print_cancelled, "已取消", "已请求取消", "cancelled"),

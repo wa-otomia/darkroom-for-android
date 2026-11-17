@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 구도 탭: 진입, 크기 프리셋, 안내 -->
+    <string name="studio_id_photo">증명사진</string>
+    <string name="studio_id_size">크기</string>
+    <plurals name="studio_id_per_sheet">
+        <item quantity="other">장당 %d매</item>
+    </plurals>
+    <string name="studio_id_authority_note">크기와 배경은 일반적인 예입니다. 발급 기관의 최신 요건을 확인하세요.</string>
+    <string name="studio_id_edge_warning">이 크기는 용지 가장자리에 가까워 인쇄할 때 가장자리 배경이 조금 잘릴 수 있습니다.</string>
+    <string name="studio_id_no_watermark">증명사진은 인쇄와 내보내기 모두 워터마크를 넣지 않습니다.</string>
+    <string name="studio_id_sheet_a11y">증명사진 배치: %1$s</string>
+    <string name="studio_id_mask_missing">오려내기 마스크가 없습니다. 다시 오려내거나 원래 배경을 선택하세요.</string>
+
+    <string name="studio_id_preset_35x45">ICAO 표준: 솅겐/EU, 영국, 호주, 싱가포르, 일본·한국 여권 등</string>
+    <string name="studio_id_preset_33x48">중국 여권·비자</string>
+    <string name="studio_id_preset_25x35">중국 1촌 (이력서, 증명서, 원서)</string>
+    <string name="studio_id_preset_22x32">중국 소1촌 (운전면허 등)</string>
+    <string name="studio_id_preset_35x49">중국 2촌</string>
+    <string name="studio_id_preset_2x2in">미국 여권·비자, 인도 비자</string>
+    <string name="studio_id_preset_50x70">캐나다 여권</string>
+    <string name="studio_id_preset_30x40">일본 이력서·체류 신청, 한국 반명함판</string>
+    <string name="studio_id_preset_24x30">일본 운전면허</string>
+    <string name="studio_id_preset_40x60">베트남·태국 등 4×6 cm 비자</string>
+    <string name="studio_id_preset_35x50">말레이시아 여권</string>
+
+    <!-- 처리 탭: 오려내기, 배경색, 가장자리 -->
+    <string name="studio_id_section">증명사진 배경</string>
+    <string name="studio_id_explain">AI는 인물 마스크만 만듭니다. 인물의 픽셀은 모두 원본 사진 그대로이며, 배경은 이 기기에서 바꿉니다. 이 버전의 사진 전체가 설정에서 지정한 AI 서비스로 업로드됩니다.</string>
+    <string name="studio_id_cutout">AI로 인물 오려내기</string>
+    <string name="studio_id_recut">다시 오려내기</string>
+    <string name="studio_id_cutting">오려내는 중…</string>
+    <string name="studio_id_mask_ready">오려내기 완료</string>
+    <string name="studio_id_background">배경색</string>
+    <string name="studio_id_need_mask">배경을 바꾸려면 먼저 인물을 오려내세요.</string>
+
+    <string name="studio_id_bg_original">원래 배경</string>
+    <string name="studio_id_bg_original_use">사진의 배경을 그대로 사용</string>
+    <string name="studio_id_bg_navy">진한 파랑</string>
+    <string name="studio_id_bg_navy_use">앱 기본색</string>
+    <string name="studio_id_bg_id_blue">증명 파랑</string>
+    <string name="studio_id_bg_id_blue_use">중국 본토에서 흔한 파란 배경</string>
+    <string name="studio_id_bg_red">빨강</string>
+    <string name="studio_id_bg_red_use">중국 본토 빨간 배경 (혼인 등기 등)</string>
+    <string name="studio_id_bg_white">흰색</string>
+    <string name="studio_id_bg_white_use">중국 여권·비자, 미국, 한국, 싱가포르, 캐나다 등</string>
+    <string name="studio_id_bg_light_grey">연회색</string>
+    <string name="studio_id_bg_light_grey_use">영국, 호주, 독일 등 솅겐 국가</string>
+    <string name="studio_id_bg_off_white">미색</string>
+    <string name="studio_id_bg_off_white_use">영국 크림색, 미국 오프화이트</string>
+    <string name="studio_id_bg_pale_blue">연파랑</string>
+    <string name="studio_id_bg_pale_blue_use">일본 여권·이력서</string>
+
+    <string name="studio_id_feather">가장자리 부드럽게</string>
+    <string name="studio_id_feather_none">없음</string>
+    <string name="studio_id_feather_weak">약하게</string>
+    <string name="studio_id_feather_medium">중간</string>
+    <string name="studio_id_feather_strong">강하게</string>
+
+    <!-- 출력 탭 -->
+    <string name="studio_id_preset_print_off">증명사진 모드에서는 프리셋으로 편집 후 인쇄를 사용할 수 없습니다.</string>
+
+    <!-- 오류 (ui/UserErrors.kt에서 연결) -->
+    <string name="id_error_mask_aspect">오려내기 실패: 반환된 마스크의 비율이 사진과 맞지 않습니다.</string>
+    <string name="id_error_mask_not_binary">오려내기 실패: 흑백 마스크가 반환되지 않았습니다.</string>
+    <string name="id_error_mask_no_person">오려내기 실패: 사진에서 인물을 찾지 못했습니다.</string>
+    <string name="id_error_mask_no_background">오려내기 실패: 배경을 분리하지 못했습니다.</string>
+    <string name="id_error_mask_undecodable">오려내기 실패: 반환된 이미지를 읽을 수 없습니다.</string>
+    <string name="id_error_mask_need_key">오려내기에는 API 키가 필요합니다. 설정에서 입력하세요.</string>
+    <string name="id_error_mask_version_gone">오려내기 결과를 버렸습니다: 이 버전이 삭제되었습니다.</string>
+    <string name="id_error_mask_missing">증명사진 마스크가 없거나 손상되었습니다. 다시 오려내거나 원래 배경을 선택하세요.</string>
+    <string name="id_error_mask_save">오려내기 마스크를 저장하지 못했습니다. 남은 저장 공간을 확인한 뒤 다시 시도하세요.</string>
+</resources>

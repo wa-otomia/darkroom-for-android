@@ -595,6 +595,9 @@ internal fun ExtraPromptDialog(
  *
  * Orientation and rotate/reset share one [FlowRow] so they sit on a single line
  * when width allows and wrap on narrow or large-font layouts.
+ *
+ * [orientationSelected] false shows neither orientation chip as selected while both stay
+ * usable (ID photo mode, where tapping one leaves the mode).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -605,6 +608,7 @@ internal fun FramingControls(
     onOrientation: (Boolean) -> Unit,
     onRotate: (Int) -> Unit,
     onReset: (() -> Unit)? = null,
+    orientationSelected: Boolean = true,
 ) {
     val shownDegrees = Math.round(rotationDegrees) % 360
     FlowRow(
@@ -614,13 +618,13 @@ internal fun FramingControls(
     ) {
         ToggleChip(
             label = stringResource(R.string.studio_frame_portrait),
-            active = !landscape,
+            active = orientationSelected && !landscape,
             enabled = enabled,
             onClick = { onOrientation(false) },
         )
         ToggleChip(
             label = stringResource(R.string.studio_frame_landscape),
-            active = landscape,
+            active = orientationSelected && landscape,
             enabled = enabled,
             onClick = { onOrientation(true) },
         )

@@ -63,6 +63,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -72,8 +73,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.wa_otomia.darkroom.R
 import io.github.wa_otomia.darkroom.core.AppliedFraming
+import io.github.wa_otomia.darkroom.core.DEFAULT_ID_PHOTO_PRESET_ID
 import io.github.wa_otomia.darkroom.core.Framing
 import io.github.wa_otomia.darkroom.core.GENERATED_PHOTO_TAG
+import io.github.wa_otomia.darkroom.core.IdBackground
+import io.github.wa_otomia.darkroom.core.IdFeather
+import io.github.wa_otomia.darkroom.core.IdPhotoPose
+import io.github.wa_otomia.darkroom.core.IdPhotoState
 import io.github.wa_otomia.darkroom.core.MAX_PRINT_ZOOM
 import io.github.wa_otomia.darkroom.core.MIN_PRINT_ZOOM
 import io.github.wa_otomia.darkroom.core.PRINT_ASPECT
@@ -84,7 +90,15 @@ import io.github.wa_otomia.darkroom.core.defaultLandscape
 import io.github.wa_otomia.darkroom.core.editsInCreationOrder
 import io.github.wa_otomia.darkroom.core.isConfigured
 import io.github.wa_otomia.darkroom.core.exactQuarterTurns
+import io.github.wa_otomia.darkroom.core.forPreset
 import io.github.wa_otomia.darkroom.core.framingFor
+import io.github.wa_otomia.darkroom.core.idBackground
+import io.github.wa_otomia.darkroom.core.idFeather
+import io.github.wa_otomia.darkroom.core.idInitialPose
+import io.github.wa_otomia.darkroom.core.idMaskRequired
+import io.github.wa_otomia.darkroom.core.idPhotoFor
+import io.github.wa_otomia.darkroom.core.idPhotoLayout
+import io.github.wa_otomia.darkroom.core.idPhotoPreset
 import io.github.wa_otomia.darkroom.core.isCancelledPrintMessage
 import io.github.wa_otomia.darkroom.core.isGenerated
 import io.github.wa_otomia.darkroom.core.listRelatedPhotos
@@ -100,6 +114,7 @@ import io.github.wa_otomia.darkroom.core.printImageSize
 import io.github.wa_otomia.darkroom.core.resolveEditPresetName
 import io.github.wa_otomia.darkroom.core.resolveRootId
 import io.github.wa_otomia.darkroom.core.rotatePan
+import io.github.wa_otomia.darkroom.core.rotatedQuarter
 import io.github.wa_otomia.darkroom.core.rotatedSize
 import io.github.wa_otomia.darkroom.core.sourceAfterVersionRemoved
 import io.github.wa_otomia.darkroom.core.studioVersionIngestName
@@ -139,6 +154,7 @@ import io.github.wa_otomia.darkroom.ui.theme.PaperDim
 import io.github.wa_otomia.darkroom.ui.theme.Room
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -192,6 +208,25 @@ fun StudioScreen(
     // The loaded row, written back unchanged until the image size is known (an edit without
     // stored dimensions waits for a probe), so leaving early cannot rewrite it half-resolved.
     var restoreFraming by remember(photoId, source) { mutableStateOf<Framing?>(null) }
+    // ID photo mode (EDID010-R03). Studio owns only the toggle, the size and the shared pose,
+    // as primitives for the saved-instance bundle. Background, feather and the mask revision
+    // are read live from the row (photo.idPhotoFor(source)) and written straight to the
+    // catalog, so the mask job's commit is never overwritten by a stale copy held here.
+    // idKnown: this version has ID state (loaded or entered this session); until then nothing
+    // is saved and the first entry starts from the initial pose (EDID010-R04).
+    var idActive by rememberSaveable(photoId, source) { mutableStateOf(false) }
+    var idKnown by rememberSaveable(photoId, source) { mutableStateOf(false) }
+    var idPresetId by rememberSaveable(photoId, source) { mutableStateOf(DEFAULT_ID_PHOTO_PRESET_ID) }
+    var idZoom by rememberSaveable(photoId, source) { mutableStateOf(1f) }
+    var idPanX by rememberSaveable(photoId, source) { mutableStateOf(0f) }
+    var idPanY by rememberSaveable(photoId, source) { mutableStateOf(0f) }
+    var idRotation by rememberSaveable(photoId, source) { mutableStateOf(0f) }
+    // A tapped background / feather until the row catches up: the catalog write re-renders the
+    // gallery thumb before the row changes, and the preview must follow the tap at once.
+    var idBgPending by remember(photoId, source) { mutableStateOf<String?>(null) }
+    var idFeatherPending by remember(photoId, source) { mutableStateOf<String?>(null) }
+    // Mask job failure for the ID section; already sanitized by AiJobs.
+    var maskError by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
     var useCurrentFraming by rememberSaveable { mutableStateOf(true) }
     var prompt by rememberSaveable(photoId) { mutableStateOf("") }
     var extraPromptOpen by rememberSaveable(photoId) { mutableStateOf(false) }
@@ -229,6 +264,8 @@ fun StudioScreen(
     }
     val generateJob = aiJobList.find { it.sourcePhotoId == photoId && it.kind == AiKind.Generate }
     val editJob = aiJobList.find { it.sourcePhotoId == photoId && it.kind == AiKind.Edit }
+    // The mask job never locks framing (EDID040-R06) but counts as busy for every other gate.
+    val maskJob = aiJobList.find { it.sourcePhotoId == photoId && it.kind == AiKind.Mask }
     val activeAi = editJob ?: generateJob
     val alreadyQueued = myPrint != null
     val generating = generateJob != null
@@ -236,7 +273,9 @@ fun StudioScreen(
     val aiHidden = activeAi?.hidden == true
     val aiActive = generating || editing
     val aiBlocking = aiActive && !aiHidden
+    val aiBusy = aiActive || maskJob != null
     val aiCancelledText = stringResource(R.string.ai_cancelled)
+    val maskReadyText = stringResource(R.string.studio_id_mask_ready)
     val generatedText = stringResource(R.string.ai_generated)
     val viewGenerated = stringResource(R.string.ai_generated_view)
     val editDoneText = stringResource(R.string.edit_done)
@@ -304,8 +343,19 @@ fun StudioScreen(
                     genError = null
                     launch { snackbar.showSnackbar(editDoneText) }
                 }
+                is StudioJobEvent.MaskReady -> {
+                    maskError = null
+                    launch { snackbar.showSnackbar(maskReadyText) }
+                }
                 is StudioJobEvent.Failed -> {
-                    if (e.action != "print") {
+                    if (e.action == "mask") {
+                        // Shown in the ID section, not the generic dialog; a cancel is blank.
+                        if (e.message.isNullOrBlank()) {
+                            launch { snackbar.showSnackbar(aiCancelledText) }
+                        } else {
+                            maskError = e.message
+                        }
+                    } else if (e.action != "print") {
                         if (e.message.isNullOrBlank()) {
                             launch { snackbar.showSnackbar(aiCancelledText) }
                         } else {
@@ -341,7 +391,7 @@ fun StudioScreen(
     val cropLocked = aiBlocking
     val printerReady = appSettings.printerMac.isNotBlank()
     val hasInstructions = presetId.isNotEmpty() || prompt.isNotBlank()
-    val canGenerate = !aiActive && grokPub.keySet && hasInstructions
+    val canGenerate = !aiBusy && grokPub.keySet && hasInstructions
     val canPrintDirect = printerReady && !alreadyQueued
     val canPrintWithPreset = printerReady && grokPub.keySet && hasInstructions && !alreadyQueued
     val queuedIds = printJobs.filter { jobFieldKey(it.state) == "queued" }.map { it.id }
@@ -385,7 +435,9 @@ fun StudioScreen(
 
     LaunchedEffect(photoId, source) {
         framingReady = false
-        val saved = catalog.get(photoId)?.framingFor(source) ?: photo.framingFor(source)
+        val stored = catalog.get(photoId)
+        val saved = stored?.framingFor(source) ?: photo.framingFor(source)
+        val savedId = stored?.idPhotoFor(source) ?: photo.idPhotoFor(source)
         restoreFraming = saved
         if (saved != null) {
             // One snapshot, no suspension: the cropper must never clamp the new pan against
@@ -406,6 +458,24 @@ fun StudioScreen(
             landscapeTouched = false
             val size = printImageSize(photo, source)
             landscape = defaultLandscape(size?.width ?: 0, size?.height ?: 0)
+        }
+        // Same snapshot: a version whose ID state is on opens straight into ID mode.
+        if (savedId != null) {
+            idKnown = true
+            idActive = savedId.active
+            idPresetId = savedId.presetId
+            idZoom = savedId.zoom
+            idPanX = savedId.panX
+            idPanY = savedId.panY
+            idRotation = savedId.rotation
+        } else {
+            idKnown = false
+            idActive = false
+            idPresetId = DEFAULT_ID_PHOTO_PRESET_ID
+            idZoom = 1f
+            idPanX = 0f
+            idPanY = 0f
+            idRotation = 0f
         }
         framingReady = true
     }
@@ -432,8 +502,12 @@ fun StudioScreen(
         imageHeight = orientedH,
     )
     val poseRef = remember { mutableStateOf(FramingPoseSnap("", "", false, null)) }
+    val idPoseRef = remember { mutableStateOf(IdPoseSnap("", "", false, false, DEFAULT_ID_PHOTO_PRESET_ID, IdPhotoPose())) }
     val framingToPersist: Framing? =
         restoreFraming ?: persistableFraming(currentFraming, orientedW, orientedH)
+    val idPose = IdPhotoPose(idZoom, idPanX, idPanY, idRotation)
+    // Saved with the ordinary framing's cadence: only for a version that has ID state.
+    val idSaveDue = framingReady && idKnown
     SideEffect {
         poseRef.value = FramingPoseSnap(
             photoId = photo.id,
@@ -441,11 +515,21 @@ fun StudioScreen(
             ready = framingReady,
             framing = framingToPersist,
         )
+        idPoseRef.value = IdPoseSnap(
+            photoId = photo.id,
+            source = source,
+            due = idSaveDue,
+            active = idActive,
+            presetId = idPresetId,
+            pose = idPose,
+        )
     }
     DisposableEffect(Unit) {
         onDispose {
             val snap = poseRef.value
             if (snap.ready) catalog.persistFraming(snap.photoId, snap.source, snap.framing)
+            val id = idPoseRef.value
+            if (id.due) catalog.persistIdPhotoPose(id.photoId, id.source, id.active, id.presetId, id.pose)
         }
     }
     LaunchedEffect(photoId, source, zoom, panX, panY, rotationDegrees, landscape, placement, framingReady, restoreFraming) {
@@ -457,14 +541,107 @@ fun StudioScreen(
             persistableFraming(currentFraming, orientedW, orientedH),
         )
     }
+    LaunchedEffect(photoId, source, idSaveDue, idActive, idPresetId, idZoom, idPanX, idPanY, idRotation) {
+        if (!idSaveDue) return@LaunchedEffect
+        delay(300)
+        catalog.saveIdPhotoPose(photo.id, source, idActive, idPresetId, idPose)
+    }
 
     val selectSource: (String) -> Unit = { next ->
         if (next != source) {
             if (framingReady) {
                 catalog.persistFraming(photo.id, source, framingToPersist)
             }
+            if (idSaveDue) {
+                catalog.persistIdPhotoPose(photo.id, source, idActive, idPresetId, idPose)
+            }
             sourceOverride = next
         }
+    }
+
+    val idPreset = idPhotoPreset(idPresetId)
+    val idLayout = remember(idPreset) { idPhotoLayout(idPreset) }
+    val idStored = photo.idPhotoFor(source)
+    val idHasMask = idStored?.hasMask == true
+    val idBg = idBackground(idBgPending ?: idStored?.background)
+    val idFeatherChoice = idFeather(idFeatherPending ?: idStored?.feather)
+    LaunchedEffect(idStored?.background, idBgPending) {
+        if (idBgPending != null && idBgPending == idStored?.background) idBgPending = null
+    }
+    LaunchedEffect(idStored?.feather, idFeatherPending) {
+        if (idFeatherPending != null && idFeatherPending == idStored?.feather) idFeatherPending = null
+    }
+    val setIdPose: (IdPhotoPose) -> Unit = { p ->
+        idZoom = p.zoom
+        idPanX = p.panX
+        idPanY = p.panY
+        idRotation = p.rotation
+    }
+    // EDID010-R01/R04: the first entry of a version starts at zoom 1, pan 0 and the right angle
+    // nearest the ordinary rotation, with the size last chosen anywhere. Nothing here touches the
+    // ordinary pose, so leaving restores it exactly.
+    val onIdToggle: (Boolean) -> Unit = { on ->
+        if (on && !idKnown) {
+            setIdPose(idInitialPose(rotationDegrees))
+            idPresetId = settings.lastIdPhotoPreset()
+            idKnown = true
+        }
+        idActive = on
+    }
+    // EDID030-R01: a size change keeps zoom and rotation and re-clamps the pan in the new cell.
+    val onIdPreset: (String) -> Unit = { id ->
+        val next = idPhotoPreset(id)
+        if (next.id != idPreset.id) {
+            setIdPose(idPose.forPreset(idLayout, idPhotoLayout(next), orientedW, orientedH))
+            idPresetId = next.id
+        }
+        settings.setLastIdPhotoPreset(next.id)
+    }
+    val onIdRotate: (Int) -> Unit = { delta ->
+        setIdPose(idPose.rotatedQuarter(delta, idLayout.cellWidth, idLayout.cellHeight, orientedW, orientedH))
+    }
+    // EDID010-R04: only the ID pose; size, mask, background and the ordinary framing stay.
+    val onIdReset: () -> Unit = {
+        val reset = IdPhotoPose()
+        setIdPose(reset)
+        snapState.begin(0f, 0f, 0f)
+        catalog.persistIdPhotoPose(photo.id, source, idActive, idPresetId, reset)
+    }
+    val onCutOut: () -> Unit = {
+        maskError = null
+        try {
+            aiJobs.enqueueMask(photo.id, source)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            maskError = e.message ?: e.toString()
+        }
+    }
+    // Written at once, not with the pose debounce (D2). A tap must land even if Studio closes
+    // right after it; a failure drops the optimistic choice and reports.
+    val writeIdChoice: (suspend () -> Unit, () -> Unit) -> Unit = { write, onFailure ->
+        scope.launch {
+            try {
+                withContext(NonCancellable) { write() }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onFailure()
+                genError = e.message ?: e.toString()
+            }
+        }
+    }
+    val onIdBackground: (IdBackground) -> Unit = { bg ->
+        val id = photo.id
+        val src = source
+        idBgPending = bg.id
+        writeIdChoice({ catalog.setIdPhotoBackground(id, src, bg.id) }, { idBgPending = null })
+    }
+    val onIdFeather: (IdFeather) -> Unit = { f ->
+        val id = photo.id
+        val src = source
+        idFeatherPending = f.id
+        writeIdChoice({ catalog.setIdPhotoFeather(id, src, f.id) }, { idFeatherPending = null })
     }
 
     val appliedAiFraming: AppliedFraming? =
@@ -496,6 +673,18 @@ fun StudioScreen(
     val startPrint: (Boolean) -> Unit = { edit ->
         printError = null
         printStripCollapsed = false
+        // The ID toggle, size and pose reach the row before the job does, so execution reads
+        // what is on screen, including a just-left ID mode (PRRD020-R04).
+        val idSave: (suspend () -> Unit)? = if (idSaveDue) {
+            val id = photo.id
+            val src = source
+            val active = idActive
+            val preset = idPresetId
+            val pose = idPose
+            ({ catalog.saveIdPhotoPose(id, src, active, preset, pose) })
+        } else {
+            null
+        }
         printQueue.enqueuePrint(
             photo.id,
             source,
@@ -509,14 +698,23 @@ fun StudioScreen(
             landscape = landscape,
             rotationDegrees = rotationDegrees,
             placement = placement,
-            watermark = watermarkArmed,
+            watermark = watermarkArmed && !idActive,
             framing = framingToPersist,
+            beforeEnqueue = idSave,
         )
         scope.launch { snackbar.showSnackbar(printQueuedText) }
     }
 
     val startExport: () -> Unit = {
         if (!exporting) {
+            // EDEX010-R04: the live ID state with the row's background, feather and mask.
+            val idExport: IdPhotoState? = if (idActive) {
+                (idStored ?: IdPhotoState())
+                    .copy(active = true, presetId = idPresetId, background = idBg.id, feather = idFeatherChoice.id)
+                    .withPose(idPose)
+            } else {
+                null
+            }
             exporting = true
             exportStripCollapsed = false
             exportProgress = null
@@ -532,22 +730,38 @@ fun StudioScreen(
                     tracker.startPhase("rendering")
                     val uri = withContext(Dispatchers.IO) {
                         val bytes = imageFile.readBytes()
-                        val jpeg = ImagePipeline.renderPrintJpeg(
-                            bytes,
-                            crop,
-                            appSettings.printFit,
-                            cropImageWidth = working.width.takeIf { it > 0 },
-                            cropImageHeight = working.height.takeIf { it > 0 },
-                            rotateQuarters = quarterTurns,
-                            landscape = landscape,
-                            rotationDegrees = rotationDegrees,
-                            placement = placement,
-                            watermark = if (watermarkArmed) settings.readWatermark() else null,
-                            photo = photo,
-                            outputScale = 2,
-                            context = context.applicationContext,
-                            sheetForPrinter = false,
-                        )
+                        val jpeg = if (idExport != null) {
+                            // A missing mask throws before decoding, so no MediaStore row is made.
+                            val mask = if (idMaskRequired(idExport)) {
+                                catalog.readIdPhotoMask(photo.id, source, idExport.maskRev)
+                            } else {
+                                null
+                            }
+                            ImagePipeline.renderIdPhotoSheetJpeg(
+                                bytes,
+                                idExport,
+                                mask,
+                                outputScale = 2,
+                                sheetForPrinter = false,
+                            )
+                        } else {
+                            ImagePipeline.renderPrintJpeg(
+                                bytes,
+                                crop,
+                                appSettings.printFit,
+                                cropImageWidth = working.width.takeIf { it > 0 },
+                                cropImageHeight = working.height.takeIf { it > 0 },
+                                rotateQuarters = quarterTurns,
+                                landscape = landscape,
+                                rotationDegrees = rotationDegrees,
+                                placement = placement,
+                                watermark = if (watermarkArmed) settings.readWatermark() else null,
+                                photo = photo,
+                                outputScale = 2,
+                                context = context.applicationContext,
+                                sheetForPrinter = false,
+                            )
+                        }
                         tracker.startPhase("saving")
                         writeExportJpeg(context.applicationContext, jpeg, exportDisplayName(photo))
                     }
@@ -575,42 +789,72 @@ fun StudioScreen(
         }
     }
 
+    // Mask job progress for the ID section (the top AI strip shows only generate/edit).
+    val maskPhaseLabel = maskJob?.phase
+        ?.let { jobFieldKey(it).ifBlank { it.toString() } }
+        ?.let { localizedGeneratePhase(it) }
+        .orEmpty()
+    val maskBytes = localizedByteProgress(maskJob?.loaded, maskJob?.total).ifEmpty { null }
+    val maskUi = maskJob?.let { it.progress?.toUi(maskPhaseLabel, maskBytes) ?: indeterminateUi(maskPhaseLabel, maskBytes) }
+
     val composePanel: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Column {
                 SectionLabel(stringResource(R.string.studio_framing))
                 FramingControls(
                     landscape = landscape,
-                    rotationDegrees = rotationDegrees,
+                    rotationDegrees = if (idActive) idRotation else rotationDegrees,
                     enabled = !cropLocked,
+                    // EDID010-R01: in ID mode neither chip shows selected; either one leaves ID
+                    // mode and then follows the ordinary orientation rule.
+                    orientationSelected = !idActive,
                     onOrientation = {
+                        if (idActive) idActive = false
                         landscapeTouched = true
                         landscape = it
                     },
-                    onRotate = onRotate,
-                    onReset = {
-                        restoreFraming = null
-                        zoom = 1f
-                        panX = 0f
-                        panY = 0f
-                        rotationDegrees = 0f
-                        landscapeTouched = false
-                        val autoW = orientedW.takeIf { it > 0 } ?: photo.width
-                        val autoH = orientedH.takeIf { it > 0 } ?: photo.height
-                        landscape = defaultLandscape(autoW, autoH)
-                        snapState.begin(0f, 0f, 0f)
-                        catalog.persistFraming(photo.id, source, null)
+                    onRotate = if (idActive) onIdRotate else onRotate,
+                    onReset = if (idActive) {
+                        onIdReset
+                    } else {
+                        {
+                            restoreFraming = null
+                            zoom = 1f
+                            panX = 0f
+                            panY = 0f
+                            rotationDegrees = 0f
+                            landscapeTouched = false
+                            val autoW = orientedW.takeIf { it > 0 } ?: photo.width
+                            val autoH = orientedH.takeIf { it > 0 } ?: photo.height
+                            landscape = defaultLandscape(autoW, autoH)
+                            snapState.begin(0f, 0f, 0f)
+                            catalog.persistFraming(photo.id, source, null)
+                        }
                     },
                 )
-                if (landscape) {
+                StudioSwitchRow(
+                    label = stringResource(R.string.studio_id_photo),
+                    checked = idActive,
+                    enabled = !cropLocked,
+                    onCheckedChange = onIdToggle,
+                )
+                if (idActive) {
+                    IdPhotoSizeSection(
+                        presetId = idPreset.id,
+                        enabled = !cropLocked,
+                        onPresetChange = onIdPreset,
+                    )
+                }
+                // The ID sheet is always landscape, turned onto the portrait paper.
+                if (landscape || idActive) {
                     StudioNote(stringResource(R.string.studio_landscape_note))
                 }
             }
             Column {
                 Text(stringResource(R.string.zoom), color = PaperDim)
                 Slider(
-                    value = zoom,
-                    onValueChange = { zoom = it },
+                    value = if (idActive) idZoom else zoom,
+                    onValueChange = { if (idActive) idZoom = it else zoom = it },
                     valueRange = MIN_PRINT_ZOOM..MAX_PRINT_ZOOM,
                     enabled = !cropLocked,
                     colors = SliderDefaults.colors(thumbColor = Amber, activeTrackColor = Amber),
@@ -619,10 +863,16 @@ fun StudioScreen(
                     StudioNote(stringResource(R.string.studio_crop_locked), tone = Amber)
                 }
             }
+            // EDID010-R05: off in ID mode without touching the session switch, which returns
+            // as it was when ID mode ends.
             StudioWatermarkRow(
-                checked = watermarkArmed,
-                enabled = canWatermark && !cropLocked,
-                hint = if (!canWatermark) stringResource(R.string.studio_watermark_unconfigured) else null,
+                checked = watermarkArmed && !idActive,
+                enabled = canWatermark && !cropLocked && !idActive,
+                hint = when {
+                    idActive -> stringResource(R.string.studio_id_no_watermark)
+                    !canWatermark -> stringResource(R.string.studio_watermark_unconfigured)
+                    else -> null
+                },
             ) { watermarkOn = it }
         }
     }
@@ -666,7 +916,7 @@ fun StudioScreen(
                             label = versionLabel(i + 1, presetName, versionFallback),
                             model = catalog.versionThumbFile(photo.id, edit.id),
                             onClick = { selectSource(edit.id) },
-                            onLongClick = if (aiActive) {
+                            onLongClick = if (aiBusy) {
                                 null
                             } else {
                                 {
@@ -679,43 +929,61 @@ fun StudioScreen(
                 }
             }
 
-            Column {
-                SectionLabel(stringResource(R.string.grok_title))
-                if (!grokPub.keySet) {
-                    Text(stringResource(R.string.grok_need_key), color = Amber, modifier = Modifier.padding(bottom = 8.dp))
-                    TextButton(onClick = { onSettings("grok") }) { Text(stringResource(R.string.nav_settings), color = Amber) }
-                }
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    Box(Modifier.weight(1f)) {
-                        PresetDropdown(presetId, presets.presets, enabled = !cropLocked) {
-                            presetId = it
-                            settings.setLastPreset(it)
-                        }
+            if (idActive) {
+                IdPhotoProcessSection(
+                    keySet = grokPub.keySet,
+                    hasMask = idHasMask,
+                    background = idBg,
+                    feather = idFeatherChoice,
+                    canCutOut = grokPub.keySet && !aiBusy,
+                    maskJob = maskJob?.let { job ->
+                        IdMaskJobUi(maskUi ?: indeterminateUi(maskPhaseLabel)) { aiJobs.cancel(job.id) }
+                    },
+                    maskError = maskError,
+                    onCutOut = onCutOut,
+                    onOpenSettings = { onSettings("grok") },
+                    onBackground = onIdBackground,
+                    onFeather = onIdFeather,
+                )
+            } else {
+                Column {
+                    SectionLabel(stringResource(R.string.grok_title))
+                    if (!grokPub.keySet) {
+                        Text(stringResource(R.string.grok_need_key), color = Amber, modifier = Modifier.padding(bottom = 8.dp))
+                        TextButton(onClick = { onSettings("grok") }) { Text(stringResource(R.string.nav_settings), color = Amber) }
                     }
-                    StudioExtraPromptRow(
-                        prompt = prompt,
-                        enabled = !cropLocked,
-                        onEdit = { extraPromptOpen = true },
-                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Box(Modifier.weight(1f)) {
+                            PresetDropdown(presetId, presets.presets, enabled = !cropLocked) {
+                                presetId = it
+                                settings.setLastPreset(it)
+                            }
+                        }
+                        StudioExtraPromptRow(
+                            prompt = prompt,
+                            enabled = !cropLocked,
+                            onEdit = { extraPromptOpen = true },
+                        )
+                    }
                 }
+                StudioSwitchRow(
+                    label = stringResource(R.string.studio_ai_use_framing),
+                    checked = useCurrentFraming,
+                    enabled = !cropLocked,
+                ) { useCurrentFraming = it }
+                PaperButton(stringResource(R.string.studio_ai_generate_version), enabled = canGenerate) {
+                    genError = null
+                    aiJobs.enqueueEdit(photo.id, source, presetId, prompt, appliedAiFraming)
+                }
+                GhostButton(stringResource(R.string.studio_ai_generate_to_gallery), enabled = canGenerate) {
+                    genError = null
+                    aiJobs.enqueueGenerate(photo.id, source, presetId, prompt, appliedAiFraming)
+                }
+                StudioNote(stringResource(R.string.studio_ai_generate_hint), topPadding = 0)
             }
-            StudioSwitchRow(
-                label = stringResource(R.string.studio_ai_use_framing),
-                checked = useCurrentFraming,
-                enabled = !cropLocked,
-            ) { useCurrentFraming = it }
-            PaperButton(stringResource(R.string.studio_ai_generate_version), enabled = canGenerate) {
-                genError = null
-                aiJobs.enqueueEdit(photo.id, source, presetId, prompt, appliedAiFraming)
-            }
-            GhostButton(stringResource(R.string.studio_ai_generate_to_gallery), enabled = canGenerate) {
-                genError = null
-                aiJobs.enqueueGenerate(photo.id, source, presetId, prompt, appliedAiFraming)
-            }
-            StudioNote(stringResource(R.string.studio_ai_generate_hint), topPadding = 0)
         }
     }
 
@@ -725,8 +993,11 @@ fun StudioScreen(
             PaperButton(stringResource(R.string.studio_add_to_print_queue), enabled = canPrintDirect) {
                 startPrint(false)
             }
-            GhostButton(stringResource(R.string.print_with_preset), enabled = canPrintWithPreset) {
+            GhostButton(stringResource(R.string.print_with_preset), enabled = canPrintWithPreset && !idActive) {
                 startPrint(true)
+            }
+            if (idActive) {
+                StudioNote(stringResource(R.string.studio_id_preset_print_off), topPadding = 0)
             }
             if (alreadyQueued) {
                 StudioNote(stringResource(R.string.print_queue_already_queued), tone = Amber, topPadding = 0)
@@ -743,6 +1014,9 @@ fun StudioScreen(
         }
     }
 
+    // In ID mode the header names the size and the sheet instead of the ordinary crop.
+    val sizeLabel = if (idActive) idSheetLabel(idPreset, idLayout) else "${working.width}×${working.height}"
+
     val onTabSelect: (StudioTab) -> Unit = { clicked ->
         if (clicked == tab && drawerExpanded) {
             drawerExpanded = false
@@ -755,7 +1029,7 @@ fun StudioScreen(
     val drawerPanel: @Composable (maxHeight: Dp) -> Unit = { panelCap ->
         Column(Modifier.fillMaxWidth()) {
             Text(
-                "${working.width}×${working.height}",
+                sizeLabel,
                 fontFamily = MonoFont,
                 color = PaperDim,
                 fontSize = 12.sp,
@@ -806,7 +1080,7 @@ fun StudioScreen(
             StudioTopBar(
                 filename = photo.filename,
                 generated = photo.isGenerated(),
-                busy = aiActive || alreadyQueued,
+                busy = aiBusy || alreadyQueued,
                 onBack = onBack,
                 onDelete = { pendingDelete = true },
             )
@@ -850,34 +1124,72 @@ fun StudioScreen(
     }
 
     val cropper: @Composable (Modifier) -> Unit = { cropModifier ->
-        WatermarkOverlay(
-            settings = watermarkSettings,
-            photo = photo,
-            landscape = landscape,
-            visible = watermarkArmed,
-            modifier = cropModifier.background(Color.Black),
-        ) {
-            AspectCropper(
+        if (idActive) {
+            // EDID030: the whole sheet, no watermark overlay (EDID010-R05).
+            val cutout = rememberIdPreviewCutout(
+                catalog = catalog,
+                photoId = photo.id,
+                source = source,
+                imageFile = imageFile,
+                maskRev = idStored?.maskRev,
+                background = idBg,
+                feather = idFeatherChoice,
+                zoom = idZoom,
+                layout = idLayout,
+                imageWidth = orientedW,
+                imageHeight = orientedH,
+            )
+            val perSheet = pluralStringResource(R.plurals.studio_id_per_sheet, idLayout.count, idLayout.count)
+            val swapped = idBg.argb?.takeIf { idHasMask }
+            IdPhotoSheetPreview(
                 model = imageFile,
                 imageWidth = orientedW,
                 imageHeight = orientedH,
-                zoom = zoom,
-                panX = panX,
-                panY = panY,
-                onZoomChange = { zoom = it },
-                onPanChange = { x, y -> panX = x; panY = y },
-                overlay = if (landscape) landscapeOverlay else portraitOverlay,
-                aspect = if (landscape) PRINT_ASPECT_LANDSCAPE.toFloat() else PRINT_ASPECT.toFloat(),
-                rotationDegrees = rotationDegrees,
-                onRotationChange = { rotationDegrees = it },
-                panFrameWidth = sheetW,
-                panFrameHeight = sheetH,
-                // Lock only while a visible AI job is running. A queued print
-                // must not freeze framing — execution reads the latest saved pose,
-                // and enqueue saves the on-screen pose before the row can run.
-                enabled = !cropLocked,
+                layout = idLayout,
+                pose = idPose,
+                onPoseChange = setIdPose,
+                cellBackground = swapped?.let { Color(it) } ?: Color.White,
+                cutout = cutout.bitmap,
+                overlay = idSheetLabel(idPreset, idLayout),
+                description = stringResource(
+                    R.string.studio_id_sheet_a11y,
+                    "${idSheetLabel(idPreset, idLayout)} · $perSheet",
+                ),
                 snapState = snapState,
+                modifier = cropModifier,
+                enabled = !cropLocked,
+                note = if (cutout.failed) stringResource(R.string.studio_id_mask_missing) else null,
             )
+        } else {
+            WatermarkOverlay(
+                settings = watermarkSettings,
+                photo = photo,
+                landscape = landscape,
+                visible = watermarkArmed,
+                modifier = cropModifier.background(Color.Black),
+            ) {
+                AspectCropper(
+                    model = imageFile,
+                    imageWidth = orientedW,
+                    imageHeight = orientedH,
+                    zoom = zoom,
+                    panX = panX,
+                    panY = panY,
+                    onZoomChange = { zoom = it },
+                    onPanChange = { x, y -> panX = x; panY = y },
+                    overlay = if (landscape) landscapeOverlay else portraitOverlay,
+                    aspect = if (landscape) PRINT_ASPECT_LANDSCAPE.toFloat() else PRINT_ASPECT.toFloat(),
+                    rotationDegrees = rotationDegrees,
+                    onRotationChange = { rotationDegrees = it },
+                    panFrameWidth = sheetW,
+                    panFrameHeight = sheetH,
+                    // Lock only while a visible AI job is running. A queued print
+                    // must not freeze framing — execution reads the latest saved pose,
+                    // and enqueue saves the on-screen pose before the row can run.
+                    enabled = !cropLocked,
+                    snapState = snapState,
+                )
+            }
         }
     }
 
@@ -906,7 +1218,7 @@ fun StudioScreen(
                             .verticalScroll(rememberScrollState()),
                     ) {
                         Text(
-                            "${working.width}×${working.height}",
+                            sizeLabel,
                             fontFamily = MonoFont,
                             color = PaperDim,
                             fontSize = 12.sp,
@@ -985,7 +1297,7 @@ fun StudioScreen(
             text = { Text(photo.filename) },
             confirmButton = {
                 TextButton(
-                    enabled = !aiActive && !alreadyQueued,
+                    enabled = !aiBusy && !alreadyQueued,
                     onClick = {
                         val id = photo.id
                         pendingDelete = false
@@ -1078,7 +1390,7 @@ fun StudioScreen(
             title = { Text(stringResource(R.string.studio_delete_version_title)) },
             confirmButton = {
                 TextButton(
-                    enabled = !aiActive,
+                    enabled = !aiBusy,
                     onClick = {
                         val id = editId
                         versionDeleteId = null
@@ -1195,6 +1507,15 @@ private data class FramingPoseSnap(
     val source: String,
     val ready: Boolean,
     val framing: Framing?,
+)
+
+private data class IdPoseSnap(
+    val photoId: String,
+    val source: String,
+    val due: Boolean,
+    val active: Boolean,
+    val presetId: String,
+    val pose: IdPhotoPose,
 )
 
 private fun exportDisplayName(photo: PhotoMeta): String {

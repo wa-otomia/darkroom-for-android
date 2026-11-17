@@ -15,6 +15,7 @@ Bluetooth Classic SPP. No Mi Home cloud.
 - **Ingest** — FTP, system camera, or manual import.
 - **Gallery** — Room catalog with edit lineage, per-photo versions, delete-with-undo.
 - **Studio** — 2:3 framing with snap-drag and 45° rotation snap, framing saved per version, watermark, 2× export, share.
+- **ID photo mode** — 11 common passport/visa sizes laid out tightly on one sheet at their real millimetre size, one shared framing for every cell, AI person mask with the background replaced on the device (the person stays original pixels), no watermark.
 - **AI** — Grok (xAI) and OpenAI behind one interface, with prompt presets.
 - **Watermark** — SNS handle and date, separate portrait/landscape positions, rendered at print and export only.
 - **Print** — queue with per-job progress, copies, fill/fit, cancel, out-of-paper detection. Output 1040 × 1560.
