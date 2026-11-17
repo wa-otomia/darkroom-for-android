@@ -571,7 +571,7 @@ internal fun IdCutoutResultViewer(failure: IdMaskFailure, onDismiss: () -> Unit)
                 )
             } else {
                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                    val noImage = if (idFailureIsLocal(failure.message)) {
+                    val noImage = if (idFailureIsLocal(failure.local, failure.message)) {
                         R.string.studio_id_cutout_result_no_image_local
                     } else {
                         R.string.studio_id_cutout_result_no_image

@@ -203,5 +203,9 @@ internal fun idLocalSwitchEnabled(busy: Boolean, compositing: Boolean): Boolean 
 /**
  * True when a failure record without an image came from the on-device cut-out, so the viewer
  * does not blame the AI for the missing image (EDID040-R11 keeps no image for such failures).
+ * The record's [local] mode decides, whatever the message (an undecodable or deleted version
+ * fails a local job without the local prefix); a record written before the mode was kept falls
+ * back to the local failure prefix.
  */
-internal fun idFailureIsLocal(message: String): Boolean = message.trimStart().startsWith(ID_MASK_MSG_LOCAL_FAILED)
+internal fun idFailureIsLocal(local: Boolean, message: String): Boolean =
+    local || message.trimStart().startsWith(ID_MASK_MSG_LOCAL_FAILED)

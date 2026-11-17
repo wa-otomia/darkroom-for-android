@@ -265,10 +265,17 @@ class IdPhotoUiStateTest {
     }
 
     @Test
-    fun localFailureRecognisedByItsMessage() {
-        assertTrue(idFailureIsLocal("本地抠图失败：UnsatisfiedLinkError"))
-        assertTrue(idFailureIsLocal(ID_MASK_MSG_LOCAL_FAILED))
-        assertFalse(idFailureIsLocal("抠图失败：返回图不是黑白蒙版"))
-        assertFalse(idFailureIsLocal(""))
+    fun localFailureRecognisedByItsModeOrLegacyMessage() {
+        // The stored mode decides, whatever the message: a corrupt or deleted version fails a
+        // local job without the local prefix and must not blame the AI.
+        assertTrue(idFailureIsLocal(local = true, message = "无法解码 JPEG"))
+        assertTrue(idFailureIsLocal(local = true, message = "抠图失败：该版本已删除"))
+        assertTrue(idFailureIsLocal(local = true, message = ""))
+        // Records written before the mode was kept fall back to the local prefix.
+        assertTrue(idFailureIsLocal(local = false, message = "本地抠图失败：UnsatisfiedLinkError"))
+        assertTrue(idFailureIsLocal(local = false, message = ID_MASK_MSG_LOCAL_FAILED))
+        assertFalse(idFailureIsLocal(local = false, message = "抠图失败：返回图不是黑白蒙版"))
+        assertFalse(idFailureIsLocal(local = false, message = "无法解码 JPEG"))
+        assertFalse(idFailureIsLocal(local = false, message = ""))
     }
 }

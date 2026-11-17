@@ -556,11 +556,17 @@ const val ID_MASK_FAILURE_MESSAGE_MAX = 500
 
 /**
  * What a version keeps after a mask job fails for any reason but a user cancel: the sanitized
- * reason, when it failed (epoch ms) and whether the reply bytes were kept next to it. Stored as
- * `idmask-failed/<photoId>/<versionKey>.json` in the app cache; its presence is the record.
+ * reason, when it failed (epoch ms), whether the reply bytes were kept next to it and whether the
+ * job was an on-device cut-out ([local], EDID040-R11; absent in older records, read as false).
+ * Stored as `idmask-failed/<photoId>/<versionKey>.json` in the app cache; its presence is the record.
  */
 @Serializable
-data class IdMaskFailureRecord(val message: String, val at: Long, val hasImage: Boolean)
+data class IdMaskFailureRecord(
+    val message: String,
+    val at: Long,
+    val hasImage: Boolean,
+    val local: Boolean = false,
+)
 
 /** [message] with secrets redacted (AIPV040-R03), trimmed and cut to [ID_MASK_FAILURE_MESSAGE_MAX] chars. */
 fun idMaskFailureMessage(message: String?): String {
@@ -590,9 +596,12 @@ fun idMaskFailureReply(reply: ByteArray?): ByteArray? = reply?.takeIf { it.isNot
 fun idMaskEndsAsCancel(error: Throwable, jobActive: Boolean): Boolean =
     error is kotlin.coroutines.cancellation.CancellationException || !jobActive
 
-/** The record of a failed cut-out with [message], at [at], given the [reply] bytes received. */
-fun idMaskFailureRecord(message: String?, reply: ByteArray?, at: Long): IdMaskFailureRecord =
-    IdMaskFailureRecord(idMaskFailureMessage(message), at, idMaskFailureReply(reply) != null)
+/**
+ * The record of a failed cut-out with [message], at [at], given the [reply] bytes received;
+ * [local] when the job ran on device.
+ */
+fun idMaskFailureRecord(message: String?, reply: ByteArray?, at: Long, local: Boolean = false): IdMaskFailureRecord =
+    IdMaskFailureRecord(idMaskFailureMessage(message), at, idMaskFailureReply(reply) != null, local)
 
 private val idMaskFailureJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 

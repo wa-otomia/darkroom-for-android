@@ -230,7 +230,7 @@ class AiJobs @Inject constructor(
                         // one arrived) before it is reported, so the screen finds it on the
                         // Failed event. Keeping it never changes the job's result.
                         withContext(Dispatchers.IO + NonCancellable) {
-                            runCatching { catalog.saveIdMaskFailure(photoId, versionKey, message, reply) }
+                            runCatching { catalog.saveIdMaskFailure(photoId, versionKey, message, reply, local) }
                         }
                     }
                     tracker.fail(message)
@@ -263,13 +263,17 @@ class AiJobs @Inject constructor(
         id: String,
         keepReply: (ByteArray) -> Unit,
     ): ByteArray {
-        val input = withContext(Dispatchers.Default) { localOutOfMemory { ImagePipeline.localMaskInput(raw) } }
-        val decoded = try {
-            tracker.startPhase("segmenting")
-            publish(id, tracker)
-            withContext(Dispatchers.Default) { segmenter.segment(input) }
-        } finally {
-            if (!input.isRecycled) input.recycle()
+        // The input is decoded under the segmenter's lock and the phase moves to "segmenting" only
+        // once it is held: a job waiting for another photo's inference stays in "preparing" and
+        // holds no bitmap (design D4).
+        val decoded = withContext(Dispatchers.Default) {
+            segmenter.segment(
+                prepare = { localOutOfMemory { ImagePipeline.localMaskInput(raw) } },
+                onSegmenting = {
+                    tracker.startPhase("segmenting")
+                    publish(id, tracker)
+                },
+            )
         }
         tracker.startPhase("saving")
         publish(id, tracker)
