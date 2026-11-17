@@ -79,18 +79,11 @@ fun idMaskInteriorRadius(width: Int, height: Int): Int =
  * 3. white (≥223) < 1 % → NO_PERSON; 4. white > 99 % → NO_BACKGROUND;
  * 5. non-black (>32) share of the top, left and right bands ([idMaskBorderBand], union, bottom
  *    excluded) > 60 % → BACKGROUND_KEPT;
- * 6. mid-grey with no black pixel within [idMaskInteriorRadius] + [extraInteriorRadius]
- *    (Chebyshev, edges replicated), as a share of non-black pixels, > 15 % → SHADED. The extra
- *    radius is the edge gradient an AI-feathered reply was asked for (EDID040-R13), in area px.
+ * 6. mid-grey with no black pixel within [idMaskInteriorRadius] (Chebyshev, edges replicated),
+ *    as a share of non-black pixels, > 15 % → SHADED.
  * An empty area has no person.
  */
-fun validateIdMask(
-    luma: ByteArray,
-    width: Int,
-    height: Int,
-    colouredCount: Long,
-    extraInteriorRadius: Int = 0,
-): IdMaskVerdict {
+fun validateIdMask(luma: ByteArray, width: Int, height: Int, colouredCount: Long): IdMaskVerdict {
     if (width <= 0 || height <= 0 || luma.size < width.toLong() * height) return IdMaskVerdict.NO_PERSON
     val n = width * height
     val total = n.toDouble()
@@ -134,8 +127,7 @@ fun validateIdMask(
             nonBlackCount++
         }
     }
-    val interiorRadius = idMaskInteriorRadius(width, height) + extraInteriorRadius.coerceAtLeast(0)
-    val farFromBlack = erodeAlpha(nonBlack, width, height, interiorRadius)
+    val farFromBlack = erodeAlpha(nonBlack, width, height, idMaskInteriorRadius(width, height))
     var interiorGrey = 0L
     for (i in 0 until n) {
         val v = luma[i].toInt() and 0xFF

@@ -6,8 +6,6 @@ import io.github.wa_otomia.darkroom.core.GENERATED_PHOTO_TAG
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_LOCAL_FAILED
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NEED_KEY
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_VERSION_GONE
-import io.github.wa_otomia.darkroom.core.IdFeather
-import io.github.wa_otomia.darkroom.core.IdMaskAiFeather
 import io.github.wa_otomia.darkroom.core.combineGeneratePrompt
 import io.github.wa_otomia.darkroom.core.generatedPhotoFilename
 import io.github.wa_otomia.darkroom.core.IdMaskVerdict
@@ -140,9 +138,7 @@ class AiJobs @Inject constructor(
      * [CatalogRepository.saveIdPhotoMask] commits. A cancel before the commit discards any late
      * result.
      */
-    fun enqueueMask(photoId: String, source: String, local: Boolean = false, aiFeather: IdMaskAiFeather? = null): String? {
-        // EDID040-R13: frozen here; a local job or a "none" level never asks the AI to feather.
-        val askedFeather = aiFeather?.takeIf { !local && it.feather != IdFeather.NONE }
+    fun enqueueMask(photoId: String, source: String, local: Boolean = false): String? {
         // D8 gate: no key means no job and no request. The AI job re-checks at execution time.
         if (!local && !settings.aiConfigured()) error(ID_MASK_MSG_NEED_KEY)
         val versionKey = resolvePhotoSource(source)
@@ -197,7 +193,7 @@ class AiJobs @Inject constructor(
                 val png = if (local) {
                     runLocalMask(raw, tracker, id) { reply = it }
                 } else {
-                    val response = grok.mask(raw, photoId, askedFeather) { progress ->
+                    val response = grok.mask(raw, photoId) { progress ->
                         applyAiProgress(tracker, progress)
                         publish(id, tracker)
                     }
@@ -205,13 +201,13 @@ class AiJobs @Inject constructor(
                     tracker.startPhase("saving")
                     publish(id, tracker)
                     withContext(Dispatchers.Default) {
-                        val decoded = ImagePipeline.decodeIdMask(response.bytes, response.upload, response.featherWidthPx)
+                        val decoded = ImagePipeline.decodeIdMask(response.bytes, response.upload)
                         ImagePipeline.encodeIdMaskPng(decoded)
                     }
                 }
                 ensureActive()
                 withContext(NonCancellable) {
-                    if (!catalog.saveIdPhotoMask(photoId, versionKey, png, askedFeather)) error(ID_MASK_MSG_VERSION_GONE)
+                    if (!catalog.saveIdPhotoMask(photoId, versionKey, png)) error(ID_MASK_MSG_VERSION_GONE)
                     committed = true
                     withContext(Dispatchers.IO) { runCatching { catalog.clearIdMaskFailure(photoId, versionKey) } }
                     tracker.succeed()

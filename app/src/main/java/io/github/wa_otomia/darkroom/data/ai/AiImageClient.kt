@@ -4,12 +4,8 @@ import android.util.Base64
 import io.github.wa_otomia.darkroom.core.AiProvider
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NEED_KEY
 import io.github.wa_otomia.darkroom.core.ID_PHOTO_MASK_PROMPT
-import io.github.wa_otomia.darkroom.core.IdFeather
-import io.github.wa_otomia.darkroom.core.IdMaskAiFeather
 import io.github.wa_otomia.darkroom.core.ProviderSettings
 import io.github.wa_otomia.darkroom.core.buildGrokEditJson
-import io.github.wa_otomia.darkroom.core.idMaskAiFeatherWidthPx
-import io.github.wa_otomia.darkroom.core.idPhotoMaskPrompt
 import io.github.wa_otomia.darkroom.core.imagesEditsUrl
 import io.github.wa_otomia.darkroom.core.imagineErrorMessage
 import io.github.wa_otomia.darkroom.core.modelsListFallbackUrl
@@ -84,8 +80,7 @@ data class AiProgress(
  * Raw matte bytes as returned by the provider, plus the upload they must be validated against
  * (expected size, content area inside an OpenAI padding canvas). Not validated here.
  */
-/** A matte reply with the [upload] it answers and the AI feather width asked for (0 when none, EDID040-R13). */
-data class IdMaskResponse(val bytes: ByteArray, val upload: IdMaskUpload, val featherWidthPx: Int = 0)
+data class IdMaskResponse(val bytes: ByteArray, val upload: IdMaskUpload)
 
 @Singleton
 class AiImageClient @Inject constructor(
@@ -165,16 +160,13 @@ class AiImageClient @Inject constructor(
 
     /**
      * Requests a person matte for the whole version image (AIPV030-R04). The settings are read
-     * once at execution time; the prompt is [idPhotoMaskPrompt]: exactly [ID_PHOTO_MASK_PROMPT]
-     * without [aiFeather], else the feathered variant whose width comes from the upload
-     * (EDID040-R13). OpenAI only returns
+     * once at execution time; the prompt is always [ID_PHOTO_MASK_PROMPT]. OpenAI only returns
      * fixed sizes, so its upload is padded onto the closest supported canvas and the request asks
      * for exactly that canvas as PNG. The caller validates the returned bytes against [IdMaskResponse.upload].
      */
     suspend fun mask(
         image: ByteArray,
         photoId: String,
-        aiFeather: IdMaskAiFeather? = null,
         onProgress: (AiProgress) -> Unit = {},
     ): IdMaskResponse =
         withContext(Dispatchers.IO) {
@@ -182,7 +174,6 @@ class AiImageClient @Inject constructor(
             val cfg = ai.activeSettings
             val provider = ai.active
             var prepared: IdMaskUpload? = null
-            var featherWidth = 0
             val bytes = execute(
                 cfg = cfg,
                 provider = provider,
@@ -194,19 +185,11 @@ class AiImageClient @Inject constructor(
             ) { onBytes ->
                 val upload = ImagePipeline.idMaskUpload(image, padToCanvas = provider == AiProvider.OPENAI)
                 prepared = upload
-                val asked = aiFeather?.takeIf { it.feather != IdFeather.NONE }
-                featherWidth = if (asked != null) {
-                    idMaskAiFeatherWidthPx(asked.radiusSourcePx, upload.sourceWidth, upload.content.width)
-                } else {
-                    0
-                }
-                // The size the model receives (the padded canvas on OpenAI); N is in the same px.
-                val prompt = idPhotoMaskPrompt(asked, featherWidth, upload.expectedWidth, upload.expectedHeight)
                 when (provider) {
-                    AiProvider.GROK -> grokEditBody(cfg, prompt, upload.jpeg, onBytes)
+                    AiProvider.GROK -> grokEditBody(cfg, ID_PHOTO_MASK_PROMPT, upload.jpeg, onBytes)
                     AiProvider.OPENAI -> openAiEditBody(
                         cfg,
-                        prompt,
+                        ID_PHOTO_MASK_PROMPT,
                         upload.jpeg,
                         onBytes,
                         size = "${upload.expectedWidth}x${upload.expectedHeight}",
@@ -214,7 +197,7 @@ class AiImageClient @Inject constructor(
                     )
                 }
             }
-            IdMaskResponse(bytes, checkNotNull(prepared), featherWidth)
+            IdMaskResponse(bytes, checkNotNull(prepared))
         }
 
     /**

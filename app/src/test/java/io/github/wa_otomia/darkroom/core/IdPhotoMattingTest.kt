@@ -10,7 +10,7 @@ import org.junit.Test
 
 /**
  * improve-id-photo-matting: reply checks (AIPV030-R04), the inward feather of fine parts
- * (EDID040-R07), the AI feather (EDID040-R12/R13) and the on-device mapping (EDID040-R11).
+ * (EDID040-R07) and the on-device mapping (EDID040-R11).
  * Every image here is synthetic; the user's evidence photos never enter the repository.
  */
 class IdPhotoMattingTest {
@@ -461,105 +461,6 @@ class IdPhotoMattingTest {
             assertArrayEquals(featherAlpha(a, 33, 21, r), featherAlphaFor(a, 33, 21, r, inward = false))
             assertArrayEquals(featherAlphaInwardFine(a, 33, 21, r), featherAlphaFor(a, 33, 21, r, inward = true))
         }
-    }
-
-    // ---------------------------------------------------------------------------------------
-    // AI feather (EDID040-R12/R13, AIPV030-R04)
-    // ---------------------------------------------------------------------------------------
-
-    /** A disc of white with a [ramp] px inward gradient to black at its outline. */
-    private fun featheredDisc(size: Int, radius: Int, ramp: Int): Img {
-        val img = Img(size, size)
-        val c = size / 2.0
-        for (y in 0 until size) for (x in 0 until size) {
-            val d = Math.hypot(x + 0.5 - c, y + 0.5 - c)
-            val inside = radius - d
-            img[x, y] = when {
-                inside <= 0 -> 0
-                inside >= ramp -> 255
-                else -> Math.round(inside / ramp * 255).toInt()
-            }
-        }
-        return img
-    }
-
-    @Test
-    fun aiFeatheredReplyPassesOnlyWithTheWidenedRadius() {
-        val img = featheredDisc(400, 80, 16)
-        assertEquals(IdMaskVerdict.SHADED, validateIdMask(img.px, img.w, img.h, 0))
-        assertEquals(IdMaskVerdict.OK, validateIdMask(img.px, img.w, img.h, 0, extraInteriorRadius = 16))
-        // A negative extra is the plain check.
-        assertEquals(IdMaskVerdict.SHADED, validateIdMask(img.px, img.w, img.h, 0, extraInteriorRadius = -5))
-    }
-
-    @Test
-    fun aiFeatherWidthRoundsAndHasAFloor() {
-        assertEquals(16, idMaskAiFeatherWidthPx(20f, 3000, 1200))
-        assertEquals(2, idMaskAiFeatherWidthPx(0.5f, 3000, 1200))
-        assertEquals(3, idMaskAiFeatherWidthPx(3.125f, 2000, 1000))
-        for (bad in listOf(0f, -1f, Float.NaN, Float.POSITIVE_INFINITY)) {
-            assertEquals(2, idMaskAiFeatherWidthPx(bad, 3000, 1200))
-        }
-        assertEquals(2, idMaskAiFeatherWidthPx(20f, 0, 1200))
-        assertEquals(2, idMaskAiFeatherWidthPx(20f, 3000, 0))
-    }
-
-    @Test
-    fun aiFeatherRequestOnlyForTheAiModeAndARealLevel() {
-        fun req(enabled: Boolean, local: Boolean, f: IdFeather) =
-            idMaskAiFeatherRequest(enabled, local, f, true, 717, 921, 3000, 4000, 1f)
-        assertEquals(null, req(false, false, IdFeather.MEDIUM))
-        assertEquals(null, req(true, true, IdFeather.MEDIUM))
-        assertEquals(null, req(true, false, IdFeather.NONE))
-        val r = req(true, false, IdFeather.MEDIUM)!!
-        assertEquals(IdFeather.MEDIUM, r.feather)
-        assertTrue(r.inward)
-        assertEquals(idFeatherSourcePx(IdFeather.MEDIUM.radiusPx(1), 717, 921, 3000, 4000, 1f), r.radiusSourcePx, 1e-6f)
-        assertFalse(idMaskAiFeatherRequest(true, false, IdFeather.WEAK, false, 717, 921, 3000, 4000, 1f)!!.inward)
-    }
-
-    @Test
-    fun featheredPromptVariants() {
-        assertEquals(ID_PHOTO_MASK_PROMPT, idPhotoMaskPrompt(null, 16, 1152, 1536))
-        assertEquals(ID_PHOTO_MASK_PROMPT, idPhotoMaskPrompt(IdMaskAiFeather(IdFeather.NONE, true, 9f), 16, 1152, 1536))
-        val inward = idPhotoMaskPrompt(IdMaskAiFeather(IdFeather.MEDIUM, true, 9f), 16, 1152, 1536)
-        val centred = idPhotoMaskPrompt(IdMaskAiFeather(IdFeather.STRONG, false, 9f), 1, 1152, 1536)
-        for (p in listOf(inward, centred)) {
-            assertTrue(p.startsWith("Task: produce an alpha matte"))
-            for (fragment in listOf("main person only", "chair backs", "flat, solid, pure white", "all-black", "1152x1536 pixels", "hair", "between hair strands and locks", "even inside those gaps", "a sharp edge is wrong", "mid grey (#808080)", "background seen between strands stays dark")) {
-                assertTrue(fragment, p.contains(fragment))
-            }
-            assertFalse(p.contains("clean, sharp edge"))
-            assertFalse(p.contains("that grey hair transition"))
-            assertTrue(p.startsWith("Task: produce an alpha matte for replacing the background of a portrait or ID photo. This matte must have a soft, feathered edge"))
-            // The person sentence no longer forbids the edge gradient it asks for.
-            assertFalse(p.contains("no shading, lighting, gradients, texture"))
-            assertTrue(p.contains("no gradients except the soft edge ramp described below"))
-            assertTrue(p.endsWith("Use only black, white and the grey edge ramp: no colours, text, watermarks or other content."))
-            assertTrue(p.all { it.code < 128 })
-            assertFalse(p.contains("  "))
-        }
-        assertTrue(inward.contains("at least 16 pixels wide, about 1.4% of the image width"))
-        assertTrue(inward.contains("entirely inside the person's outline"))
-        assertFalse(inward.contains("centred on"))
-        // The width never drops under 2 in the text.
-        assertTrue(centred.contains("at least 2 pixels wide, about 0.2% of the image width"))
-        assertTrue(centred.contains("centred on the person's outline"))
-        // A zero width never divides by zero.
-        assertTrue(idPhotoMaskPrompt(IdMaskAiFeather(IdFeather.WEAK, true, 9f), 4, 0, 0).contains("about 0.1% of the image width"))
-        assertFalse(centred.contains("entirely inside"))
-    }
-
-    @Test
-    fun aiFeatherStateNormalizesAndRendersWithoutLocalFeather() {
-        assertEquals(null, IdPhotoState(aiFeather = "none").normalized().aiFeather)
-        assertEquals(null, IdPhotoState(aiFeather = "bogus").normalized().aiFeather)
-        assertEquals(null, IdPhotoState(aiFeather = " ").normalized().aiFeather)
-        assertEquals("medium", IdPhotoState(aiFeather = " medium ").normalized().aiFeather)
-        assertEquals(IdFeather.STRONG, IdPhotoState(feather = "strong").localFeather())
-        assertEquals(IdFeather.NONE, IdPhotoState(feather = "strong", aiFeather = "weak").localFeather())
-        assertEquals(IdFeather.WEAK, IdPhotoState(feather = "weak", aiFeather = "none").localFeather())
-        assertFalse(DEFAULT_ID_PHOTO_AI_FEATHER)
     }
 
     // ---------------------------------------------------------------------------------------

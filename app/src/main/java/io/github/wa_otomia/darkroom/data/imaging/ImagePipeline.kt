@@ -45,6 +45,7 @@ import io.github.wa_otomia.darkroom.core.featherAlphaFor
 import io.github.wa_otomia.darkroom.core.idMaskColoured
 import io.github.wa_otomia.darkroom.core.fitMaskContent
 import io.github.wa_otomia.darkroom.core.idBackground
+import io.github.wa_otomia.darkroom.core.idFeather
 import io.github.wa_otomia.darkroom.core.idMaskAspectMatches
 import io.github.wa_otomia.darkroom.core.idMaskLumaToAlpha
 import io.github.wa_otomia.darkroom.core.idMaskVerdictMessage
@@ -451,8 +452,7 @@ object ImagePipeline {
                 layout.cellHeight,
                 background.argb,
                 maskBitmap,
-                // EDID040-R13: an AI-feathered mask gets no on-device feather.
-                id.localFeather().radiusPx(scale),
+                idFeather(id.feather).radiusPx(scale),
                 id.featherInward,
             )
             assembleIdSheet(cell, layout, sheetForPrinter)
@@ -549,9 +549,6 @@ object ImagePipeline {
         val expectedHeight: Int,
         val content: IdRect,
         val padded: Boolean,
-        /** The oriented full-size version the upload was made from (EDID040-R13 width math). */
-        val sourceWidth: Int = 0,
-        val sourceHeight: Int = 0,
     )
 
     /**
@@ -570,8 +567,6 @@ object ImagePipeline {
                 expectedHeight = upload.height,
                 content = IdRect(0, 0, upload.width, upload.height),
                 padded = false,
-                sourceWidth = source.oriented.width,
-                sourceHeight = source.oriented.height,
             )
         } else {
             val (canvasW, canvasH) = openAiMaskCanvas(upload.width, upload.height)
@@ -617,8 +612,6 @@ object ImagePipeline {
                 expectedHeight = canvasH,
                 content = content,
                 padded = true,
-                sourceWidth = source.oriented.width,
-                sourceHeight = source.oriented.height,
             )
         }
     }
@@ -630,11 +623,10 @@ object ImagePipeline {
      * Decodes a provider reply (any format ImageDecoder reads) and checks it against [upload]:
      * aspect within 1% of the expected size, then the content rect (scaled to the reply size)
      * is cut out and only that area is checked ([validateIdMask]: colour, mid-grey, white share,
-     * kept background, shading; an AI-feathered reply widens the shading radius by [featherWidthPx]
-     * upload px, scaled to the reply). Failures throw [IllegalStateException] with an `ID_MASK_MSG_*` message;
+     * kept background, shading). Failures throw [IllegalStateException] with an `ID_MASK_MSG_*` message;
      * nothing is stretched or re-aligned.
      */
-    fun decodeIdMask(response: ByteArray, upload: IdMaskUpload, featherWidthPx: Int = 0): IdMaskDecoded {
+    fun decodeIdMask(response: ByteArray, upload: IdMaskUpload): IdMaskDecoded {
         var replyW = 0
         var replyH = 0
         val bitmap = try {
@@ -684,13 +676,7 @@ object ImagePipeline {
                 error(ID_MASK_MSG_UNDECODABLE)
             }
             val verdict = try {
-                // EDID040-R13: an AI-feathered reply's asked gradient, in reply content px.
-                val extra = if (featherWidthPx > 0 && upload.content.width > 0) {
-                    Math.round(featherWidthPx.toDouble() * w / upload.content.width).toInt()
-                } else {
-                    0
-                }
-                validateIdMask(luma, w, h, coloured, extra)
+                validateIdMask(luma, w, h, coloured)
             } catch (_: OutOfMemoryError) {
                 error(ID_MASK_MSG_UNDECODABLE)
             }
