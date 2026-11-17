@@ -39,6 +39,7 @@
     <string name="phase_generate_saving">저장 중</string>
     <string name="phase_generate_uploading">사진 업로드 중</string>
     <string name="phase_generate_processing">처리 중</string>
+    <string name="phase_generate_segmenting">인물 인식 중</string>
     <string name="phase_generate_downloading">다운로드 중</string>
     <string name="phase_generate_done">완료</string>
     <string name="phase_generate_error">오류</string>

@@ -93,6 +93,17 @@ fun aiPhases(stats: ProgressStats? = null): List<WeightedPhase> = durationWeight
     stats,
 )
 
+/** On-device ID photo cut-out (EDID040-R11): no upload or download, one inference. */
+fun localMaskPhases(stats: ProgressStats? = null): List<WeightedPhase> = durationWeightedPhases(
+    JobKind.Ai,
+    listOf(
+        WeightedPhase("preparing", 0.15f),
+        WeightedPhase("segmenting", 0.70f),
+        WeightedPhase("saving", 0.15f),
+    ),
+    stats,
+)
+
 /** Cold-start constants unless [stats] has at least one learned EMA sample. */
 fun durationWeightedPhases(
     kind: JobKind,

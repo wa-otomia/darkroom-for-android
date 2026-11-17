@@ -14,6 +14,7 @@ class JobPhasesTest {
         assertEquals(R.string.phase_generate_uploading, generatePhaseRes("uploading"))
         assertEquals(R.string.phase_generate_preparing, generatePhaseRes("preparing"))
         assertEquals(R.string.phase_generate_saving, generatePhaseRes("saving"))
+        assertEquals(R.string.phase_generate_segmenting, generatePhaseRes("segmenting"))
         assertEquals(R.string.job_state_aborted, jobStateRes("aborted"))
         assertEquals(R.string.job_state_no_paper, jobStateRes("no_paper"))
         assertEquals(R.string.transfer_phase_done, transferPhaseRes("done"))

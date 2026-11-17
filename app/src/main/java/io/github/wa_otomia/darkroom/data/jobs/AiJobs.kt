@@ -3,16 +3,21 @@ package io.github.wa_otomia.darkroom.data.jobs
 import io.github.wa_otomia.darkroom.core.AiJobSnapshot
 import io.github.wa_otomia.darkroom.core.AppliedFraming
 import io.github.wa_otomia.darkroom.core.GENERATED_PHOTO_TAG
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_LOCAL_FAILED
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NEED_KEY
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_VERSION_GONE
 import io.github.wa_otomia.darkroom.core.combineGeneratePrompt
 import io.github.wa_otomia.darkroom.core.generatedPhotoFilename
+import io.github.wa_otomia.darkroom.core.IdMaskVerdict
 import io.github.wa_otomia.darkroom.core.idMaskEndsAsCancel
+import io.github.wa_otomia.darkroom.core.idMaskVerdictMessage
 import io.github.wa_otomia.darkroom.core.resolvePhotoSource
 import io.github.wa_otomia.darkroom.core.sanitizeAiSecrets
+import io.github.wa_otomia.darkroom.core.validateLocalMaskLuma
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
 import io.github.wa_otomia.darkroom.data.ai.AiImageClient
 import io.github.wa_otomia.darkroom.data.imaging.ImagePipeline
+import io.github.wa_otomia.darkroom.data.imaging.LocalSelfieSegmenter
 import io.github.wa_otomia.darkroom.data.printer.StudioJobEvent
 import io.github.wa_otomia.darkroom.data.progress.JobKind
 import io.github.wa_otomia.darkroom.data.progress.JobProgress
@@ -20,6 +25,7 @@ import io.github.wa_otomia.darkroom.data.progress.JobProgressTracker
 import io.github.wa_otomia.darkroom.data.progress.ProgressStats
 import io.github.wa_otomia.darkroom.data.progress.aiPhases
 import io.github.wa_otomia.darkroom.data.progress.applyAiProgress
+import io.github.wa_otomia.darkroom.data.progress.localMaskPhases
 import io.github.wa_otomia.darkroom.data.settings.SettingsRepository
 import io.github.wa_otomia.darkroom.di.ApplicationScope
 import kotlinx.coroutines.CancellationException
@@ -58,6 +64,8 @@ data class AiJob(
     val startedAt: Long,
     val error: String?,
     val progress: JobProgress? = null,
+    /** A [AiKind.Mask] job run on this device (EDID040-R11): no provider request, no upload. */
+    val local: Boolean = false,
 ) {
     fun toSnapshot(): AiJobSnapshot = AiJobSnapshot(
         id = id,
@@ -82,6 +90,7 @@ class AiJobs @Inject constructor(
     private val catalog: CatalogRepository,
     private val settings: SettingsRepository,
     private val grok: AiImageClient,
+    private val segmenter: LocalSelfieSegmenter,
     private val stats: ProgressStats,
     @ApplicationScope private val appScope: CoroutineScope,
 ) {
@@ -118,16 +127,20 @@ class AiJobs @Inject constructor(
     /**
      * Starts a person-matte job for one version (EDID040, AIJB010-R04). Returns the job id, or null
      * when any AI job row for [photoId] exists (hidden or still in its finished/failed tail).
-     * Throws [IllegalStateException] with [ID_MASK_MSG_NEED_KEY] when no AI key is configured.
+     * Without [local], throws [IllegalStateException] with [ID_MASK_MSG_NEED_KEY] when no AI key is
+     * configured.
      *
-     * The version key is frozen here, so switching versions later still stores the mask on the
-     * originating version. The job never uses presets or extra prompts, never touches the last
-     * preset, and never creates an edit or a photo: only [CatalogRepository.saveIdPhotoMask] commits.
-     * A cancel before the commit discards any late result.
+     * [local] (EDID040-R10/R11) is frozen here: the job segments on this device with
+     * [LocalSelfieSegmenter], needs no key, sends no provider request and uploads nothing,
+     * whatever the setting reads later. Either way the version key is frozen here, so switching
+     * versions later still stores the mask on the originating version. The job never uses presets
+     * or extra prompts, never touches the last preset, and never creates an edit or a photo: only
+     * [CatalogRepository.saveIdPhotoMask] commits. A cancel before the commit discards any late
+     * result.
      */
-    fun enqueueMask(photoId: String, source: String): String? {
-        // D8 gate: no key means no job and no request. The job re-checks at execution time.
-        if (!settings.aiConfigured()) error(ID_MASK_MSG_NEED_KEY)
+    fun enqueueMask(photoId: String, source: String, local: Boolean = false): String? {
+        // D8 gate: no key means no job and no request. The AI job re-checks at execution time.
+        if (!local && !settings.aiConfigured()) error(ID_MASK_MSG_NEED_KEY)
         val versionKey = resolvePhotoSource(source)
         val id = UUID.randomUUID().toString()
         val row = AiJob(
@@ -142,6 +155,7 @@ class AiJobs @Inject constructor(
             hidden = false,
             startedAt = System.currentTimeMillis(),
             error = null,
+            local = local,
         )
         // Every writer of _jobs mutates through MutableStateFlow.update, so this gate and the
         // append are one atomic step and no concurrent tick can drop the new row.
@@ -156,34 +170,40 @@ class AiJobs @Inject constructor(
             }
         }
         if (!added) return null
-        val tracker = JobProgressTracker(id, JobKind.Ai, aiPhases(stats), stats)
+        val phases = if (local) localMaskPhases(stats) else aiPhases(stats)
+        val tracker = JobProgressTracker(id, JobKind.Ai, phases, stats)
         tracker.startPhase("preparing")
         publish(id, tracker)
         val handle = appScope.launch(start = CoroutineStart.LAZY) {
             val ticker = tracker.launchTicks(this) { publish(id, tracker) }
             var committed = false
             // EDID040-R09: the last reply received, kept with the failure record whatever fails
-            // after it arrives (undecodable, wrong aspect, not a matte, version gone).
+            // after it arrives (undecodable, wrong aspect, not a matte, version gone). A local job
+            // keeps its own mask only when the white-share check rejects it (EDID040-R11).
             var reply: ByteArray? = null
             try {
                 // EDID040-R09: a new attempt drops the version's last failure record.
                 withContext(Dispatchers.IO) { runCatching { catalog.clearIdMaskFailure(photoId, versionKey) } }
-                if (!settings.aiConfigured()) error(ID_MASK_MSG_NEED_KEY)
+                if (!local && !settings.aiConfigured()) error(ID_MASK_MSG_NEED_KEY)
                 val raw = withContext(Dispatchers.IO) {
                     val file = catalog.sourceFile(photoId, versionKey)
                     if (!file.isFile) error(ID_MASK_MSG_VERSION_GONE)
                     file.readBytes()
                 }
-                val response = grok.mask(raw, photoId) { progress ->
-                    applyAiProgress(tracker, progress)
+                val png = if (local) {
+                    runLocalMask(raw, tracker, id) { reply = it }
+                } else {
+                    val response = grok.mask(raw, photoId) { progress ->
+                        applyAiProgress(tracker, progress)
+                        publish(id, tracker)
+                    }
+                    reply = response.bytes
+                    tracker.startPhase("saving")
                     publish(id, tracker)
-                }
-                reply = response.bytes
-                tracker.startPhase("saving")
-                publish(id, tracker)
-                val png = withContext(Dispatchers.Default) {
-                    val decoded = ImagePipeline.decodeIdMask(response.bytes, response.upload)
-                    ImagePipeline.encodeIdMaskPng(decoded)
+                    withContext(Dispatchers.Default) {
+                        val decoded = ImagePipeline.decodeIdMask(response.bytes, response.upload)
+                        ImagePipeline.encodeIdMaskPng(decoded)
+                    }
                 }
                 ensureActive()
                 withContext(NonCancellable) {
@@ -229,6 +249,55 @@ class AiJobs @Inject constructor(
         handles[id] = handle
         handle.start()
         return id
+    }
+
+    /**
+     * The local half of [enqueueMask] (EDID040-R11): upright bounded input, one on-device
+     * inference, the white-share check, then the grey PNG to commit. [keepReply] receives the
+     * PNG only when the check rejects it, so the failure record can show what was found.
+     * Out-of-memory while preparing or encoding is a local failure, never a crash.
+     */
+    private suspend fun runLocalMask(
+        raw: ByteArray,
+        tracker: JobProgressTracker,
+        id: String,
+        keepReply: (ByteArray) -> Unit,
+    ): ByteArray {
+        val input = withContext(Dispatchers.Default) { localOutOfMemory { ImagePipeline.localMaskInput(raw) } }
+        val decoded = try {
+            tracker.startPhase("segmenting")
+            publish(id, tracker)
+            withContext(Dispatchers.Default) { segmenter.segment(input) }
+        } finally {
+            if (!input.isRecycled) input.recycle()
+        }
+        tracker.startPhase("saving")
+        publish(id, tracker)
+        return withContext(Dispatchers.Default) {
+            val png = localOutOfMemory { ImagePipeline.encodeIdMaskPng(decoded) }
+            val verdict = validateLocalMaskLuma(decoded.luma)
+            if (verdict != IdMaskVerdict.OK) {
+                keepReply(png)
+                error(idMaskVerdictMessage(verdict))
+            }
+            png
+        }
+    }
+
+    /**
+     * Runs [block], turning running out of memory (raw, or wrapped by ImagePipeline as its decode
+     * message) into the local failure message (EDID040-R11).
+     */
+    private inline fun <T> localOutOfMemory(block: () -> T): T {
+        try {
+            return block()
+        } catch (oom: OutOfMemoryError) {
+            error("$ID_MASK_MSG_LOCAL_FAILED：${oom.javaClass.simpleName}")
+        } catch (e: IllegalStateException) {
+            val cause = e.cause
+            if (cause is OutOfMemoryError) error("$ID_MASK_MSG_LOCAL_FAILED：${cause.javaClass.simpleName}")
+            throw e
+        }
     }
 
     fun cancel(id: String): Pair<Boolean, String> {

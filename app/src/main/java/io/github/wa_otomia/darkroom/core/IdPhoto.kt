@@ -365,6 +365,9 @@ fun idBackground(id: String?): IdBackground {
 
 val DEFAULT_ID_BACKGROUND_AFTER_MASK = IdBackground.NAVY
 
+/** "本地抠图" starts off (EDID040-R10): AI cut-out stays the default. */
+const val DEFAULT_ID_PHOTO_LOCAL_CUTOUT = false
+
 enum class IdFeather(val id: String, val radiusMm: Double) {
     NONE("none", 0.0),
     WEAK("weak", 0.1),
@@ -538,6 +541,11 @@ const val ID_MASK_MSG_UNDECODABLE = "抠图失败：无法解码返回图"
 const val ID_MASK_MSG_NEED_KEY = "抠图失败：未配置 AI 密钥"
 const val ID_MASK_MSG_VERSION_GONE = "抠图失败：该版本已删除"
 const val ID_MASK_MSG_MISSING = "证件照蒙版缺失或损坏"
+const val ID_MASK_MSG_BACKGROUND_KEPT = "抠图失败：返回图保留了原背景，不是蒙版"
+const val ID_MASK_MSG_SHADED = "抠图失败：返回图是带明暗的灰度图，不是蒙版"
+
+/** On-device cut-out failure (EDID040-R11); the thrown message adds "：<exception class>". */
+const val ID_MASK_MSG_LOCAL_FAILED = "本地抠图失败"
 
 // ---------------------------------------------------------------------------------------------
 // Failed cut-out record (EDID040-R09)
@@ -604,13 +612,29 @@ fun parseIdMaskFailureRecord(raw: String?): IdMaskFailureRecord? {
 // AI mask request (AIPV030-R04)
 // ---------------------------------------------------------------------------------------------
 
-/** Fixed instruction for the matte request. Presets and extra prompts never join it. */
+/**
+ * Fixed instruction for the matte request (AIPV030-R04). Presets and extra prompts never join it.
+ * One sentence per literal, joined by exactly one space.
+ */
 const val ID_PHOTO_MASK_PROMPT: String =
-    "Create a pure black-and-white segmentation matte of this photo. " +
-        "Paint the person pure white (#FFFFFF): the whole head, hair, ears, neck, shoulders and clothing. " +
-        "Paint everything else pure black (#000000), including the background and any solid border or padding. " +
-        "Keep exactly the same image size, framing and composition as the input. " +
-        "Do not crop, shift, resize or add anything. No grey shading, colours, text or other content."
+    "Task: produce an alpha matte for replacing the background of a portrait or ID photo. " +
+        "This is a segmentation task, not a photo edit: do not relight, recolour, restyle or re-render the photo. " +
+        "Output only the matte, at exactly the same width, height, framing and composition as the input; " +
+        "do not crop, pad, shift, rotate, resize or redraw anything, so that every matte pixel lines up with the same pixel of the input. " +
+        "Foreground is the main person only: hair, face, ears, neck, shoulders, arms and hands if visible, " +
+        "worn clothing and worn accessories such as glasses, earrings, hats and headscarves. " +
+        "Background is everything else, even where it touches or overlaps the person: walls, floors, ceilings, sky, doors, windows, " +
+        "furniture including chairs, chair backs, headrests, sofas and cushions, shelves, hanging clothes and coats, bags, objects, " +
+        "other people, shadows cast on the background, and any border or padding. " +
+        "Paint the background pure black (#000000), even where it is white or light-coloured in the photo. " +
+        "Paint the person as one flat, solid, pure white (#FFFFFF) silhouette with no shading, lighting, gradients, texture, " +
+        "facial features or outlines inside it; eyes, mouth, glasses, hair texture and clothing details must not be visible. " +
+        "Keep the edge tight to the person, with no glow, halo or margin around it. " +
+        "Only where fine hair strands or flyaways overlap the background, use grey levels to show partial transparency " +
+        "(lighter means more hair, darker means more background); the main mass of the hair stays solid white, " +
+        "and everywhere else make a clean, sharp edge. " +
+        "If no person is visible, return an all-black image. " +
+        "Use only black, white and that grey hair transition: no colours, text, watermarks or other content."
 
 val OPENAI_MASK_CANVASES: List<Pair<Int, Int>> = listOf(1024 to 1024, 1536 to 1024, 1024 to 1536)
 

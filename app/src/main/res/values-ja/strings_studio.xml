@@ -39,6 +39,7 @@
     <string name="phase_generate_saving">保存中</string>
     <string name="phase_generate_uploading">写真をアップロード中</string>
     <string name="phase_generate_processing">処理中</string>
+    <string name="phase_generate_segmenting">人物を検出中</string>
     <string name="phase_generate_downloading">ダウンロード中</string>
     <string name="phase_generate_done">完了</string>
     <string name="phase_generate_error">エラー</string>

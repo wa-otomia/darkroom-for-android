@@ -31,6 +31,9 @@
     <string name="studio_id_explain">AI는 인물 마스크만 만듭니다. 인물의 픽셀은 모두 원본 사진 그대로이며, 배경은 이 기기에서 바꿉니다. 이 버전의 사진 전체가 설정에서 지정한 AI 서비스로 업로드됩니다.</string>
     <string name="studio_id_cutout">AI로 인물 오려내기</string>
     <string name="studio_id_recut">다시 오려내기</string>
+    <string name="studio_id_cutout_local">기기에서 인물 오려내기</string>
+    <string name="studio_id_local_cutout">기기에서 오려내기</string>
+    <string name="studio_id_local_explain">이 기기에서 Google ML Kit로 인물을 오려냅니다. 사진과 결과는 업로드되지 않으며 API 키가 필요 없습니다. 머리카락 등 가장자리는 AI 오려내기보다 거칠 수 있습니다.</string>
     <string name="studio_id_cutting">오려내는 중…</string>
     <string name="studio_id_cutting_other">다른 버전(%1$s)을 오려내는 중…</string>
     <string name="studio_id_mask_ready">오려내기 완료</string>
@@ -86,4 +89,7 @@
     <string name="id_error_mask_version_gone">오려내기 결과를 버렸습니다: 이 버전이 삭제되었습니다.</string>
     <string name="id_error_mask_missing">증명사진 마스크가 없거나 손상되었습니다. 다시 오려내거나 원래 배경을 선택하세요.</string>
     <string name="id_error_mask_save">오려내기 마스크를 저장하지 못했습니다. 남은 저장 공간을 확인한 뒤 다시 시도하세요.</string>
+    <string name="id_error_mask_background_kept">오려내기 실패: 결과에 원래 배경이 남아 있어 마스크가 아닙니다.</string>
+    <string name="id_error_mask_shaded">오려내기 실패: 결과가 음영이 있는 흑백 이미지라 마스크가 아닙니다.</string>
+    <string name="id_error_mask_local_failed">기기에서 오려내지 못했습니다. 다시 시도하거나 \'기기에서 오려내기\'를 끄고 AI를 사용하세요.</string>
 </resources>

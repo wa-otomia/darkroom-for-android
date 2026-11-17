@@ -34,6 +34,13 @@ class JobProgressTest {
     }
 
     @Test
+    fun localMaskPhasesHaveNoTransfer() {
+        val phases = localMaskPhases()
+        assertEquals(listOf("preparing", "segmenting", "saving"), phases.map { it.id })
+        assertEquals(1f, phases.sumOf { it.weight.toDouble() }.toFloat(), 0.0001f)
+    }
+
+    @Test
     fun phaseFractionCapsAt95UntilComplete() {
         val timed = phaseFraction(null, null, false, null, null, 60_000, 1_000, phaseComplete = false)
         assertEquals(0.95f, timed, 0.0001f)

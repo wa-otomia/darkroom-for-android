@@ -32,6 +32,9 @@
     <string name="studio_id_explain">AI only draws a mask of the person. Every pixel of the person comes from your photo; the background is replaced on this device. The whole photo of this version is uploaded to the AI provider set in Settings.</string>
     <string name="studio_id_cutout">AI cut out person</string>
     <string name="studio_id_recut">Cut out again</string>
+    <string name="studio_id_cutout_local">Cut out person on device</string>
+    <string name="studio_id_local_cutout">Cut out on this device</string>
+    <string name="studio_id_local_explain">Uses Google ML Kit on this device. The photo and the cut-out are not uploaded and no API key is needed. Edges, especially hair, are usually rougher than an AI cut-out.</string>
     <string name="studio_id_cutting">Cutting out…</string>
     <string name="studio_id_cutting_other">Cutting out another version (%1$s)…</string>
     <string name="studio_id_mask_ready">Cut-out ready</string>
@@ -87,4 +90,7 @@
     <string name="id_error_mask_version_gone">Cut-out discarded: this version was deleted.</string>
     <string name="id_error_mask_missing">The ID photo mask is missing or damaged. Cut out again, or choose the original background.</string>
     <string name="id_error_mask_save">Couldn\'t save the cut-out mask. Check free storage and try again.</string>
+    <string name="id_error_mask_background_kept">Cut-out failed: the reply kept the original background, so it is not a mask.</string>
+    <string name="id_error_mask_shaded">Cut-out failed: the reply was a shaded greyscale image, not a mask.</string>
+    <string name="id_error_mask_local_failed">On-device cut-out failed. Try again, or turn off “Cut out on this device” to use AI.</string>
 </resources>
