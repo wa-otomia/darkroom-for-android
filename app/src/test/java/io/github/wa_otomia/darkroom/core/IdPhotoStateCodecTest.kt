@@ -103,16 +103,6 @@ class IdPhotoStateCodecTest {
     }
 
     @Test
-    fun onlyDecodedButRejectedRepliesAreKept() {
-        for (m in listOf(ID_MASK_MSG_ASPECT, ID_MASK_MSG_NOT_BINARY, ID_MASK_MSG_NO_PERSON, ID_MASK_MSG_NO_BACKGROUND)) {
-            assertTrue(m, idMaskFailureKeepsReply(m))
-        }
-        for (m in listOf(ID_MASK_MSG_UNDECODABLE, ID_MASK_MSG_NEED_KEY, ID_MASK_MSG_VERSION_GONE, ID_MASK_MSG_MISSING, "timeout", "", null)) {
-            assertFalse(m.toString(), idMaskFailureKeepsReply(m))
-        }
-    }
-
-    @Test
     fun presetLookupFallsBackToDefault() {
         assertEquals("35x45", idPhotoPreset(null).id)
         assertEquals("35x45", idPhotoPreset("").id)

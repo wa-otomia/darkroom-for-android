@@ -63,12 +63,14 @@
     <string name="studio_id_feather_inward">Soften inward</string>
     <string name="studio_id_compositing">Applying the new background…</string>
 
-    <!-- Failed mask viewer (EDID040-R09) -->
-    <string name="studio_id_view_failed_mask">View returned mask</string>
-    <string name="studio_id_failed_mask_title">Mask returned by the AI</string>
+    <!-- Last failed cut-out viewer (EDID040-R09) -->
+    <string name="studio_id_view_cutout_result">View this cut-out result</string>
+    <string name="studio_id_cutout_result_title">Result of this cut-out</string>
+    <string name="studio_id_cutout_result_no_image">The AI did not return a usable image.</string>
+    <string name="studio_id_cutout_result_at">Failed at %1$s</string>
     <string name="studio_id_failed_mask_close">Close</string>
 
-    <!-- On/off state of square switch chips (ID photo, inward feather) -->
+    <!-- On/off state of square switch chips (ID photo) -->
     <string name="studio_toggle_on">On</string>
     <string name="studio_toggle_off">Off</string>
 

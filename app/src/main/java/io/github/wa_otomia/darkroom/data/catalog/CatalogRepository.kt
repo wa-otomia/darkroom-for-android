@@ -21,6 +21,10 @@ import io.github.wa_otomia.darkroom.core.idMaskRequired
 import io.github.wa_otomia.darkroom.core.hasVersion
 import io.github.wa_otomia.darkroom.core.idPhotoFor
 import io.github.wa_otomia.darkroom.core.orphanIdMaskFailureDirs
+import io.github.wa_otomia.darkroom.core.encodeIdMaskFailureRecord
+import io.github.wa_otomia.darkroom.core.idMaskFailureRecord
+import io.github.wa_otomia.darkroom.core.idMaskFailureReply
+import io.github.wa_otomia.darkroom.core.parseIdMaskFailureRecord
 import io.github.wa_otomia.darkroom.core.mergeIdPhotoPose
 import io.github.wa_otomia.darkroom.core.withIdPhoto
 import io.github.wa_otomia.darkroom.core.galleryThumbSource
@@ -49,6 +53,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -69,6 +75,12 @@ data class PendingDeletion(
 )
 
 data class DeleteProgress(val done: Int, val total: Int)
+
+/**
+ * A version's failed cut-out (EDID040-R09): the sanitized reason, when it failed (epoch ms) and
+ * the kept reply file, which is null when no reply arrived or it is gone. Cache only.
+ */
+data class IdMaskFailure(val message: String, val at: Long, val hasImage: Boolean, val bytesFile: File?)
 
 @Singleton
 class CatalogRepository @Inject constructor(
@@ -159,37 +171,88 @@ class CatalogRepository @Inject constructor(
     private fun idMaskPrefix(versionKey: String) = "$versionKey-mask-"
 
     /**
-     * `cache/idmask-failed/<photoId>/<versionKey>`: the last mask reply of a version that decoded
-     * but failed validation, kept as returned for viewing (EDID040-R09). Never uploaded or logged.
+     * `cache/idmask-failed/<photoId>/<versionKey>`: the reply bytes of the version's last failed
+     * cut-out, as received (EDID040-R09). Absent when no reply arrived. Never uploaded or logged.
      */
-    fun idMaskFailureFile(photoId: String, source: String): File =
+    private fun idMaskFailureFile(photoId: String, source: String): File =
         File(idMaskFailureDir(photoId), framingVersionKey(source))
+
+    /** `cache/idmask-failed/<photoId>/<versionKey>.json`: the failure record; its presence is the record. */
+    private fun idMaskFailureRecordFile(photoId: String, source: String): File =
+        File(idMaskFailureDir(photoId), framingVersionKey(source) + ".json")
 
     private fun idMaskFailureDir(photoId: String) = File(File(context.cacheDir, "idmask-failed"), photoId)
 
+    /** Bumped on every write or clear of a failure record, so screens re-read theirs. */
+    private val idMaskFailureRev = MutableStateFlow(0L)
+
     /**
-     * Keeps [bytes] as the version's failed mask reply: temp file plus rename. Under [rowLock] and
-     * only while the photo and the version still exist, so a reply that arrives after a delete
-     * ([deleteNow], [deleteEdit]) never recreates the folder (EDID040-R09). Returns whether it
-     * was kept.
+     * Emits once on collection and again after every failure record write or clear (any photo,
+     * any version); collectors re-read the record they show (EDID040-R09).
      */
-    suspend fun saveIdMaskFailure(photoId: String, source: String, bytes: ByteArray): Boolean =
+    fun idMaskFailureChanges(): Flow<Unit> = idMaskFailureRev.map { }
+
+    private fun idMaskFailureChanged() {
+        idMaskFailureRev.update { it + 1 }
+    }
+
+    /**
+     * Records the version's failed cut-out (EDID040-R09): drops the old record, writes the reply
+     * [bytes] when any arrived, then the JSON record with the sanitized [message]. Both go through
+     * a temp file and a rename. Under [rowLock] and only while the photo and the version still
+     * exist, so a failure that lands after a delete ([deleteNow], [deleteEdit]) never recreates
+     * the folder. A reply that cannot be written leaves a record without an image. Returns
+     * whether a record was written.
+     */
+    suspend fun saveIdMaskFailure(photoId: String, source: String, message: String, bytes: ByteArray?): Boolean =
         withContext(Dispatchers.IO) {
             rowLock.withLock {
                 val current = get(photoId) ?: return@withLock false
                 if (!current.hasVersion(source)) return@withLock false
-                writeAtomically(idMaskFailureFile(photoId, source), bytes)
-                true
+                deleteIdMaskFailureFiles(photoId, source)
+                try {
+                    val reply = idMaskFailureReply(bytes)
+                    val kept = reply != null && runCatching {
+                        writeAtomically(idMaskFailureFile(photoId, source), reply)
+                    }.isSuccess
+                    val record = idMaskFailureRecord(message, reply.takeIf { kept }, System.currentTimeMillis())
+                    writeAtomically(
+                        idMaskFailureRecordFile(photoId, source),
+                        encodeIdMaskFailureRecord(record).toByteArray(Charsets.UTF_8),
+                    )
+                    true
+                } finally {
+                    idMaskFailureChanged()
+                }
             }
         }
 
-    fun clearIdMaskFailure(photoId: String, source: String) {
-        idMaskFailureFile(photoId, source).delete()
+    /**
+     * The version's failure record, or null when there is none or its JSON is missing, too large
+     * or corrupt. [IdMaskFailure.bytesFile] is null when no reply was kept or its file is gone.
+     */
+    fun readIdMaskFailure(photoId: String, source: String): IdMaskFailure? {
+        val json = idMaskFailureRecordFile(photoId, source)
+        if (!json.isFile || json.length() > ID_MASK_FAILURE_JSON_MAX_BYTES) return null
+        val record = parseIdMaskFailureRecord(runCatching { json.readText(Charsets.UTF_8) }.getOrNull()) ?: return null
+        val bytes = idMaskFailureFile(photoId, source).takeIf { record.hasImage && it.isFile && it.length() > 0 }
+        return IdMaskFailure(record.message, record.at, bytes != null, bytes)
     }
 
-    fun hasIdMaskFailure(photoId: String, source: String): Boolean {
-        val file = idMaskFailureFile(photoId, source)
-        return file.isFile && file.length() > 0
+    /** Drops the version's failure record and reply (next attempt, success, version delete). */
+    fun clearIdMaskFailure(photoId: String, source: String) {
+        deleteIdMaskFailureFiles(photoId, source)
+        idMaskFailureChanged()
+    }
+
+    /** The record first, so a reader never finds a record whose reply was already removed on purpose. */
+    private fun deleteIdMaskFailureFiles(photoId: String, source: String) {
+        val record = idMaskFailureRecordFile(photoId, source)
+        val reply = idMaskFailureFile(photoId, source)
+        record.delete()
+        File(record.path + ".tmp").delete()
+        reply.delete()
+        File(reply.path + ".tmp").delete()
     }
 
     /** The mask bytes for [maskRev], or null when there is no rev or the file is missing or empty. */
@@ -701,7 +764,10 @@ class CatalogRepository @Inject constructor(
         }
         // Failed mask replies of deleted photos (EDID040-R09).
         for (name in orphanIdMaskFailureDirs(failedDirs.map { it.name }, known)) {
-            if (File(failedRoot, name).deleteRecursively()) removed++
+            if (File(failedRoot, name).deleteRecursively()) {
+                removed++
+                idMaskFailureChanged()
+            }
         }
         if (removed > 0) activityLog.record("catalog", "prune $removed orphan folders")
         removed
@@ -745,7 +811,7 @@ class CatalogRepository @Inject constructor(
                 // failed thumbnail the user can delete again. The other order would leak files
                 // invisibly; pruneOrphans() mops up whatever slips through.
                 File(library, id).deleteRecursively()
-                idMaskFailureDir(id).deleteRecursively()
+                if (idMaskFailureDir(id).deleteRecursively()) idMaskFailureChanged()
                 db.photoDao().delete(id)
             }
             activityLog.record("catalog", "delete $id")
@@ -786,6 +852,7 @@ class CatalogRepository @Inject constructor(
         private const val ORPHAN_MIN_AGE_MS = 10 * 60 * 1000L
         private const val DELETE_PROGRESS_MIN = 10
         private const val MASK_REV_LENGTH = 12
+        private const val ID_MASK_FAILURE_JSON_MAX_BYTES = 16L * 1024
     }
 }
 

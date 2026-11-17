@@ -62,12 +62,14 @@
     <string name="studio_id_feather_inward">向内羽化</string>
     <string name="studio_id_compositing">正在合成新背景…</string>
 
-    <!-- Failed mask viewer (EDID040-R09) -->
-    <string name="studio_id_view_failed_mask">查看返回的蒙版</string>
-    <string name="studio_id_failed_mask_title">AI 返回的蒙版</string>
+    <!-- Last failed cut-out viewer (EDID040-R09) -->
+    <string name="studio_id_view_cutout_result">查看本次抠图结果</string>
+    <string name="studio_id_cutout_result_title">本次抠图结果</string>
+    <string name="studio_id_cutout_result_no_image">AI 没有返回可用的图片。</string>
+    <string name="studio_id_cutout_result_at">失败时间：%1$s</string>
     <string name="studio_id_failed_mask_close">关闭</string>
 
-    <!-- On/off state of square switch chips (ID photo, inward feather) -->
+    <!-- On/off state of square switch chips (ID photo) -->
     <string name="studio_toggle_on">开</string>
     <string name="studio_toggle_off">关</string>
 

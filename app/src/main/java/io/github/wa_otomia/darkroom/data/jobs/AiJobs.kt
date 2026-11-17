@@ -7,7 +7,6 @@ import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NEED_KEY
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_VERSION_GONE
 import io.github.wa_otomia.darkroom.core.combineGeneratePrompt
 import io.github.wa_otomia.darkroom.core.generatedPhotoFilename
-import io.github.wa_otomia.darkroom.core.idMaskFailureKeepsReply
 import io.github.wa_otomia.darkroom.core.resolvePhotoSource
 import io.github.wa_otomia.darkroom.core.sanitizeAiSecrets
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
@@ -159,8 +158,11 @@ class AiJobs @Inject constructor(
         val handle = appScope.launch(start = CoroutineStart.LAZY) {
             val ticker = tracker.launchTicks(this) { publish(id, tracker) }
             var committed = false
+            // EDID040-R09: the last reply received, kept with the failure record whatever fails
+            // after it arrives (undecodable, wrong aspect, not a matte, version gone).
+            var reply: ByteArray? = null
             try {
-                // EDID040-R09: a new attempt drops the version's last failed reply.
+                // EDID040-R09: a new attempt drops the version's last failure record.
                 withContext(Dispatchers.IO) { runCatching { catalog.clearIdMaskFailure(photoId, versionKey) } }
                 if (!settings.aiConfigured()) error(ID_MASK_MSG_NEED_KEY)
                 val raw = withContext(Dispatchers.IO) {
@@ -172,21 +174,11 @@ class AiJobs @Inject constructor(
                     applyAiProgress(tracker, progress)
                     publish(id, tracker)
                 }
+                reply = response.bytes
                 tracker.startPhase("saving")
                 publish(id, tracker)
                 val png = withContext(Dispatchers.Default) {
-                    val decoded = try {
-                        ImagePipeline.decodeIdMask(response.bytes, response.upload)
-                    } catch (e: IllegalStateException) {
-                        // A reply that decoded but failed the matte checks is kept for viewing;
-                        // undecodable replies are not. Keeping it never changes the job's result.
-                        if (idMaskFailureKeepsReply(e.message)) {
-                            withContext(Dispatchers.IO + NonCancellable) {
-                                runCatching { catalog.saveIdMaskFailure(photoId, versionKey, response.bytes) }
-                            }
-                        }
-                        throw e
-                    }
+                    val decoded = ImagePipeline.decodeIdMask(response.bytes, response.upload)
                     ImagePipeline.encodeIdMaskPng(decoded)
                 }
                 ensureActive()
@@ -199,12 +191,21 @@ class AiJobs @Inject constructor(
                     _events.tryEmit(StudioJobEvent.MaskReady(photoId, versionKey))
                 }
             } catch (e: CancellationException) {
+                // User cancel (or the app scope ending): no failure record (EDID040-R09).
                 if (!committed) {
                     _jobs.update { list -> list.filter { it.id != id } }
                     _events.tryEmit(StudioJobEvent.Failed(photoId, AiKind.Mask.action, ""))
                 }
             } catch (e: Exception) {
                 val message = sanitizeAiSecrets(e.message ?: e.toString())
+                if (!committed) {
+                    // EDID040-R09: every other failure leaves a record (with the reply when one
+                    // arrived) before it is reported, so the screen finds it on the Failed event.
+                    // Keeping it never changes the job's result.
+                    withContext(Dispatchers.IO + NonCancellable) {
+                        runCatching { catalog.saveIdMaskFailure(photoId, versionKey, message, reply) }
+                    }
+                }
                 tracker.fail(message)
                 publish(id, tracker)
                 _events.tryEmit(StudioJobEvent.Failed(photoId, AiKind.Mask.action, message))

@@ -121,6 +121,7 @@ import io.github.wa_otomia.darkroom.core.sourceAfterVersionRemoved
 import io.github.wa_otomia.darkroom.core.studioVersionIngestName
 import io.github.wa_otomia.darkroom.core.versionLabel
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
+import io.github.wa_otomia.darkroom.data.catalog.IdMaskFailure
 import io.github.wa_otomia.darkroom.data.imaging.ImagePipeline
 import io.github.wa_otomia.darkroom.data.jobs.AiJobs
 import io.github.wa_otomia.darkroom.data.jobs.AiKind
@@ -157,6 +158,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -236,9 +238,11 @@ fun StudioScreen(
     // EDID040-R08: the preview is building a new composite; the ID controls wait for it.
     // Reported by the preview while it is composed, false for every new version.
     var idCompositing by remember(photoId, source) { mutableStateOf(false) }
-    // EDID040-R09: this version's failure kept the reply that failed validation.
-    var idFailedMaskKept by remember(photoId, source) { mutableStateOf(false) }
-    var idFailedMaskOpen by remember(photoId, source) { mutableStateOf(false) }
+    // EDID040-R09: this version's last failed cut-out, read from the cache record; re-read on
+    // screen open, version switch, every record write/clear and every mask Ready/Failed event.
+    var idMaskFailure by remember(photoId, source) { mutableStateOf<IdMaskFailure?>(null) }
+    var idMaskFailureCheck by remember(photoId) { mutableStateOf(0) }
+    var idCutoutResultOpen by remember(photoId, source) { mutableStateOf(false) }
     // Mask job failure for the ID section; already sanitized by AiJobs. Recorded with the version
     // (framing version key) it belongs to and shown only on that version.
     var maskError by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
@@ -372,6 +376,7 @@ fun StudioScreen(
                     launch { snackbar.showSnackbar(editDoneText) }
                 }
                 is StudioJobEvent.MaskReady -> {
+                    idMaskFailureCheck++
                     if (maskErrorVersion == framingVersionKey(e.source)) {
                         maskError = null
                         maskErrorVersion = null
@@ -380,6 +385,7 @@ fun StudioScreen(
                 }
                 is StudioJobEvent.Failed -> {
                     if (e.action == "mask") {
+                        idMaskFailureCheck++
                         // Shown in the ID section, not the generic dialog; a cancel is blank.
                         if (e.message.isNullOrBlank()) {
                             launch { snackbar.showSnackbar(aiCancelledText) }
@@ -925,12 +931,16 @@ fun StudioScreen(
         }
     }
     val maskErrorHere = maskErrorFor(maskError, maskErrorVersion, currentVersionKey)
-    // The mask job keeps the reply before it reports the failure, so a check on each shown
-    // failure finds it; a new cut-out clears the failure (and the file) first.
-    LaunchedEffect(photo.id, source, maskErrorHere) {
-        idFailedMaskKept = maskErrorHere != null &&
-            withContext(Dispatchers.IO) { runCatching { catalog.hasIdMaskFailure(photo.id, source) }.getOrDefault(false) }
-        if (!idFailedMaskKept) idFailedMaskOpen = false
+    // The mask job writes the record before it reports the failure and clears it when a new
+    // attempt starts or succeeds; each write or clear signals, so the entry follows the record.
+    LaunchedEffect(photo.id, source, idMaskFailureCheck) {
+        catalog.idMaskFailureChanges().collectLatest {
+            val read = withContext(Dispatchers.IO) {
+                runCatching { catalog.readIdMaskFailure(photo.id, source) }.getOrNull()
+            }
+            idMaskFailure = read
+            if (read == null) idCutoutResultOpen = false
+        }
     }
 
     val composePanel: @Composable () -> Unit = {
@@ -1083,8 +1093,8 @@ fun StudioScreen(
                     onBackground = onIdBackground,
                     onFeather = onIdFeather,
                     onFeatherInward = onIdFeatherInward,
-                    onViewFailedMask = if (idFailedMaskKept) {
-                        { idFailedMaskOpen = true }
+                    onViewCutoutResult = if (idMaskFailure != null) {
+                        { idCutoutResultOpen = true }
                     } else {
                         null
                     },
@@ -1444,11 +1454,11 @@ fun StudioScreen(
         )
     }
 
-    if (idFailedMaskOpen && idFailedMaskKept && maskErrorHere != null) {
-        IdFailedMaskViewer(
-            file = catalog.idMaskFailureFile(photo.id, source),
-            reason = maskErrorHere,
-            onDismiss = { idFailedMaskOpen = false },
+    val cutoutResult = idMaskFailure
+    if (idCutoutResultOpen && cutoutResult != null) {
+        IdCutoutResultViewer(
+            failure = cutoutResult,
+            onDismiss = { idCutoutResultOpen = false },
         )
     }
 

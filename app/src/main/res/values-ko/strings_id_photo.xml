@@ -62,12 +62,14 @@
     <string name="studio_id_feather_inward">안쪽으로 부드럽게</string>
     <string name="studio_id_compositing">새 배경을 합성하는 중…</string>
 
-    <!-- Failed mask viewer (EDID040-R09) -->
-    <string name="studio_id_view_failed_mask">반환된 마스크 보기</string>
-    <string name="studio_id_failed_mask_title">AI가 반환한 마스크</string>
+    <!-- Last failed cut-out viewer (EDID040-R09) -->
+    <string name="studio_id_view_cutout_result">이번 오려내기 결과 보기</string>
+    <string name="studio_id_cutout_result_title">이번 오려내기 결과</string>
+    <string name="studio_id_cutout_result_no_image">AI가 사용할 수 있는 이미지를 반환하지 않았습니다.</string>
+    <string name="studio_id_cutout_result_at">실패 시각: %1$s</string>
     <string name="studio_id_failed_mask_close">닫기</string>
 
-    <!-- On/off state of square switch chips (ID photo, inward feather) -->
+    <!-- On/off state of square switch chips (ID photo) -->
     <string name="studio_toggle_on">켜짐</string>
     <string name="studio_toggle_off">꺼짐</string>
 

@@ -62,12 +62,14 @@
     <string name="studio_id_feather_inward">内側にぼかす</string>
     <string name="studio_id_compositing">新しい背景を合成中…</string>
 
-    <!-- Failed mask viewer (EDID040-R09) -->
-    <string name="studio_id_view_failed_mask">返されたマスクを見る</string>
-    <string name="studio_id_failed_mask_title">AI が返したマスク</string>
+    <!-- Last failed cut-out viewer (EDID040-R09) -->
+    <string name="studio_id_view_cutout_result">今回の切り抜き結果を見る</string>
+    <string name="studio_id_cutout_result_title">今回の切り抜き結果</string>
+    <string name="studio_id_cutout_result_no_image">AI から使える画像が返されませんでした。</string>
+    <string name="studio_id_cutout_result_at">失敗日時：%1$s</string>
     <string name="studio_id_failed_mask_close">閉じる</string>
 
-    <!-- On/off state of square switch chips (ID photo, inward feather) -->
+    <!-- On/off state of square switch chips (ID photo) -->
     <string name="studio_toggle_on">オン</string>
     <string name="studio_toggle_off">オフ</string>
 
