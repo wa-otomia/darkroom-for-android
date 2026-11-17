@@ -642,9 +642,15 @@ fun parseIdMaskFailureRecord(raw: String?): IdMaskFailureRecord? {
 // AI mask request (AIPV030-R04)
 // ---------------------------------------------------------------------------------------------
 
-private const val ID_MASK_PROMPT_HEAD: String =
-    "Task: produce an alpha matte for replacing the background of a portrait or ID photo. " +
-        "This is a segmentation task, not a photo edit: do not relight, recolour, restyle or re-render the photo. " +
+private const val ID_MASK_PROMPT_TASK: String =
+    "Task: produce an alpha matte for replacing the background of a portrait or ID photo. "
+
+/** The feathered variant says up front that the edge is soft (EDID040-R13). */
+private const val ID_MASK_PROMPT_FEATHER_LEAD: String =
+    "This matte must have a soft, feathered edge, described below; a sharp edge is wrong. "
+
+private const val ID_MASK_PROMPT_BODY: String =
+    "This is a segmentation task, not a photo edit: do not relight, recolour, restyle or re-render the photo. " +
         "Output only the matte, at exactly the same width, height, framing and composition as the input; " +
         "do not crop, pad, shift, rotate, resize or redraw anything, so that every matte pixel lines up with the same pixel of the input. " +
         "Foreground is the main person only: hair, face, ears, neck, shoulders, arms and hands if visible, " +
@@ -652,7 +658,9 @@ private const val ID_MASK_PROMPT_HEAD: String =
         "Background is everything else, even where it touches or overlaps the person: walls, floors, ceilings, sky, doors, windows, " +
         "furniture including chairs, chair backs, headrests, sofas and cushions, shelves, hanging clothes and coats, bags, objects, " +
         "other people, shadows cast on the background, and any border or padding. " +
-        "Paint the background pure black (#000000), even where it is white or light-coloured in the photo. "
+        "Background seen through gaps in the person is background too: between hair strands and locks, inside curls and loose ends, " +
+        "between the hair and the face, neck or shoulders, and between the arms and the body. " +
+        "Paint the background pure black (#000000), even where it is white or light-coloured in the photo and even inside those gaps. "
 
 private const val ID_MASK_PROMPT_PERSON_SHARP: String =
     "Paint the person as one flat, solid, pure white (#FFFFFF) silhouette with no shading, lighting, gradients, texture, " +
@@ -661,8 +669,8 @@ private const val ID_MASK_PROMPT_PERSON_SHARP: String =
 private const val ID_MASK_PROMPT_EDGE_SHARP: String =
     "Keep the edge tight to the person, with no glow, halo or margin around it. " +
         "Only where fine hair strands or flyaways overlap the background, use grey levels to show partial transparency " +
-        "(lighter means more hair, darker means more background); the main mass of the hair stays solid white, " +
-        "and everywhere else make a clean, sharp edge. "
+        "(lighter means more hair, darker means more background); only dense hair with no background showing through " +
+        "stays solid white, and everywhere else make a clean, sharp edge. "
 
 private const val ID_MASK_PROMPT_NO_PERSON: String = "If no person is visible, return an all-black image. "
 
@@ -672,19 +680,19 @@ private const val ID_MASK_PROMPT_TAIL_SHARP: String =
 /** The person sentence of the feathered variant: no inner gradients, except the edge one asked for. */
 private const val ID_MASK_PROMPT_PERSON_FEATHER: String =
     "Paint the person as one flat, solid, pure white (#FFFFFF) silhouette with no shading, lighting, texture, " +
-        "facial features or outlines inside it, and no gradients except the soft edge gradient described below; " +
+        "facial features or outlines inside it, and no gradients except the soft edge ramp described below; " +
         "eyes, mouth, glasses, hair texture and clothing details must not be visible. "
 
 private const val ID_MASK_PROMPT_TAIL_FEATHER: String =
-    "Use only black, white and the grey edge gradient: no colours, text, watermarks or other content."
+    "Use only black, white and the grey edge ramp: no colours, text, watermarks or other content."
 
 /**
  * Fixed instruction for the matte request (AIPV030-R04). Presets and extra prompts never join it.
  * One sentence per literal, joined by exactly one space.
  */
 const val ID_PHOTO_MASK_PROMPT: String =
-    ID_MASK_PROMPT_HEAD + ID_MASK_PROMPT_PERSON_SHARP + ID_MASK_PROMPT_EDGE_SHARP + ID_MASK_PROMPT_NO_PERSON +
-        ID_MASK_PROMPT_TAIL_SHARP
+    ID_MASK_PROMPT_TASK + ID_MASK_PROMPT_BODY + ID_MASK_PROMPT_PERSON_SHARP + ID_MASK_PROMPT_EDGE_SHARP +
+        ID_MASK_PROMPT_NO_PERSON + ID_MASK_PROMPT_TAIL_SHARP
 
 /**
  * The feather an AI cut-out asks for (EDID040-R13), frozen when the job is queued: the level,
@@ -727,28 +735,36 @@ fun idMaskAiFeatherWidthPx(radiusSourcePx: Float, sourceWidth: Int, contentWidth
 
 /**
  * The matte instruction (AIPV030-R04): exactly [ID_PHOTO_MASK_PROMPT] without [feather] (or with
- * a "none" level). With one, the edge sentences ask for a [widthPx]-wide gradient over the whole
- * outline, hair included, inside it when inward and centred on it otherwise, noting the
- * [uploadWidth]×[uploadHeight] input size (EDID040-R13).
+ * a "none" level). With one, a lead sentence says the edge is soft, the person sentence allows
+ * the edge ramp, and the edge sentences ask for a ramp at least [widthPx] px wide (also given as
+ * a share of [uploadWidth], with the [uploadWidth]×[uploadHeight] input size) over the whole
+ * outline, hair included, inside it when inward and centred on it otherwise (EDID040-R13).
  */
 fun idPhotoMaskPrompt(feather: IdMaskAiFeather?, widthPx: Int, uploadWidth: Int, uploadHeight: Int): String {
     if (feather == null || feather.feather == IdFeather.NONE) return ID_PHOTO_MASK_PROMPT
     val n = widthPx.coerceAtLeast(2)
+    // The same width as a share of the image, for a model that answers at another size.
+    val percent = if (uploadWidth > 0) maxOf(0.1, n * 100.0 / uploadWidth) else 0.1
+    val share = String.format(java.util.Locale.ROOT, "%.1f", percent)
     val direction = if (feather.inward) {
-        "The gradient lies entirely inside the person's outline: it starts at full white about $n pixels inside the edge " +
-            "and reaches pure black exactly at the outline, so nothing outside the person is lit. "
+        "The ramp lies entirely inside the person's outline: full white begins about $n pixels inside the edge " +
+            "and the ramp reaches pure black exactly at the outline, so nothing outside the person is lit. "
     } else {
-        "The gradient is centred on the person's outline, about half inside and half outside it. "
+        "The ramp is centred on the person's outline, about half inside and half outside it. "
     }
-    return ID_MASK_PROMPT_HEAD +
+    return ID_MASK_PROMPT_TASK +
+        ID_MASK_PROMPT_FEATHER_LEAD +
+        ID_MASK_PROMPT_BODY +
         ID_MASK_PROMPT_PERSON_FEATHER +
-        "Feather the whole outline of the person, including the hair, fine strands and flyaways: along every edge, " +
-        "blend from pure white to pure black through a smooth, even grey gradient about $n pixels wide " +
-        "(the input image is ${uploadWidth}x$uploadHeight pixels). " +
+        "Feather the whole outline of the person, including the hair, fine strands and flyaways: across every edge, " +
+        "pure white must fade to pure black through a smooth, even grey ramp at least $n pixels wide, " +
+        "about $share% of the image width (the input image is ${uploadWidth}x$uploadHeight pixels). " +
+        "It should look as if a hard cut-out had been blurred by that amount: halfway across the ramp the grey is " +
+        "mid grey (#808080), and an edge only one or two pixels wide is wrong. " +
         direction +
-        "Fine hair strands become softly translucent instead of crisp. " +
+        "Fine hair strands become softly translucent instead of crisp, and the background seen between strands stays dark. " +
         "Away from the edge, the person stays solid white and the background solid black, " +
-        "with no glow or halo beyond the gradient. " +
+        "with no glow or halo beyond the ramp. " +
         ID_MASK_PROMPT_NO_PERSON +
         ID_MASK_PROMPT_TAIL_FEATHER
 }

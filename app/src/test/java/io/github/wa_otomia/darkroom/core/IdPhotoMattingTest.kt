@@ -526,24 +526,27 @@ class IdPhotoMattingTest {
         val centred = idPhotoMaskPrompt(IdMaskAiFeather(IdFeather.STRONG, false, 9f), 1, 1152, 1536)
         for (p in listOf(inward, centred)) {
             assertTrue(p.startsWith("Task: produce an alpha matte"))
-            for (fragment in listOf("main person only", "chair backs", "flat, solid, pure white", "all-black", "1152x1536 pixels", "hair")) {
+            for (fragment in listOf("main person only", "chair backs", "flat, solid, pure white", "all-black", "1152x1536 pixels", "hair", "between hair strands and locks", "even inside those gaps", "a sharp edge is wrong", "mid grey (#808080)", "background seen between strands stays dark")) {
                 assertTrue(fragment, p.contains(fragment))
             }
             assertFalse(p.contains("clean, sharp edge"))
             assertFalse(p.contains("that grey hair transition"))
+            assertTrue(p.startsWith("Task: produce an alpha matte for replacing the background of a portrait or ID photo. This matte must have a soft, feathered edge"))
             // The person sentence no longer forbids the edge gradient it asks for.
             assertFalse(p.contains("no shading, lighting, gradients, texture"))
-            assertTrue(p.contains("no gradients except the soft edge gradient described below"))
-            assertTrue(p.endsWith("Use only black, white and the grey edge gradient: no colours, text, watermarks or other content."))
+            assertTrue(p.contains("no gradients except the soft edge ramp described below"))
+            assertTrue(p.endsWith("Use only black, white and the grey edge ramp: no colours, text, watermarks or other content."))
             assertTrue(p.all { it.code < 128 })
             assertFalse(p.contains("  "))
         }
-        assertTrue(inward.contains("about 16 pixels wide"))
+        assertTrue(inward.contains("at least 16 pixels wide, about 1.4% of the image width"))
         assertTrue(inward.contains("entirely inside the person's outline"))
         assertFalse(inward.contains("centred on"))
         // The width never drops under 2 in the text.
-        assertTrue(centred.contains("about 2 pixels wide"))
+        assertTrue(centred.contains("at least 2 pixels wide, about 0.2% of the image width"))
         assertTrue(centred.contains("centred on the person's outline"))
+        // A zero width never divides by zero.
+        assertTrue(idPhotoMaskPrompt(IdMaskAiFeather(IdFeather.WEAK, true, 9f), 4, 0, 0).contains("about 0.1% of the image width"))
         assertFalse(centred.contains("entirely inside"))
     }
 
