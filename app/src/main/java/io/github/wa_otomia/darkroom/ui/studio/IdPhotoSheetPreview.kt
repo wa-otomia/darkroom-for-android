@@ -513,34 +513,43 @@ internal fun rememberIdPreviewCutout(
             imageHeight,
             key.zoomStep * CUTOUT_ZOOM_STEP,
         )
-        try {
-            val bitmap = cutoutRenderLock.withLock {
-                withContext(Dispatchers.IO) {
-                    val mask = catalog.readIdPhotoMask(photoId, source, key.maskRev) ?: error(ID_MASK_MSG_MISSING)
-                    ensureActive()
-                    val bytes = imageFile.readBytes()
-                    ensureActive()
-                    ImagePipeline.renderIdPreviewCutout(
-                        bytes,
-                        mask,
-                        key.argb,
-                        featherSourcePx,
-                    ).asImageBitmap()
+        var attempt = 0
+        while (true) {
+            try {
+                val bitmap = cutoutRenderLock.withLock {
+                    withContext(Dispatchers.IO) {
+                        val mask = catalog.readIdPhotoMask(photoId, source, key.maskRev) ?: error(ID_MASK_MSG_MISSING)
+                        ensureActive()
+                        val bytes = imageFile.readBytes()
+                        ensureActive()
+                        ImagePipeline.renderIdPreviewCutout(
+                            bytes,
+                            mask,
+                            key.argb,
+                            featherSourcePx,
+                        ).asImageBitmap()
+                    }
                 }
-            }
-            held = key to bitmap
-            failedKey = null
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            // Only a missing or undecodable mask is reported as such (it also blocks print and
-            // export). A source decode failure, an I/O error or running out of memory is a
-            // transient preview failure: no note, and the held cut-out stays so the next
-            // zoom-only change is still debounced. A failed mask revision is remembered by
-            // (file, revision), so zoom, feather and size changes neither hide the note nor retry.
-            if (e.message == ID_MASK_MSG_MISSING) {
-                held = null
-                failedKey = key
+                held = key to bitmap
+                failedKey = null
+                return@LaunchedEffect
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // Only a missing or undecodable mask is reported as such (it also blocks print and
+                // export). A failed mask revision is remembered by (file, revision), so zoom, feather
+                // and size changes neither hide the note nor retry.
+                if (e.message == ID_MASK_MSG_MISSING) {
+                    held = null
+                    failedKey = key
+                    return@LaunchedEffect
+                }
+                // A source decode failure, an I/O error or running out of memory is transient: no
+                // note, the held cut-out stays (so the next zoom-only change is still debounced), and
+                // the same key is rendered again after a short, bounded backoff, since nothing else
+                // re-runs this effect while the inputs are unchanged.
+                val wait = cutoutRetryDelayMs(attempt++) ?: return@LaunchedEffect
+                delay(wait)
             }
         }
     }

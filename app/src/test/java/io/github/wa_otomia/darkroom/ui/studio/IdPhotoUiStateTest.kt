@@ -62,6 +62,14 @@ class IdPhotoUiStateTest {
     }
 
     @Test
+    fun transientCutoutFailureRetriesWithBoundedBackoff() {
+        val delays = generateSequence(0) { it + 1 }.map { cutoutRetryDelayMs(it) }.takeWhile { it != null }.toList()
+        assertEquals(listOf(500L, 1_500L, 4_000L), delays)
+        assertNull(cutoutRetryDelayMs(3))
+        assertNull(cutoutRetryDelayMs(100))
+    }
+
+    @Test
     fun pendingChoiceSurvivesAnOlderRowValueEqualToTheLatestTap() {
         // Stored navy. Tap white (write A), then navy (write B) before A lands.
         var p = PendingIdChoice().begin("white")

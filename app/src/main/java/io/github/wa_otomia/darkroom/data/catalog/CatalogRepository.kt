@@ -19,7 +19,7 @@ import io.github.wa_otomia.darkroom.core.idBackground
 import io.github.wa_otomia.darkroom.core.idFeather
 import io.github.wa_otomia.darkroom.core.idMaskRequired
 import io.github.wa_otomia.darkroom.core.idPhotoFor
-import io.github.wa_otomia.darkroom.core.normalizeIdPhotoPresetId
+import io.github.wa_otomia.darkroom.core.mergeIdPhotoPose
 import io.github.wa_otomia.darkroom.core.withIdPhoto
 import io.github.wa_otomia.darkroom.core.galleryThumbSource
 import io.github.wa_otomia.darkroom.core.toPlacement
@@ -347,23 +347,32 @@ class CatalogRepository @Inject constructor(
     /**
      * Studio's ID mode toggle, size and pose for one version (EDID010-R03). Merges only these
      * fields: background, feather and the mask revision are left exactly as stored. The state is
-     * kept even when [active] is false, so leaving and re-entering ID mode restores it. An
-     * inactive save for a version that never entered ID mode writes nothing, so its first entry
-     * still starts from the initial pose (EDID010-R04).
+     * kept even when [active] is false, so leaving and re-entering ID mode restores it. Without a
+     * stored state an inactive save writes nothing unless [createIfMissing] (the caller knows the
+     * version entered ID mode), so a version that never entered still starts from the initial
+     * pose (EDID010-R04). See [mergeIdPhotoPose].
      */
-    suspend fun saveIdPhotoPose(photoId: String, source: String, active: Boolean, presetId: String, pose: IdPhotoPose) {
-        updateIdPhoto(photoId, source) { old ->
-            if (old == null && !active) return@updateIdPhoto null
-            (old ?: IdPhotoState()).copy(
-                active = active,
-                presetId = normalizeIdPhotoPresetId(presetId),
-            ).withPose(pose)
-        }
+    suspend fun saveIdPhotoPose(
+        photoId: String,
+        source: String,
+        active: Boolean,
+        presetId: String,
+        pose: IdPhotoPose,
+        createIfMissing: Boolean = false,
+    ) {
+        updateIdPhoto(photoId, source) { old -> mergeIdPhotoPose(old, active, presetId, pose, createIfMissing) }
     }
 
     /** Fire-and-forget [saveIdPhotoPose] on the repository scope, so it outlives the caller. */
-    fun persistIdPhotoPose(photoId: String, source: String, active: Boolean, presetId: String, pose: IdPhotoPose) {
-        launchPersist { saveIdPhotoPose(photoId, source, active, presetId, pose) }
+    fun persistIdPhotoPose(
+        photoId: String,
+        source: String,
+        active: Boolean,
+        presetId: String,
+        pose: IdPhotoPose,
+        createIfMissing: Boolean = false,
+    ) {
+        launchPersist { saveIdPhotoPose(photoId, source, active, presetId, pose, createIfMissing) }
     }
 
     suspend fun setIdPhotoBackground(photoId: String, source: String, background: String) {
@@ -431,6 +440,8 @@ class CatalogRepository @Inject constructor(
             val current = get(photoId) ?: return@withLock
             val key = framingVersionKey(source)
             val old = current.idPhotoFor(key)
+            // Never create state for a version that is gone (a late save after it was deleted).
+            if (old == null && key != ORIGINAL_VERSION_ID && current.edits.none { it.id == key }) return@withLock
             val state = transform(old)?.normalized() ?: old
             val next = current.withIdPhoto(key, state)
             val display = displaySource(next)

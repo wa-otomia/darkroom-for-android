@@ -238,4 +238,27 @@ class IdPhotoStateCodecTest {
         val (_, i) = decodeVersionStates(raw)
         assertEquals(IdPhotoState(), i["e1"])
     }
+
+    @Test
+    fun inactivePoseSaveWithoutStateWritesNothingUnlessTheVersionEntered() {
+        val pose = IdPhotoPose(1.6f, 0.1f, -0.05f, 0f)
+        assertNull(mergeIdPhotoPose(null, active = false, presetId = "33x48", pose = pose, createIfMissing = false))
+        // Studio left ID mode before its first debounced save landed: the entry is still created.
+        val created = mergeIdPhotoPose(null, active = false, presetId = "33x48", pose = pose, createIfMissing = true)
+        assertEquals(IdPhotoState(active = false, presetId = "33x48").withPose(pose), created)
+        val active = mergeIdPhotoPose(null, active = true, presetId = "33x48", pose = pose, createIfMissing = false)
+        assertEquals(IdPhotoState(active = true, presetId = "33x48").withPose(pose), active)
+    }
+
+    @Test
+    fun poseSaveKeepsBackgroundFeatherAndMask() {
+        val pose = IdPhotoPose(1.2f, 0f, 0f, 270f)
+        val merged = mergeIdPhotoPose(idOriginal, active = false, presetId = "nope", pose = pose, createIfMissing = false)!!
+        assertFalse(merged.active)
+        assertEquals(normalizeIdPhotoPresetId("nope"), merged.presetId)
+        assertEquals(pose, merged.pose)
+        assertEquals(idOriginal.background, merged.background)
+        assertEquals(idOriginal.feather, merged.feather)
+        assertEquals(idOriginal.maskRev, merged.maskRev)
+    }
 }

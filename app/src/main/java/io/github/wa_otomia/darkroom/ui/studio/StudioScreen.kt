@@ -358,7 +358,7 @@ fun StudioScreen(
                     }
                     val id = idPoseRef.value
                     if (id.due && id.photoId == photoId && id.source != e.editId) {
-                        catalog.persistIdPhotoPose(id.photoId, id.source, id.active, id.presetId, id.pose)
+                        catalog.persistIdPhotoPose(id.photoId, id.source, id.active, id.presetId, id.pose, createIfMissing = true)
                     }
                     sourceOverride = e.editId
                     genError = null
@@ -568,7 +568,7 @@ fun StudioScreen(
             val snap = poseRef.value
             if (snap.ready) catalog.persistFraming(snap.photoId, snap.source, snap.framing)
             val id = idPoseRef.value
-            if (id.due) catalog.persistIdPhotoPose(id.photoId, id.source, id.active, id.presetId, id.pose)
+            if (id.due) catalog.persistIdPhotoPose(id.photoId, id.source, id.active, id.presetId, id.pose, createIfMissing = true)
         }
     }
     LaunchedEffect(photoId, source, zoom, panX, panY, rotationDegrees, landscape, placement, framingReady, restoreFraming) {
@@ -580,10 +580,13 @@ fun StudioScreen(
             persistableFraming(currentFraming, orientedW, orientedH),
         )
     }
+    // Every ID save below runs only once idKnown is set (the version has ID state or entered ID
+    // mode here), so an inactive save may create the entry: leaving ID mode before the first
+    // debounced save landed must still keep the chosen size and pose (EDID010-R03).
     LaunchedEffect(photoId, source, idSaveDue, idActive, idPresetId, idZoom, idPanX, idPanY, idRotation) {
         if (!idSaveDue) return@LaunchedEffect
         delay(300)
-        catalog.saveIdPhotoPose(photo.id, source, idActive, idPresetId, idPose)
+        catalog.saveIdPhotoPose(photo.id, source, idActive, idPresetId, idPose, createIfMissing = true)
     }
 
     val selectSource: (String) -> Unit = { next ->
@@ -592,7 +595,7 @@ fun StudioScreen(
                 catalog.persistFraming(photo.id, source, framingToPersist)
             }
             if (idSaveDue) {
-                catalog.persistIdPhotoPose(photo.id, source, idActive, idPresetId, idPose)
+                catalog.persistIdPhotoPose(photo.id, source, idActive, idPresetId, idPose, createIfMissing = true)
             }
             sourceOverride = next
         }
@@ -662,7 +665,7 @@ fun StudioScreen(
         val reset = IdPhotoPose()
         setIdPose(reset)
         snapState.begin(0f, 0f, 0f)
-        catalog.persistIdPhotoPose(photo.id, source, idActive, idPresetId, reset)
+        catalog.persistIdPhotoPose(photo.id, source, idActive, idPresetId, reset, createIfMissing = true)
     }
     val onCutOut: () -> Unit = {
         val version = framingVersionKey(source)
@@ -751,7 +754,7 @@ fun StudioScreen(
             val active = idActive
             val preset = idPresetId
             val pose = idPose
-            ({ catalog.saveIdPhotoPose(id, src, active, preset, pose) })
+            ({ catalog.saveIdPhotoPose(id, src, active, preset, pose, createIfMissing = true) })
         } else {
             null
         }

@@ -659,13 +659,18 @@ object ImagePipeline {
             val bottom = Math.round(upload.content.bottom * sy).toInt().coerceIn(top + 1, bitmap.height)
             val w = right - left
             val h = bottom - top
-            val pixels = try {
-                IntArray(w * h).also { bitmap.getPixels(it, 0, w, left, top, w, h) }
+            // Callers only catch Exception, so every post-decode allocation maps OOM to a message.
+            val luma = try {
+                val pixels = IntArray(w * h).also { bitmap.getPixels(it, 0, w, left, top, w, h) }
+                ByteArray(w * h) { i -> idMaskLuma(pixels[i]).toByte() }
             } catch (_: OutOfMemoryError) {
                 error(ID_MASK_MSG_UNDECODABLE)
             }
-            val luma = ByteArray(w * h) { i -> idMaskLuma(pixels[i]).toByte() }
-            val verdict = validateIdMaskLuma(luma)
+            val verdict = try {
+                validateIdMaskLuma(luma)
+            } catch (_: OutOfMemoryError) {
+                error(ID_MASK_MSG_UNDECODABLE)
+            }
             if (verdict != IdMaskVerdict.OK) error(idMaskVerdictMessage(verdict))
             return IdMaskDecoded(luma, w, h)
         } finally {

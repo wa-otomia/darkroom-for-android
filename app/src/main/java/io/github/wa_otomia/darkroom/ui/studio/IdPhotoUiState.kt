@@ -50,6 +50,16 @@ internal fun cutoutStart(
     return if (zoomMoving) CutoutStart.Debounced else CutoutStart.Now
 }
 
+/** Backoff before re-rendering a cut-out after a transient (non-mask) failure. */
+private val CUTOUT_RETRY_DELAYS_MS = longArrayOf(500L, 1_500L, 4_000L)
+
+/**
+ * Wait before retry number [attempt] (0-based) of a preview cut-out whose render failed for a
+ * reason other than the mask (source decode, I/O, memory), or null once the bounded retries are
+ * used up.
+ */
+internal fun cutoutRetryDelayMs(attempt: Int): Long? = CUTOUT_RETRY_DELAYS_MS.getOrNull(attempt)
+
 /**
  * A tapped background or feather shown before the catalog write lands. [value] stays until every
  * write started from a tap has completed and the row shows the latest tap, so an earlier write

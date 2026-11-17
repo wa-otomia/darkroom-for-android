@@ -418,6 +418,27 @@ data class IdPhotoState(
 
 fun PhotoMeta.idPhotoFor(source: String?): IdPhotoState? = idPhotos[framingVersionKey(source)]
 
+/**
+ * A version's ID state after a Studio save of its toggle, size and pose (EDID010-R03), or null to
+ * keep [old] as stored. Background, feather and the mask revision stay as they are. Without a
+ * stored state an inactive save writes nothing unless [createIfMissing] says the version did
+ * enter ID mode (its first entry is saved even when ID mode was left before any active save
+ * landed); a version that never entered still starts from the initial pose (EDID010-R04).
+ */
+fun mergeIdPhotoPose(
+    old: IdPhotoState?,
+    active: Boolean,
+    presetId: String,
+    pose: IdPhotoPose,
+    createIfMissing: Boolean,
+): IdPhotoState? {
+    if (old == null && !active && !createIfMissing) return null
+    return (old ?: IdPhotoState()).copy(
+        active = active,
+        presetId = normalizeIdPhotoPresetId(presetId),
+    ).withPose(pose)
+}
+
 /** Replaces the version's ID state; null removes it. Ordinary framings are untouched. */
 fun PhotoMeta.withIdPhoto(source: String?, state: IdPhotoState?): PhotoMeta {
     val key = framingVersionKey(source)
