@@ -7,6 +7,7 @@ import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NEED_KEY
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_VERSION_GONE
 import io.github.wa_otomia.darkroom.core.combineGeneratePrompt
 import io.github.wa_otomia.darkroom.core.generatedPhotoFilename
+import io.github.wa_otomia.darkroom.core.idMaskEndsAsCancel
 import io.github.wa_otomia.darkroom.core.resolvePhotoSource
 import io.github.wa_otomia.darkroom.core.sanitizeAiSecrets
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
@@ -29,6 +30,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -190,25 +192,29 @@ class AiJobs @Inject constructor(
                     publish(id, tracker)
                     _events.tryEmit(StudioJobEvent.MaskReady(photoId, versionKey))
                 }
-            } catch (e: CancellationException) {
-                // User cancel (or the app scope ending): no failure record (EDID040-R09).
-                if (!committed) {
-                    _jobs.update { list -> list.filter { it.id != id } }
-                    _events.tryEmit(StudioJobEvent.Failed(photoId, AiKind.Mask.action, ""))
-                }
             } catch (e: Exception) {
-                val message = sanitizeAiSecrets(e.message ?: e.toString())
-                if (!committed) {
-                    // EDID040-R09: every other failure leaves a record (with the reply when one
-                    // arrived) before it is reported, so the screen finds it on the Failed event.
-                    // Keeping it never changes the job's result.
-                    withContext(Dispatchers.IO + NonCancellable) {
-                        runCatching { catalog.saveIdMaskFailure(photoId, versionKey, message, reply) }
+                if (idMaskEndsAsCancel(e, isActive)) {
+                    // User cancel (or the app scope ending), including one that lands while the
+                    // reply is decoded and surfaces as the decode's own error: no failure record
+                    // (EDID040-R09).
+                    if (!committed) {
+                        _jobs.update { list -> list.filter { it.id != id } }
+                        _events.tryEmit(StudioJobEvent.Failed(photoId, AiKind.Mask.action, ""))
                     }
+                } else {
+                    val message = sanitizeAiSecrets(e.message ?: e.toString())
+                    if (!committed) {
+                        // EDID040-R09: every other failure leaves a record (with the reply when
+                        // one arrived) before it is reported, so the screen finds it on the
+                        // Failed event. Keeping it never changes the job's result.
+                        withContext(Dispatchers.IO + NonCancellable) {
+                            runCatching { catalog.saveIdMaskFailure(photoId, versionKey, message, reply) }
+                        }
+                    }
+                    tracker.fail(message)
+                    publish(id, tracker)
+                    _events.tryEmit(StudioJobEvent.Failed(photoId, AiKind.Mask.action, message))
                 }
-                tracker.fail(message)
-                publish(id, tracker)
-                _events.tryEmit(StudioJobEvent.Failed(photoId, AiKind.Mask.action, message))
             } finally {
                 ticker.cancel()
                 withContext(NonCancellable) {
