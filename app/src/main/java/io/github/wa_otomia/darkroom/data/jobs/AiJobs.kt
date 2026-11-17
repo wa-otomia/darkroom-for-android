@@ -7,6 +7,7 @@ import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NEED_KEY
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_VERSION_GONE
 import io.github.wa_otomia.darkroom.core.combineGeneratePrompt
 import io.github.wa_otomia.darkroom.core.generatedPhotoFilename
+import io.github.wa_otomia.darkroom.core.idMaskFailureKeepsReply
 import io.github.wa_otomia.darkroom.core.resolvePhotoSource
 import io.github.wa_otomia.darkroom.core.sanitizeAiSecrets
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
@@ -159,6 +160,8 @@ class AiJobs @Inject constructor(
             val ticker = tracker.launchTicks(this) { publish(id, tracker) }
             var committed = false
             try {
+                // EDID040-R09: a new attempt drops the version's last failed reply.
+                withContext(Dispatchers.IO) { runCatching { catalog.clearIdMaskFailure(photoId, versionKey) } }
                 if (!settings.aiConfigured()) error(ID_MASK_MSG_NEED_KEY)
                 val raw = withContext(Dispatchers.IO) {
                     val file = catalog.sourceFile(photoId, versionKey)
@@ -172,13 +175,25 @@ class AiJobs @Inject constructor(
                 tracker.startPhase("saving")
                 publish(id, tracker)
                 val png = withContext(Dispatchers.Default) {
-                    val decoded = ImagePipeline.decodeIdMask(response.bytes, response.upload)
+                    val decoded = try {
+                        ImagePipeline.decodeIdMask(response.bytes, response.upload)
+                    } catch (e: IllegalStateException) {
+                        // A reply that decoded but failed the matte checks is kept for viewing;
+                        // undecodable replies are not. Keeping it never changes the job's result.
+                        if (idMaskFailureKeepsReply(e.message)) {
+                            withContext(Dispatchers.IO + NonCancellable) {
+                                runCatching { catalog.saveIdMaskFailure(photoId, versionKey, response.bytes) }
+                            }
+                        }
+                        throw e
+                    }
                     ImagePipeline.encodeIdMaskPng(decoded)
                 }
                 ensureActive()
                 withContext(NonCancellable) {
                     if (!catalog.saveIdPhotoMask(photoId, versionKey, png)) error(ID_MASK_MSG_VERSION_GONE)
                     committed = true
+                    withContext(Dispatchers.IO) { runCatching { catalog.clearIdMaskFailure(photoId, versionKey) } }
                     tracker.succeed()
                     publish(id, tracker)
                     _events.tryEmit(StudioJobEvent.MaskReady(photoId, versionKey))

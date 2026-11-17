@@ -87,6 +87,8 @@ internal fun idSheetLabel(preset: IdPhotoPreset, layout: IdPhotoLayout): String 
 
 @StringRes
 internal fun idPresetPurposeRes(id: String): Int = when (id) {
+    "kr-visa" -> R.string.studio_id_preset_kr_visa
+    "jp-visa" -> R.string.studio_id_preset_jp_visa
     "33x48" -> R.string.studio_id_preset_33x48
     "25x35" -> R.string.studio_id_preset_25x35
     "22x32" -> R.string.studio_id_preset_22x32

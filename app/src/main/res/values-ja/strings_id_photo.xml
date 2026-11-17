@@ -13,6 +13,8 @@
     <string name="studio_id_mask_missing">切り抜きマスクがありません。もう一度切り抜くか、元の背景を選んでください。</string>
 
     <string name="studio_id_preset_35x45">ICAO 標準：シェンゲン/EU、英国、オーストラリア、シンガポール、日本・韓国のパスポートなど</string>
+    <string name="studio_id_preset_kr_visa">韓国ビザ</string>
+    <string name="studio_id_preset_jp_visa">日本ビザ</string>
     <string name="studio_id_preset_33x48">中国のパスポート・ビザ</string>
     <string name="studio_id_preset_25x35">中国の一寸（履歴書・証明書・出願）</string>
     <string name="studio_id_preset_22x32">中国の小一寸（運転免許など）</string>

@@ -103,6 +103,69 @@ fun featherAlpha(alpha: ByteArray, width: Int, height: Int, radius: Int): ByteAr
 }
 
 /**
+ * Separable (2r+1)² minimum filter of [alpha] (unsigned, row-major) with edge replication: the
+ * mask shrinks by [radius] px (Chebyshev). A radius of 0 or less returns a copy.
+ */
+fun erodeAlpha(alpha: ByteArray, width: Int, height: Int, radius: Int): ByteArray {
+    if (radius <= 0 || width <= 0 || height <= 0 || alpha.size < width * height) return alpha.copyOf()
+    val r = radius
+    val maxLen = maxOf(width, height) + 2 * r
+    val line = IntArray(maxLen)
+    val prefix = IntArray(maxLen)
+    val suffix = IntArray(maxLen)
+    val result = IntArray(maxOf(width, height))
+    val rows = ByteArray(width * height)
+    for (y in 0 until height) {
+        val base = y * width
+        minFilterLine(width, r, line, prefix, suffix, result) { i -> alpha[base + i].toInt() and 0xFF }
+        for (x in 0 until width) rows[base + x] = result[x].toByte()
+    }
+    val out = alpha.copyOf()
+    for (x in 0 until width) {
+        minFilterLine(height, r, line, prefix, suffix, result) { i -> rows[i * width + x].toInt() and 0xFF }
+        for (y in 0 until height) out[y * width + x] = result[y].toByte()
+    }
+    return out
+}
+
+/**
+ * Sliding (2r+1) minimum over a line of [n] values read through [read], edges replicated, into
+ * [out] (van Herk / Gil-Werman: three comparisons per value whatever the radius).
+ */
+private inline fun minFilterLine(
+    n: Int,
+    r: Int,
+    line: IntArray,
+    prefix: IntArray,
+    suffix: IntArray,
+    out: IntArray,
+    read: (Int) -> Int,
+) {
+    val window = 2 * r + 1
+    val len = n + 2 * r
+    for (j in 0 until len) line[j] = read((j - r).coerceIn(0, n - 1))
+    for (j in 0 until len) {
+        prefix[j] = if (j % window == 0) line[j] else minOf(prefix[j - 1], line[j])
+    }
+    for (j in len - 1 downTo 0) {
+        suffix[j] = if (j == len - 1 || (j + 1) % window == 0) line[j] else minOf(suffix[j + 1], line[j])
+    }
+    for (i in 0 until n) out[i] = minOf(suffix[i], prefix[i + window - 1])
+}
+
+/**
+ * Inward feather (EDID040-R07): erode by [radius], then [featherAlpha] by [radius]. A pixel with
+ * α 0 stays 0, and a pixel whose (4r+1)² window is all 255 stays 255, so the blend lies inside
+ * the mask's edge. A radius of 0 or less returns a copy.
+ */
+fun featherAlphaInward(alpha: ByteArray, width: Int, height: Int, radius: Int): ByteArray =
+    featherAlpha(erodeAlpha(alpha, width, height, radius), width, height, radius)
+
+/** [featherAlphaInward] when [inward], otherwise the symmetric [featherAlpha]. */
+fun featherAlphaFor(alpha: ByteArray, width: Int, height: Int, radius: Int, inward: Boolean): ByteArray =
+    if (inward) featherAlphaInward(alpha, width, height, radius) else featherAlpha(alpha, width, height, radius)
+
+/**
  * `out = src·a + bg·(1−a)` with `a = srcA/255 · α/255`. The result is opaque; an opaque
  * source under α 255 keeps its exact RGB, and α 0 (or a transparent source) gives [background].
  */

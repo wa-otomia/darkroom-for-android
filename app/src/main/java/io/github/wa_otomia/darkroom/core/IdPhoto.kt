@@ -29,6 +29,8 @@ data class IdPhotoPreset(val id: String, val widthMm: Double, val heightMm: Doub
 /** Built-in sizes. Order and ids are stable: they are stored and shown in this order. */
 val ID_PHOTO_PRESETS: List<IdPhotoPreset> = listOf(
     IdPhotoPreset("35x45", 35.0, 45.0),
+    IdPhotoPreset("kr-visa", 35.0, 45.0),
+    IdPhotoPreset("jp-visa", 45.0, 45.0),
     IdPhotoPreset("33x48", 33.0, 48.0),
     IdPhotoPreset("25x35", 25.0, 35.0),
     IdPhotoPreset("22x32", 22.0, 32.0),
@@ -394,6 +396,8 @@ data class IdPhotoState(
     val background: String = IdBackground.ORIGINAL.id,
     val feather: String = IdFeather.WEAK.id,
     val maskRev: String? = null,
+    /** Shrink the mask by the feather radius before smoothing, so the blend stays inside (EDID040-R07). */
+    val featherInward: Boolean = true,
 ) {
     val pose: IdPhotoPose get() = IdPhotoPose(zoom, panX, panY, rotation)
 
@@ -413,6 +417,7 @@ data class IdPhotoState(
         background = idBackground(background).id,
         feather = idFeather(feather).id,
         maskRev = maskRev?.trim()?.takeIf { it.isNotEmpty() },
+        featherInward = featherInward,
     )
 }
 
@@ -520,6 +525,15 @@ const val ID_MASK_MSG_UNDECODABLE = "抠图失败：无法解码返回图"
 const val ID_MASK_MSG_NEED_KEY = "抠图失败：未配置 AI 密钥"
 const val ID_MASK_MSG_VERSION_GONE = "抠图失败：该版本已删除"
 const val ID_MASK_MSG_MISSING = "证件照蒙版缺失或损坏"
+
+/**
+ * True for the failures of a reply that decoded but failed the matte checks: that reply is kept
+ * for viewing (EDID040-R09). Undecodable replies, network, key and other failures are not.
+ */
+fun idMaskFailureKeepsReply(message: String?): Boolean = when (message) {
+    ID_MASK_MSG_ASPECT, ID_MASK_MSG_NOT_BINARY, ID_MASK_MSG_NO_PERSON, ID_MASK_MSG_NO_BACKGROUND -> true
+    else -> false
+}
 
 // ---------------------------------------------------------------------------------------------
 // AI mask request (AIPV030-R04)

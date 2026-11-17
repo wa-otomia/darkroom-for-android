@@ -156,6 +156,29 @@ class CatalogRepository @Inject constructor(
 
     private fun idMaskPrefix(versionKey: String) = "$versionKey-mask-"
 
+    /**
+     * `cache/idmask-failed/<photoId>/<versionKey>`: the last mask reply of a version that decoded
+     * but failed validation, kept as returned for viewing (EDID040-R09). Never uploaded or logged.
+     */
+    fun idMaskFailureFile(photoId: String, source: String): File =
+        File(idMaskFailureDir(photoId), framingVersionKey(source))
+
+    private fun idMaskFailureDir(photoId: String) = File(File(context.cacheDir, "idmask-failed"), photoId)
+
+    /** Keeps [bytes] as the version's failed mask reply: temp file plus rename. */
+    fun saveIdMaskFailure(photoId: String, source: String, bytes: ByteArray) {
+        writeAtomically(idMaskFailureFile(photoId, source), bytes)
+    }
+
+    fun clearIdMaskFailure(photoId: String, source: String) {
+        idMaskFailureFile(photoId, source).delete()
+    }
+
+    fun hasIdMaskFailure(photoId: String, source: String): Boolean {
+        val file = idMaskFailureFile(photoId, source)
+        return file.isFile && file.length() > 0
+    }
+
     /** The mask bytes for [maskRev], or null when there is no rev or the file is missing or empty. */
     fun readIdPhotoMask(photoId: String, source: String, maskRev: String?): ByteArray? {
         val rev = maskRev?.trim()?.takeIf { it.isNotEmpty() && '/' !in it && '\\' !in it } ?: return null
@@ -322,6 +345,7 @@ class CatalogRepository @Inject constructor(
             editFile(photoId, resolved).delete()
             thumbFile(photoId, resolved).delete()
             deleteIdMasks(photoId, resolved)
+            clearIdMaskFailure(photoId, resolved)
             activityLog.record("catalog", "delete edit $resolved of $photoId")
         }
     }
@@ -383,6 +407,11 @@ class CatalogRepository @Inject constructor(
     suspend fun setIdPhotoFeather(photoId: String, source: String, feather: String) {
         val id = idFeather(feather).id
         updateIdPhoto(photoId, source) { old -> (old ?: IdPhotoState()).copy(feather = id) }
+    }
+
+    /** The version's inward-feather switch (EDID040-R07); other fields stay as stored. */
+    suspend fun setIdPhotoFeatherInward(photoId: String, source: String, inward: Boolean) {
+        updateIdPhoto(photoId, source) { old -> (old ?: IdPhotoState()).copy(featherInward = inward) }
     }
 
     /**
@@ -696,6 +725,7 @@ class CatalogRepository @Inject constructor(
                 // failed thumbnail the user can delete again. The other order would leak files
                 // invisibly; pruneOrphans() mops up whatever slips through.
                 File(library, id).deleteRecursively()
+                idMaskFailureDir(id).deleteRecursively()
                 db.photoDao().delete(id)
             }
             activityLog.record("catalog", "delete $id")

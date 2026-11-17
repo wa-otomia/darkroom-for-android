@@ -41,7 +41,7 @@ import io.github.wa_otomia.darkroom.core.cropInSourceSpace
 import io.github.wa_otomia.darkroom.core.compositeIdPixels
 import io.github.wa_otomia.darkroom.core.exifOrientationTransform
 import io.github.wa_otomia.darkroom.core.exportSheetSize
-import io.github.wa_otomia.darkroom.core.featherAlpha
+import io.github.wa_otomia.darkroom.core.featherAlphaFor
 import io.github.wa_otomia.darkroom.core.fitMaskContent
 import io.github.wa_otomia.darkroom.core.idBackground
 import io.github.wa_otomia.darkroom.core.idFeather
@@ -452,6 +452,7 @@ object ImagePipeline {
                 background.argb,
                 maskBitmap,
                 idFeather(id.feather).radiusPx(scale),
+                id.featherInward,
             )
             assembleIdSheet(cell, layout, sheetForPrinter)
         } finally {
@@ -479,13 +480,15 @@ object ImagePipeline {
      * Studio preview base: the whole version, EXIF-corrected, long edge at most [maxEdge],
      * composited over [background] through [mask]. The result is opaque. [featherSourcePx] is a
      * radius in full-size oriented source px (see `idFeatherSourcePx`); it is scaled to the
-     * preview size here, so the feather is an approximation of the print one.
+     * preview size here, so the feather is an approximation of the print one. [featherInward]
+     * picks the inward feather, as the print does (EDID040-R07).
      */
     fun renderIdPreviewCutout(
         bytes: ByteArray,
         mask: ByteArray,
         background: Int,
         featherSourcePx: Float,
+        featherInward: Boolean,
         maxEdge: Int = 2048,
     ): Bitmap = reportingDecodeFailure {
         val maskBitmap = decodeStoredIdMask(mask)
@@ -523,7 +526,7 @@ object ImagePipeline {
                     maskBitmap.height.toFloat(),
                     Rect(0, 0, out.width, out.height),
                 )
-                compositeThroughMask(image, maskBitmap, maskMatrix, background, radius)
+                compositeThroughMask(image, maskBitmap, maskMatrix, background, radius, featherInward)
                 image
             } catch (t: Throwable) {
                 recycle(image)
@@ -728,6 +731,7 @@ object ImagePipeline {
         background: Int?,
         maskBitmap: Bitmap?,
         featherPx: Int,
+        featherInward: Boolean,
     ): Bitmap {
         val source = inspectJpeg(bytes)
         val placement = state.pose.toCellPlacement(
@@ -769,7 +773,7 @@ object ImagePipeline {
                 Rect(0, 0, orientedW, orientedH),
             )
             placementMatrix(orientedW, orientedH, placement, cellW, cellH, maskMatrix)
-            compositeThroughMask(cell, maskBitmap, maskMatrix, background, featherPx)
+            compositeThroughMask(cell, maskBitmap, maskMatrix, background, featherPx, featherInward)
             return cell
         } catch (t: Throwable) {
             recycle(cell)
@@ -779,8 +783,8 @@ object ImagePipeline {
 
     /**
      * Draws [maskBitmap] through [maskMatrix] onto black at [target]'s size, turns its luma into
-     * α, feathers α by [featherPx] in [target] px and composites [target] over [background] in
-     * place. [maskBitmap] is recycled once drawn.
+     * α, feathers α by [featherPx] in [target] px (inward when [featherInward]) and composites
+     * [target] over [background] in place. [maskBitmap] is recycled once drawn.
      */
     private fun compositeThroughMask(
         target: Bitmap,
@@ -788,6 +792,7 @@ object ImagePipeline {
         maskMatrix: Matrix,
         background: Int,
         featherPx: Int,
+        featherInward: Boolean,
     ) {
         val w = target.width
         val h = target.height
@@ -803,7 +808,7 @@ object ImagePipeline {
         }
         recycle(maskBitmap)
         val alpha = ByteArray(w * h) { i -> idMaskLumaToAlpha(idMaskLuma(pixels[i])).toByte() }
-        val feathered = featherAlpha(alpha, w, h, featherPx)
+        val feathered = featherAlphaFor(alpha, w, h, featherPx, featherInward)
         target.getPixels(pixels, 0, w, 0, 0, w, h)
         compositeIdPixels(pixels, feathered, background)
         target.setPixels(pixels, 0, w, 0, 0, w, h)

@@ -527,6 +527,7 @@ internal fun rememberIdPreviewCutout(
                             mask,
                             key.argb,
                             featherSourcePx,
+                            featherInward = true,
                         ).asImageBitmap()
                     }
                 }

@@ -13,6 +13,8 @@
     <string name="studio_id_mask_missing">오려내기 마스크가 없습니다. 다시 오려내거나 원래 배경을 선택하세요.</string>
 
     <string name="studio_id_preset_35x45">ICAO 표준: 솅겐/EU, 영국, 호주, 싱가포르, 일본·한국 여권 등</string>
+    <string name="studio_id_preset_kr_visa">한국 비자</string>
+    <string name="studio_id_preset_jp_visa">일본 비자</string>
     <string name="studio_id_preset_33x48">중국 여권·비자</string>
     <string name="studio_id_preset_25x35">중국 1촌 (이력서, 증명서, 원서)</string>
     <string name="studio_id_preset_22x32">중국 소1촌 (운전면허 등)</string>
