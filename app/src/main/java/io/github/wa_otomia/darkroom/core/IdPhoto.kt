@@ -652,8 +652,10 @@ private const val ID_MASK_PROMPT_HEAD: String =
         "Background is everything else, even where it touches or overlaps the person: walls, floors, ceilings, sky, doors, windows, " +
         "furniture including chairs, chair backs, headrests, sofas and cushions, shelves, hanging clothes and coats, bags, objects, " +
         "other people, shadows cast on the background, and any border or padding. " +
-        "Paint the background pure black (#000000), even where it is white or light-coloured in the photo. " +
-        "Paint the person as one flat, solid, pure white (#FFFFFF) silhouette with no shading, lighting, gradients, texture, " +
+        "Paint the background pure black (#000000), even where it is white or light-coloured in the photo. "
+
+private const val ID_MASK_PROMPT_PERSON_SHARP: String =
+    "Paint the person as one flat, solid, pure white (#FFFFFF) silhouette with no shading, lighting, gradients, texture, " +
         "facial features or outlines inside it; eyes, mouth, glasses, hair texture and clothing details must not be visible. "
 
 private const val ID_MASK_PROMPT_EDGE_SHARP: String =
@@ -667,6 +669,12 @@ private const val ID_MASK_PROMPT_NO_PERSON: String = "If no person is visible, r
 private const val ID_MASK_PROMPT_TAIL_SHARP: String =
     "Use only black, white and that grey hair transition: no colours, text, watermarks or other content."
 
+/** The person sentence of the feathered variant: no inner gradients, except the edge one asked for. */
+private const val ID_MASK_PROMPT_PERSON_FEATHER: String =
+    "Paint the person as one flat, solid, pure white (#FFFFFF) silhouette with no shading, lighting, texture, " +
+        "facial features or outlines inside it, and no gradients except the soft edge gradient described below; " +
+        "eyes, mouth, glasses, hair texture and clothing details must not be visible. "
+
 private const val ID_MASK_PROMPT_TAIL_FEATHER: String =
     "Use only black, white and the grey edge gradient: no colours, text, watermarks or other content."
 
@@ -675,7 +683,8 @@ private const val ID_MASK_PROMPT_TAIL_FEATHER: String =
  * One sentence per literal, joined by exactly one space.
  */
 const val ID_PHOTO_MASK_PROMPT: String =
-    ID_MASK_PROMPT_HEAD + ID_MASK_PROMPT_EDGE_SHARP + ID_MASK_PROMPT_NO_PERSON + ID_MASK_PROMPT_TAIL_SHARP
+    ID_MASK_PROMPT_HEAD + ID_MASK_PROMPT_PERSON_SHARP + ID_MASK_PROMPT_EDGE_SHARP + ID_MASK_PROMPT_NO_PERSON +
+        ID_MASK_PROMPT_TAIL_SHARP
 
 /**
  * The feather an AI cut-out asks for (EDID040-R13), frozen when the job is queued: the level,
@@ -732,6 +741,7 @@ fun idPhotoMaskPrompt(feather: IdMaskAiFeather?, widthPx: Int, uploadWidth: Int,
         "The gradient is centred on the person's outline, about half inside and half outside it. "
     }
     return ID_MASK_PROMPT_HEAD +
+        ID_MASK_PROMPT_PERSON_FEATHER +
         "Feather the whole outline of the person, including the hair, fine strands and flyaways: along every edge, " +
         "blend from pure white to pure black through a smooth, even grey gradient about $n pixels wide " +
         "(the input image is ${uploadWidth}x$uploadHeight pixels). " +

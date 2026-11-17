@@ -531,6 +531,9 @@ class IdPhotoMattingTest {
             }
             assertFalse(p.contains("clean, sharp edge"))
             assertFalse(p.contains("that grey hair transition"))
+            // The person sentence no longer forbids the edge gradient it asks for.
+            assertFalse(p.contains("no shading, lighting, gradients, texture"))
+            assertTrue(p.contains("no gradients except the soft edge gradient described below"))
             assertTrue(p.endsWith("Use only black, white and the grey edge gradient: no colours, text, watermarks or other content."))
             assertTrue(p.all { it.code < 128 })
             assertFalse(p.contains("  "))

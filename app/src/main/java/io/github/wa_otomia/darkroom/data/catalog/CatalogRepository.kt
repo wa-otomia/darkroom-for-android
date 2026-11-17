@@ -540,7 +540,8 @@ class CatalogRepository @Inject constructor(
                     firstMask -> IdFeather.WEAK.id
                     else -> base.feather
                 },
-                featherInward = baked?.inward ?: base.featherInward,
+                // A first mask starts inward (EDID040-R07/R11) even if the switch moved before it.
+                featherInward = baked?.inward ?: if (firstMask) true else base.featherInward,
                 aiFeather = baked?.feather?.id,
             ).normalized()
             val next = current.withIdPhoto(key, state)

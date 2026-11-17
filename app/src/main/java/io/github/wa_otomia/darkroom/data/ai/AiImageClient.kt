@@ -200,7 +200,8 @@ class AiImageClient @Inject constructor(
                 } else {
                     0
                 }
-                val prompt = idPhotoMaskPrompt(asked, featherWidth, upload.content.width, upload.content.height)
+                // The size the model receives (the padded canvas on OpenAI); N is in the same px.
+                val prompt = idPhotoMaskPrompt(asked, featherWidth, upload.expectedWidth, upload.expectedHeight)
                 when (provider) {
                     AiProvider.GROK -> grokEditBody(cfg, prompt, upload.jpeg, onBytes)
                     AiProvider.OPENAI -> openAiEditBody(

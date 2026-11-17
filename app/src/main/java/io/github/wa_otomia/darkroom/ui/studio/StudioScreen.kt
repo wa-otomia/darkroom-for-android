@@ -1320,8 +1320,9 @@ fun StudioScreen(
                 maskRev = idStored?.maskRev,
                 background = idBg,
                 // EDID040-R13: an AI-feathered mask gets no on-device feather.
+                // The inward switch is fixed too, so toggling it never recomposites the same image.
                 feather = if (idStored?.aiFeatherLevel != null) IdFeather.NONE else idFeatherChoice,
-                featherInward = idFeatherInward,
+                featherInward = if (idStored?.aiFeatherLevel != null) true else idFeatherInward,
                 zoom = idZoom,
                 layout = idLayout,
                 imageWidth = orientedW,
