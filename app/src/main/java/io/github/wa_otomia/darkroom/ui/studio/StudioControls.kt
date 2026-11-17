@@ -427,16 +427,13 @@ internal fun StudioSwitchRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
-                .then(
-                    if (enabled) {
-                        Modifier.toggleable(
-                            value = checked,
-                            role = Role.Switch,
-                            onValueChange = onCheckedChange,
-                        )
-                    } else {
-                        Modifier
-                    },
+                // Kept when disabled too, so TalkBack still hears the on/off state, the Switch
+                // role and "disabled"; a disabled toggleable ignores taps.
+                .toggleable(
+                    value = checked,
+                    enabled = enabled,
+                    role = Role.Switch,
+                    onValueChange = onCheckedChange,
                 ),
             verticalAlignment = Alignment.CenterVertically,
         ) {

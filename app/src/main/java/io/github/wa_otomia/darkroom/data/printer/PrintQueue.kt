@@ -503,8 +503,9 @@ class PrintQueue @Inject constructor(
             throwIfCancelled()
             // Freeze the version's latest saved framing before any image use.
             // Enqueue pose arguments stay on the row as a record and are not rendered.
-            // The ID photo state (with its mask revision) is frozen from the same single read.
-            val frozenPhoto = catalog.get(photoId)
+            // The ID photo state (with its mask revision) is frozen from the same single read,
+            // together with that revision's mask bytes, so a later re-cut cannot delete them.
+            val (frozenPhoto, frozenMask) = catalog.getWithIdMask(photoId, source)
             val savedFraming = frozenPhoto?.framingFor(source)
             val idState = frozenPhoto?.idPhotoFor(source)
             // A preset print ignores the ID state and keeps the ordinary path.
@@ -579,10 +580,7 @@ class PrintQueue @Inject constructor(
             // Mask gate: before any printer connection or remote job, so a missing mask is a
             // certain failure. Never falls back to the original background.
             val idMask: ByteArray? = if (idPrint && idMaskRequired(idState)) {
-                val maskRev = idState?.maskRev
-                withContext(Dispatchers.IO) {
-                    runCatching { catalog.readIdPhotoMask(photoId, source, maskRev) }.getOrNull()
-                } ?: error(ID_MASK_MSG_MISSING)
+                frozenMask ?: error(ID_MASK_MSG_MISSING)
             } else {
                 null
             }

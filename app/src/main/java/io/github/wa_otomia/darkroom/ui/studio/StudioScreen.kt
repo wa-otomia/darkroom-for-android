@@ -468,8 +468,11 @@ fun StudioScreen(
             idPanX = savedId.panX
             idPanY = savedId.panY
             idRotation = savedId.rotation
-        } else {
-            idKnown = false
+        } else if (!idKnown) {
+            // Skipped when idKnown came back from the saved-instance bundle (the values are keyed
+            // on this version): a first entry whose write from the previous composition has not
+            // landed yet. Keeping it lets the next save converge with that write, instead of the
+            // screen dropping ID mode while the row turns it on.
             idActive = false
             idPresetId = DEFAULT_ID_PHOTO_PRESET_ID
             idZoom = 1f
@@ -565,6 +568,20 @@ fun StudioScreen(
     val idHasMask = idStored?.hasMask == true
     val idBg = idBackground(idBgPending ?: idStored?.background)
     val idFeatherChoice = idFeather(idFeatherPending ?: idStored?.feather)
+    // Backstop for the load above: a first entry written by a composition that is already gone
+    // (left and reopened at once) can land after the load found nothing. Adopt it when it shows,
+    // so the screen never shows ordinary framing while the row (and so a print) has ID mode on.
+    LaunchedEffect(photoId, source, framingReady, idStored != null) {
+        val late = idStored ?: return@LaunchedEffect
+        if (!framingReady || idKnown) return@LaunchedEffect
+        idKnown = true
+        idActive = late.active
+        idPresetId = late.presetId
+        idZoom = late.zoom
+        idPanX = late.panX
+        idPanY = late.panY
+        idRotation = late.rotation
+    }
     LaunchedEffect(idStored?.background, idBgPending) {
         if (idBgPending != null && idBgPending == idStored?.background) idBgPending = null
     }
@@ -732,8 +749,10 @@ fun StudioScreen(
                         val bytes = imageFile.readBytes()
                         val jpeg = if (idExport != null) {
                             // A missing mask throws before decoding, so no MediaStore row is made.
+                            // The row's current revision and its bytes are read in one step, so a
+                            // re-cut that committed after the tap cannot delete them in between.
                             val mask = if (idMaskRequired(idExport)) {
-                                catalog.readIdPhotoMask(photo.id, source, idExport.maskRev)
+                                catalog.getWithIdMask(photo.id, source).second
                             } else {
                                 null
                             }

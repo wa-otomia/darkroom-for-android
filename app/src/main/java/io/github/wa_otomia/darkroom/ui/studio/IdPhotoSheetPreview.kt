@@ -508,8 +508,14 @@ internal fun rememberIdPreviewCutout(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            held = null
-            failedKey = key
+            // Only a missing or undecodable mask is reported as such (it also blocks print and
+            // export). A source decode failure, an I/O error or running out of memory is a
+            // transient preview failure: no note, and the held cut-out stays so the next
+            // zoom-only change is still debounced.
+            if (e.message == ID_MASK_MSG_MISSING) {
+                held = null
+                failedKey = key
+            }
         }
     }
     val current = held

@@ -58,7 +58,7 @@
     <string name="studio_id_feather_strong">강하게</string>
 
     <!-- 출력 탭 -->
-    <string name="studio_id_preset_print_off">증명사진 모드에서는 프리셋으로 편집 후 인쇄를 사용할 수 없습니다.</string>
+    <string name="studio_id_preset_print_off">증명사진 모드에서는 \'프리셋으로 편집 후 대기열에 추가\'를 사용할 수 없습니다.</string>
 
     <!-- 오류 (ui/UserErrors.kt에서 연결) -->
     <string name="id_error_mask_aspect">오려내기 실패: 반환된 마스크의 비율이 사진과 맞지 않습니다.</string>

@@ -58,7 +58,7 @@
     <string name="studio_id_feather_strong">強</string>
 
     <!-- 出力タブ -->
-    <string name="studio_id_preset_print_off">証明写真モードではプリセット編集して印刷は使えません。</string>
+    <string name="studio_id_preset_print_off">証明写真モードでは「プリセットで編集してキューに追加」は使えません。</string>
 
     <!-- エラー（ui/UserErrors.kt で対応付け） -->
     <string name="id_error_mask_aspect">切り抜きに失敗しました：返されたマスクの比率が写真と一致しません。</string>

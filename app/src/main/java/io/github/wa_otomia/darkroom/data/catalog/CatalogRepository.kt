@@ -78,9 +78,9 @@ class CatalogRepository @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
-     * Serialises the read-modify-replace of a photo row between the per-version writers that
-     * can overlap: Studio's framing and ID pose saves, the background / feather taps, the mask
-     * job's commit, version deletion and photo deletion. Never held across a network call.
+     * Serialises every read-modify-replace of an existing photo row: Studio's framing and ID pose
+     * saves, the background / feather taps, the mask job's commit, new edits, print records,
+     * version deletion and photo deletion. Never held across a network call.
      */
     private val rowLock = Mutex()
 
@@ -167,6 +167,21 @@ class CatalogRepository @Inject constructor(
 
     suspend fun get(id: String): PhotoMeta? = db.photoDao().get(id)?.toMeta()
 
+    /**
+     * The row plus the bytes of [source]'s stored mask revision (null when it has none or the
+     * file is missing), read together under [rowLock]. A re-cut deletes the superseded file
+     * right after its commit, so a job that freezes the ID state must read the mask in the same
+     * step (PRRD020-R04: a later re-cut does not affect a job that already started).
+     */
+    suspend fun getWithIdMask(photoId: String, source: String): Pair<PhotoMeta?, ByteArray?> =
+        withContext(Dispatchers.IO) {
+            rowLock.withLock {
+                val photo = get(photoId)
+                val rev = photo?.idPhotoFor(source)?.maskRev
+                photo to rev?.let { runCatching { readIdPhotoMask(photoId, source, it) }.getOrNull() }
+            }
+        }
+
     suspend fun list(): List<PhotoMeta> = db.photoDao().list().map { it.toMeta() }
 
     suspend fun related(id: String): List<PhotoMeta> = listRelatedPhotos(list(), id)
@@ -235,7 +250,7 @@ class CatalogRepository @Inject constructor(
         presetId: String = "",
         presetTitle: String = "",
     ): EditRecord = withContext(Dispatchers.IO) {
-        val current = get(photoId) ?: error("照片不存在")
+        get(photoId) ?: error("照片不存在")
         val stored = storedAiJpeg(jpeg, "修图结果不是 JPEG")
         val id = UUID.randomUUID().toString()
         ImagePipeline.writeFile(editFile(photoId, id), stored)
@@ -251,9 +266,19 @@ class CatalogRepository @Inject constructor(
             presetId = presetId,
             presetTitle = presetTitle,
         )
-        val next = current.copy(edits = current.edits + record)
-        refreshGalleryFramedThumb(next)
-        db.photoDao().upsert(next.toEntity())
+        // The files are written outside the lock; the row is re-read under it so a mask commit
+        // or ID / framing write that landed meanwhile is merged, not overwritten.
+        rowLock.withLock {
+            val current = get(photoId)
+            if (current == null) {
+                editFile(photoId, id).delete()
+                thumbFile(photoId, id).delete()
+                error("照片不存在")
+            }
+            val next = current.copy(edits = current.edits + record)
+            refreshGalleryFramedThumb(next)
+            db.photoDao().upsert(next.toEntity())
+        }
         record
     }
 
@@ -527,8 +552,12 @@ class CatalogRepository @Inject constructor(
     }
 
     suspend fun recordPrint(photoId: String, record: PrintRecord) {
-        val current = get(photoId) ?: return
-        db.photoDao().upsert(current.copy(prints = current.prints + record).toEntity())
+        withContext(Dispatchers.IO) {
+            rowLock.withLock {
+                val current = get(photoId) ?: return@withLock
+                db.photoDao().upsert(current.copy(prints = current.prints + record).toEntity())
+            }
+        }
     }
 
     /** Deletes immediately, with no undo. Prefer [scheduleDelete] anywhere a user can see it. */

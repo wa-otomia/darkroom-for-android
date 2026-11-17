@@ -58,7 +58,7 @@
     <string name="studio_id_feather_strong">强</string>
 
     <!-- 输出标签 -->
-    <string name="studio_id_preset_print_off">证件照模式下不能按预设修图并打印。</string>
+    <string name="studio_id_preset_print_off">证件照模式下不能使用“按预设修图并加入队列”。</string>
 
     <!-- 错误（ui/UserErrors.kt 映射） -->
     <string name="id_error_mask_aspect">抠图失败：返回的蒙版比例与照片不符。</string>

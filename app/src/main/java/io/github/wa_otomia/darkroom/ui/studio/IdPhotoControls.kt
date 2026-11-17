@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -414,7 +415,7 @@ private fun IdFeatherChip(label: String, selected: Boolean, enabled: Boolean, on
     val shape = RoundedCornerShape(2.dp)
     Box(
         modifier = Modifier
-            .heightIn(min = 48.dp)
+            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
             .clip(shape)
             .background(if (selected) Amber.copy(alpha = if (enabled) 0.9f else 0.4f) else Color.Transparent)
             .then(if (selected) Modifier else Modifier.border(1.dp, PaperFaint, shape))

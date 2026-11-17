@@ -59,7 +59,7 @@
     <string name="studio_id_feather_strong">Strong</string>
 
     <!-- Output tab -->
-    <string name="studio_id_preset_print_off">Edit with preset is not available for ID photos.</string>
+    <string name="studio_id_preset_print_off">Edit with preset and queue is not available for ID photos.</string>
 
     <!-- Errors owned by ui/UserErrors.kt -->
     <string name="id_error_mask_aspect">Cut-out failed: the returned mask does not match the photo\'s proportions.</string>
