@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose tab: entry, size presets, notes -->
+    <string name="studio_id_photo">ID photo</string>
+    <string name="studio_id_size">Size</string>
+    <plurals name="studio_id_per_sheet">
+        <item quantity="one">%d per sheet</item>
+        <item quantity="other">%d per sheet</item>
+    </plurals>
+    <string name="studio_id_authority_note">Sizes and backgrounds are common choices only. Check the issuing authority\'s latest requirements.</string>
+    <string name="studio_id_edge_warning">This size sits close to the paper edge, so the printer may trim a little of the background at the edges.</string>
+    <string name="studio_id_no_watermark">ID photos are printed and exported without a watermark.</string>
+    <string name="studio_id_sheet_a11y">ID photo sheet: %1$s</string>
+    <string name="studio_id_mask_missing">The cut-out mask is missing. Cut out again or choose the original background.</string>
+
+    <string name="studio_id_preset_35x45">ICAO standard: Schengen/EU, UK, Australia, Singapore, Japanese and Korean passports</string>
+    <string name="studio_id_preset_33x48">Chinese passport and visa</string>
+    <string name="studio_id_preset_25x35">Chinese 1-inch (résumé, certificates, applications)</string>
+    <string name="studio_id_preset_22x32">Chinese small 1-inch (driving licence, etc.)</string>
+    <string name="studio_id_preset_35x49">Chinese 2-inch</string>
+    <string name="studio_id_preset_2x2in">US passport and visa, Indian visa</string>
+    <string name="studio_id_preset_50x70">Canadian passport</string>
+    <string name="studio_id_preset_30x40">Japanese résumé and residence applications, Korean half size</string>
+    <string name="studio_id_preset_24x30">Japanese driving licence</string>
+    <string name="studio_id_preset_40x60">4×6 cm visas (Vietnam, Thailand, etc.)</string>
+    <string name="studio_id_preset_35x50">Malaysian passport</string>
+
+    <!-- Process tab: cut-out, palette, feather -->
+    <string name="studio_id_section">ID photo background</string>
+    <string name="studio_id_explain">AI only draws a mask of the person. Every pixel of the person comes from your photo; the background is replaced on this device. The whole photo of this version is uploaded to the AI provider set in Settings.</string>
+    <string name="studio_id_cutout">AI cut out person</string>
+    <string name="studio_id_recut">Cut out again</string>
+    <string name="studio_id_cutting">Cutting out…</string>
+    <string name="studio_id_cutting_other">Cutting out another version (%1$s)…</string>
+    <string name="studio_id_mask_ready">Cut-out ready</string>
+    <string name="studio_id_background">Background</string>
+    <string name="studio_id_need_mask">Cut out the person first to change the background.</string>
+
+    <string name="studio_id_bg_original">Original</string>
+    <string name="studio_id_bg_original_use">Keep the photo\'s own background</string>
+    <string name="studio_id_bg_navy">Navy</string>
+    <string name="studio_id_bg_navy_use">App default</string>
+    <string name="studio_id_bg_id_blue">ID blue</string>
+    <string name="studio_id_bg_id_blue_use">Common blue backdrop in mainland China</string>
+    <string name="studio_id_bg_red">Red</string>
+    <string name="studio_id_bg_red_use">Mainland China red backdrop (marriage registration, etc.)</string>
+    <string name="studio_id_bg_white">White</string>
+    <string name="studio_id_bg_white_use">Chinese passport and visa, US, Korea, Singapore, Canada</string>
+    <string name="studio_id_bg_light_grey">Light grey</string>
+    <string name="studio_id_bg_light_grey_use">UK, Australia, Schengen countries such as Germany</string>
+    <string name="studio_id_bg_off_white">Off-white</string>
+    <string name="studio_id_bg_off_white_use">UK cream, US off-white</string>
+    <string name="studio_id_bg_pale_blue">Pale blue</string>
+    <string name="studio_id_bg_pale_blue_use">Japanese passport and résumé</string>
+
+    <string name="studio_id_feather">Edge softening</string>
+    <string name="studio_id_feather_none">None</string>
+    <string name="studio_id_feather_weak">Weak</string>
+    <string name="studio_id_feather_medium">Medium</string>
+    <string name="studio_id_feather_strong">Strong</string>
+
+    <!-- Output tab -->
+    <string name="studio_id_preset_print_off">Edit with preset and queue is not available for ID photos.</string>
+
+    <!-- Errors owned by ui/UserErrors.kt -->
+    <string name="id_error_mask_aspect">Cut-out failed: the returned mask does not match the photo\'s proportions.</string>
+    <string name="id_error_mask_not_binary">Cut-out failed: the reply was not a black-and-white mask.</string>
+    <string name="id_error_mask_no_person">Cut-out failed: no person was found in the photo.</string>
+    <string name="id_error_mask_no_background">Cut-out failed: the background could not be separated.</string>
+    <string name="id_error_mask_undecodable">Cut-out failed: the returned image could not be read.</string>
+    <string name="id_error_mask_need_key">Cut-out needs an API key. Add one in Settings.</string>
+    <string name="id_error_mask_version_gone">Cut-out discarded: this version was deleted.</string>
+    <string name="id_error_mask_missing">The ID photo mask is missing or damaged. Cut out again, or choose the original background.</string>
+    <string name="id_error_mask_save">Couldn\'t save the cut-out mask. Check free storage and try again.</string>
+</resources>

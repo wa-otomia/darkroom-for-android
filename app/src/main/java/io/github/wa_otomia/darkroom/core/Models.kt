@@ -57,6 +57,8 @@ data class PhotoMeta(
     val tags: List<String> = emptyList(),
     /** Per-version crop pose. Key is [ORIGINAL_VERSION_ID] or an edit id. Missing = auto defaults. */
     val framings: Map<String, Framing> = emptyMap(),
+    /** Per-version ID photo state, same keys as [framings], stored inside framingsJson entries. */
+    val idPhotos: Map<String, IdPhotoState> = emptyMap(),
 )
 
 /** Catalog tag written when a Studio result is saved as its own gallery photo. */

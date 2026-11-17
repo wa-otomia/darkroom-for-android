@@ -427,16 +427,13 @@ internal fun StudioSwitchRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
-                .then(
-                    if (enabled) {
-                        Modifier.toggleable(
-                            value = checked,
-                            role = Role.Switch,
-                            onValueChange = onCheckedChange,
-                        )
-                    } else {
-                        Modifier
-                    },
+                // Kept when disabled too, so TalkBack still hears the on/off state, the Switch
+                // role and "disabled"; a disabled toggleable ignores taps.
+                .toggleable(
+                    value = checked,
+                    enabled = enabled,
+                    role = Role.Switch,
+                    onValueChange = onCheckedChange,
                 ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -595,6 +592,9 @@ internal fun ExtraPromptDialog(
  *
  * Orientation and rotate/reset share one [FlowRow] so they sit on a single line
  * when width allows and wrap on narrow or large-font layouts.
+ *
+ * [orientationSelected] false shows neither orientation chip as selected while both stay
+ * usable (ID photo mode, where tapping one leaves the mode).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -605,6 +605,7 @@ internal fun FramingControls(
     onOrientation: (Boolean) -> Unit,
     onRotate: (Int) -> Unit,
     onReset: (() -> Unit)? = null,
+    orientationSelected: Boolean = true,
 ) {
     val shownDegrees = Math.round(rotationDegrees) % 360
     FlowRow(
@@ -614,13 +615,13 @@ internal fun FramingControls(
     ) {
         ToggleChip(
             label = stringResource(R.string.studio_frame_portrait),
-            active = !landscape,
+            active = orientationSelected && !landscape,
             enabled = enabled,
             onClick = { onOrientation(false) },
         )
         ToggleChip(
             label = stringResource(R.string.studio_frame_landscape),
-            active = landscape,
+            active = orientationSelected && landscape,
             enabled = enabled,
             onClick = { onOrientation(true) },
         )

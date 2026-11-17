@@ -2,6 +2,7 @@ package io.github.wa_otomia.darkroom.data.printer
 
 import android.content.Context
 import io.github.wa_otomia.darkroom.core.Framing
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_MISSING
 import io.github.wa_otomia.darkroom.core.OrientedSize
 import io.github.wa_otomia.darkroom.core.PhotoMeta
 import io.github.wa_otomia.darkroom.core.PixelCrop
@@ -12,6 +13,9 @@ import io.github.wa_otomia.darkroom.core.alignedEditFraming
 import io.github.wa_otomia.darkroom.core.combineGeneratePrompt
 import io.github.wa_otomia.darkroom.core.exactQuarterTurns
 import io.github.wa_otomia.darkroom.core.framingFor
+import io.github.wa_otomia.darkroom.core.idMaskRequired
+import io.github.wa_otomia.darkroom.core.idPhotoFor
+import io.github.wa_otomia.darkroom.core.idPrintApplies
 import io.github.wa_otomia.darkroom.core.persistableFraming
 import io.github.wa_otomia.darkroom.core.PrintJobCancelFlags
 import io.github.wa_otomia.darkroom.core.resolveExecutionPose
@@ -84,6 +88,7 @@ sealed class StudioJobEvent {
     data class Generated(override val photoId: String, val created: PhotoMeta) : StudioJobEvent()
     data class Edited(override val photoId: String, val editId: String) : StudioJobEvent()
     data class PrintFinished(override val photoId: String) : StudioJobEvent()
+    data class MaskReady(override val photoId: String, val source: String) : StudioJobEvent()
     data class Failed(override val photoId: String, val action: String, val message: String?) : StudioJobEvent()
 }
 
@@ -248,10 +253,14 @@ class PrintQueue @Inject constructor(
         placement: ViewportPlacement? = null,
         watermark: Boolean = false,
         framing: Framing? = null,
+        beforeEnqueue: (suspend () -> Unit)? = null,
     ) {
         appScope.launch {
             // Null clears the slot (default pose). The row is written only after this returns.
             catalog.saveFraming(photoId, source, framing)
+            // Caller-owned saves (the Studio's ID photo pose) also finish before the row exists,
+            // so execution reads them at its freeze point.
+            beforeEnqueue?.invoke()
             enqueueRow(
                 photoId = photoId,
                 source = source,
@@ -494,7 +503,13 @@ class PrintQueue @Inject constructor(
             throwIfCancelled()
             // Freeze the version's latest saved framing before any image use.
             // Enqueue pose arguments stay on the row as a record and are not rendered.
-            val savedFraming = catalog.get(photoId)?.framingFor(source)
+            // The ID photo state (with its mask revision) is frozen from the same single read,
+            // together with that revision's mask bytes, so a later re-cut cannot delete them.
+            val (frozenPhoto, frozenMask) = catalog.getWithIdMask(photoId, source)
+            val savedFraming = frozenPhoto?.framingFor(source)
+            val idState = frozenPhoto?.idPhotoFor(source)
+            // A preset print ignores the ID state and keeps the ordinary path.
+            val idPrint = idPrintApplies(idState, usedPreset)
             val autoLandscape = resolveEnqueueLandscape(photoId, source, null)
             val execution = resolveExecutionPose(
                 saved = savedFraming,
@@ -562,22 +577,40 @@ class PrintQueue @Inject constructor(
             throwIfCancelled()
             tracker.startPhase("preparing")
             emit(photoId, "preparing")
+            // Mask gate: before any printer connection or remote job, so a missing mask is a
+            // certain failure. Never falls back to the original background.
+            val idMask: ByteArray? = if (idPrint && idMaskRequired(idState)) {
+                frozenMask ?: error(ID_MASK_MSG_MISSING)
+            } else {
+                null
+            }
             val copiesN = (copies ?: cfg.defaultCopies).coerceIn(1, 9)
             val bytes = catalog.sourceFile(photoId, usedSource).readBytes()
-            val mark = if (watermark) settings.readWatermark() else null
-            val photoMeta = catalog.get(photoId)
-            val jpeg = ImagePipeline.renderPrintJpeg(
-                bytes,
-                crop = null,
-                cfg.printFit,
-                rotateQuarters = exactQuarterTurns(renderRotation) ?: 0,
-                landscape = renderLandscape,
-                rotationDegrees = renderRotation,
-                placement = renderPlacement,
-                watermark = mark,
-                photo = photoMeta,
-                context = context,
-            )
+            val jpeg = if (idPrint && idState != null) {
+                // The ID sheet never carries a watermark, whatever the row says.
+                ImagePipeline.renderIdPhotoSheetJpeg(
+                    bytes,
+                    idState,
+                    idMask,
+                    outputScale = 1,
+                    sheetForPrinter = true,
+                )
+            } else {
+                val mark = if (watermark) settings.readWatermark() else null
+                val photoMeta = catalog.get(photoId)
+                ImagePipeline.renderPrintJpeg(
+                    bytes,
+                    crop = null,
+                    cfg.printFit,
+                    rotateQuarters = exactQuarterTurns(renderRotation) ?: 0,
+                    landscape = renderLandscape,
+                    rotationDegrees = renderRotation,
+                    placement = renderPlacement,
+                    watermark = mark,
+                    photo = photoMeta,
+                    context = context,
+                )
+            }
             throwIfCancelled()
             tracker.startPhase("connecting")
             emit(photoId, "connecting")

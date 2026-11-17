@@ -13,6 +13,13 @@ import androidx.exifinterface.media.ExifInterface
 import io.github.wa_otomia.darkroom.core.AI_UPLOAD_MAX_EDGE
 import io.github.wa_otomia.darkroom.core.Affine2x3
 import io.github.wa_otomia.darkroom.core.DEFAULT_PRINT_QUALITY
+import io.github.wa_otomia.darkroom.core.ID_CUT_LINE_COLOR
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_MISSING
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_UNDECODABLE
+import io.github.wa_otomia.darkroom.core.IdMaskVerdict
+import io.github.wa_otomia.darkroom.core.IdPhotoLayout
+import io.github.wa_otomia.darkroom.core.IdPhotoState
+import io.github.wa_otomia.darkroom.core.IdRect
 import io.github.wa_otomia.darkroom.core.OrientedSize
 import io.github.wa_otomia.darkroom.core.PRINT_HEIGHT
 import io.github.wa_otomia.darkroom.core.PRINT_WIDTH
@@ -22,6 +29,7 @@ import io.github.wa_otomia.darkroom.core.PrintFit
 import io.github.wa_otomia.darkroom.core.THUMB_WIDTH
 import io.github.wa_otomia.darkroom.core.ViewportPlacement
 import io.github.wa_otomia.darkroom.core.WatermarkSettings
+import io.github.wa_otomia.darkroom.core.aiUploadSize
 import io.github.wa_otomia.darkroom.core.centeredAspectCrop
 import io.github.wa_otomia.darkroom.core.clampCrop
 import io.github.wa_otomia.darkroom.core.clampZoom
@@ -30,17 +38,32 @@ import io.github.wa_otomia.darkroom.core.coverSampleSize
 import io.github.wa_otomia.darkroom.core.coverScale
 import io.github.wa_otomia.darkroom.core.cropAspect
 import io.github.wa_otomia.darkroom.core.cropInSourceSpace
+import io.github.wa_otomia.darkroom.core.compositeIdPixels
 import io.github.wa_otomia.darkroom.core.exifOrientationTransform
 import io.github.wa_otomia.darkroom.core.exportSheetSize
+import io.github.wa_otomia.darkroom.core.featherAlpha
+import io.github.wa_otomia.darkroom.core.fitMaskContent
+import io.github.wa_otomia.darkroom.core.idBackground
+import io.github.wa_otomia.darkroom.core.idFeather
+import io.github.wa_otomia.darkroom.core.idMaskAspectMatches
+import io.github.wa_otomia.darkroom.core.idMaskLumaToAlpha
+import io.github.wa_otomia.darkroom.core.idMaskVerdictMessage
+import io.github.wa_otomia.darkroom.core.idPhotoLayout
+import io.github.wa_otomia.darkroom.core.idPhotoPreset
 import io.github.wa_otomia.darkroom.core.longEdgeSampleSize
 import io.github.wa_otomia.darkroom.core.sheetQuarterTurns
 import io.github.wa_otomia.darkroom.core.ensureJpegBytes
 import io.github.wa_otomia.darkroom.core.exactQuarterTurns
 import io.github.wa_otomia.darkroom.core.normalizeQuarterTurns
+import io.github.wa_otomia.darkroom.core.openAiMaskCanvas
 import io.github.wa_otomia.darkroom.core.orientedDimensions
+import io.github.wa_otomia.darkroom.core.previewDecodeSize
 import io.github.wa_otomia.darkroom.core.resolveCropOnBitmap
 import io.github.wa_otomia.darkroom.core.rotateCrop
 import io.github.wa_otomia.darkroom.core.rotatedSize
+import io.github.wa_otomia.darkroom.core.scaled
+import io.github.wa_otomia.darkroom.core.toCellPlacement
+import io.github.wa_otomia.darkroom.core.validateIdMaskLuma
 import io.github.wa_otomia.darkroom.core.widthSampleSize
 import kotlinx.coroutines.CancellationException
 import java.io.ByteArrayInputStream
@@ -77,6 +100,12 @@ object ImagePipeline {
      * entirely and keep whatever size arrived.
      */
     const val GENERATE_MAX_EDGE = 2048
+
+    /** JPEG quality of the padded mask upload, matching [grokUploadJpeg]. */
+    private const val ID_MASK_UPLOAD_QUALITY = 85
+
+    /** Long-edge cap when decoding a mask reply; replies are at most about 2k, so this rarely bites. */
+    private const val ID_MASK_DECODE_MAX_EDGE = AI_UPLOAD_MAX_EDGE * 2
 
     /**
      * Transcodes a still that is not already JPEG (HEIC/HEIF, PNG, WebP) into JPEG bytes.
@@ -384,6 +413,474 @@ object ImagePipeline {
         }
     }
 
+    // -----------------------------------------------------------------------------------------
+    // ID photo sheet (EDID020/030/040) and AI mask transport helpers (AIPV030-R04)
+    // -----------------------------------------------------------------------------------------
+
+    /**
+     * The landscape ID sheet for [state]: one upright cell rendered once and copied into every
+     * slot of the size preset's layout (rotated slots turned 90° counter-clockwise), grey cut
+     * lines in the gaps, white elsewhere. Never watermarked.
+     *
+     * Geometry is the scale-1 layout times [outputScale]. [sheetForPrinter] turns the finished
+     * 1560×1040 sheet onto the portrait printer sheet (clockwise), like [renderPrintJpeg].
+     *
+     * A colour background needs [mask] (the stored grey PNG, in the version's EXIF-corrected
+     * space). When it is missing or cannot be decoded this throws [ID_MASK_MSG_MISSING] before
+     * the source is decoded; it never falls back to the original background.
+     */
+    fun renderIdPhotoSheetBitmap(
+        bytes: ByteArray,
+        state: IdPhotoState,
+        mask: ByteArray?,
+        outputScale: Int = 1,
+        sheetForPrinter: Boolean = false,
+    ): Bitmap = reportingDecodeFailure {
+        val id = state.normalized()
+        val background = idBackground(id.background)
+        val scale = outputScale.coerceAtLeast(1)
+        val maskBitmap = if (background.needsMask) decodeStoredIdMask(mask) else null
+        try {
+            val base = idPhotoLayout(idPhotoPreset(id.presetId))
+            val layout = base.scaled(scale)
+            val cell = renderIdCell(
+                bytes,
+                id,
+                base,
+                layout.cellWidth,
+                layout.cellHeight,
+                background.argb,
+                maskBitmap,
+                idFeather(id.feather).radiusPx(scale),
+            )
+            assembleIdSheet(cell, layout, sheetForPrinter)
+        } finally {
+            maskBitmap?.let { recycle(it) }
+        }
+    }
+
+    fun renderIdPhotoSheetJpeg(
+        bytes: ByteArray,
+        state: IdPhotoState,
+        mask: ByteArray?,
+        outputScale: Int = 1,
+        sheetForPrinter: Boolean = false,
+        quality: Int = DEFAULT_PRINT_QUALITY,
+    ): ByteArray = reportingDecodeFailure {
+        val sheet = renderIdPhotoSheetBitmap(bytes, state, mask, outputScale, sheetForPrinter)
+        try {
+            encodeJpeg(sheet, quality)
+        } finally {
+            recycle(sheet)
+        }
+    }
+
+    /**
+     * Studio preview base: the whole version, EXIF-corrected, long edge at most [maxEdge],
+     * composited over [background] through [mask]. The result is opaque. [featherSourcePx] is a
+     * radius in full-size oriented source px (see `idFeatherSourcePx`); it is scaled to the
+     * preview size here, so the feather is an approximation of the print one.
+     */
+    fun renderIdPreviewCutout(
+        bytes: ByteArray,
+        mask: ByteArray,
+        background: Int,
+        featherSourcePx: Float,
+        maxEdge: Int = 2048,
+    ): Bitmap = reportingDecodeFailure {
+        val maskBitmap = decodeStoredIdMask(mask)
+        try {
+            val source = inspectJpeg(bytes)
+            val out = previewDecodeSize(source.oriented.width, source.oriented.height, maxEdge)
+            val raw = decodeSampled(bytes, longEdgeSampleSize(source.oriented.width, source.oriented.height, maxEdge))
+            val image = try {
+                Bitmap.createBitmap(out.width, out.height, Bitmap.Config.ARGB_8888)
+            } catch (t: Throwable) {
+                recycle(raw)
+                throw t
+            }
+            try {
+                try {
+                    val exif = exifOrientationTransform(source.orientation, raw.width, raw.height)
+                    val matrix = Matrix()
+                    matrix.setValues(exif.matrixValues())
+                    matrix.postConcat(
+                        mapRectMatrix(0f, 0f, exif.outputWidth.toFloat(), exif.outputHeight.toFloat(), Rect(0, 0, out.width, out.height)),
+                    )
+                    Canvas(image).drawBitmap(raw, matrix, bitmapPaint())
+                } finally {
+                    recycle(raw)
+                }
+                val radius = if (featherSourcePx.isFinite() && featherSourcePx > 0f) {
+                    Math.round(featherSourcePx * out.width / source.oriented.width.coerceAtLeast(1)).coerceAtLeast(1)
+                } else {
+                    0
+                }
+                val maskMatrix = mapRectMatrix(
+                    0f,
+                    0f,
+                    maskBitmap.width.toFloat(),
+                    maskBitmap.height.toFloat(),
+                    Rect(0, 0, out.width, out.height),
+                )
+                compositeThroughMask(image, maskBitmap, maskMatrix, background, radius)
+                image
+            } catch (t: Throwable) {
+                recycle(image)
+                throw t
+            }
+        } finally {
+            recycle(maskBitmap)
+        }
+    }
+
+    /**
+     * What a mask request uploads. [expectedWidth]×[expectedHeight] is the size the reply is
+     * checked against (the upload itself, or the padded canvas); [content] is where the photo
+     * sits inside it, in those px.
+     */
+    data class IdMaskUpload(
+        val jpeg: ByteArray,
+        val expectedWidth: Int,
+        val expectedHeight: Int,
+        val content: IdRect,
+        val padded: Boolean,
+    )
+
+    /**
+     * The whole version, EXIF applied, no crop, no watermark, long edge at most 1536 and never
+     * upscaled ([aiUploadSize]). Without [padToCanvas] the bytes are exactly [grokUploadJpeg].
+     * With it (providers with fixed output sizes) the image is fitted, unscaled-up and centred,
+     * onto the closest supported canvas ([openAiMaskCanvas]) with black padding, JPEG q85.
+     */
+    fun idMaskUpload(bytes: ByteArray, padToCanvas: Boolean): IdMaskUpload = reportingDecodeFailure {
+        val source = inspectJpeg(bytes)
+        val upload = aiUploadSize(source.oriented.width, source.oriented.height)
+        if (!padToCanvas) {
+            IdMaskUpload(
+                jpeg = grokUploadJpeg(bytes),
+                expectedWidth = upload.width,
+                expectedHeight = upload.height,
+                content = IdRect(0, 0, upload.width, upload.height),
+                padded = false,
+            )
+        } else {
+            val (canvasW, canvasH) = openAiMaskCanvas(upload.width, upload.height)
+            val content = fitMaskContent(upload.width, upload.height, canvasW, canvasH)
+            val raw = decodeSampled(
+                bytes,
+                longEdgeSampleSize(source.oriented.width, source.oriented.height, AI_UPLOAD_MAX_EDGE),
+            )
+            val jpeg = try {
+                val out = Bitmap.createBitmap(canvasW, canvasH, Bitmap.Config.ARGB_8888)
+                try {
+                    val canvas = Canvas(out)
+                    canvas.drawColor(Color.BLACK)
+                    val exif = exifOrientationTransform(source.orientation, raw.width, raw.height)
+                    val matrix = Matrix()
+                    matrix.setValues(exif.matrixValues())
+                    matrix.postConcat(
+                        mapRectMatrix(
+                            0f,
+                            0f,
+                            exif.outputWidth.toFloat(),
+                            exif.outputHeight.toFloat(),
+                            Rect(content.left, content.top, content.right, content.bottom),
+                        ),
+                    )
+                    canvas.save()
+                    try {
+                        canvas.clipRect(content.left, content.top, content.right, content.bottom)
+                        canvas.drawBitmap(raw, matrix, bitmapPaint())
+                    } finally {
+                        canvas.restore()
+                    }
+                    encodeJpeg(out, ID_MASK_UPLOAD_QUALITY)
+                } finally {
+                    recycle(out)
+                }
+            } finally {
+                recycle(raw)
+            }
+            IdMaskUpload(
+                jpeg = jpeg,
+                expectedWidth = canvasW,
+                expectedHeight = canvasH,
+                content = content,
+                padded = true,
+            )
+        }
+    }
+
+    /** Unsigned luma of the mask's content area, row-major, [width]×[height]. */
+    data class IdMaskDecoded(val luma: ByteArray, val width: Int, val height: Int)
+
+    /**
+     * Decodes a provider reply (any format ImageDecoder reads) and checks it against [upload]:
+     * aspect within 1% of the expected size, then the content rect (scaled to the reply size)
+     * is cut out and only that area is checked for a black-and-white matte with a person and a
+     * background. Failures throw [IllegalStateException] with an `ID_MASK_MSG_*` message;
+     * nothing is stretched or re-aligned.
+     */
+    fun decodeIdMask(response: ByteArray, upload: IdMaskUpload): IdMaskDecoded {
+        var replyW = 0
+        var replyH = 0
+        val bitmap = try {
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(response))) { decoder, info, _ ->
+                decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE)
+                replyW = info.size.width
+                replyH = info.size.height
+                val longEdge = maxOf(replyW, replyH)
+                if (longEdge > ID_MASK_DECODE_MAX_EDGE) {
+                    val scale = ID_MASK_DECODE_MAX_EDGE.toDouble() / longEdge
+                    decoder.setTargetSize(
+                        (replyW * scale).toInt().coerceAtLeast(1),
+                        (replyH * scale).toInt().coerceAtLeast(1),
+                    )
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: OutOfMemoryError) {
+            error(ID_MASK_MSG_UNDECODABLE)
+        } catch (_: Exception) {
+            error(ID_MASK_MSG_UNDECODABLE)
+        }
+        try {
+            if (bitmap.width <= 0 || bitmap.height <= 0) error(ID_MASK_MSG_UNDECODABLE)
+            if (!idMaskAspectMatches(upload.expectedWidth, upload.expectedHeight, replyW, replyH)) {
+                error(idMaskVerdictMessage(IdMaskVerdict.ASPECT_MISMATCH))
+            }
+            val sx = bitmap.width.toDouble() / upload.expectedWidth
+            val sy = bitmap.height.toDouble() / upload.expectedHeight
+            val left = Math.round(upload.content.left * sx).toInt().coerceIn(0, bitmap.width - 1)
+            val top = Math.round(upload.content.top * sy).toInt().coerceIn(0, bitmap.height - 1)
+            val right = Math.round(upload.content.right * sx).toInt().coerceIn(left + 1, bitmap.width)
+            val bottom = Math.round(upload.content.bottom * sy).toInt().coerceIn(top + 1, bitmap.height)
+            val w = right - left
+            val h = bottom - top
+            // Callers only catch Exception, so every post-decode allocation maps OOM to a message.
+            val luma = try {
+                val pixels = IntArray(w * h).also { bitmap.getPixels(it, 0, w, left, top, w, h) }
+                ByteArray(w * h) { i -> idMaskLuma(pixels[i]).toByte() }
+            } catch (_: OutOfMemoryError) {
+                error(ID_MASK_MSG_UNDECODABLE)
+            }
+            val verdict = try {
+                validateIdMaskLuma(luma)
+            } catch (_: OutOfMemoryError) {
+                error(ID_MASK_MSG_UNDECODABLE)
+            }
+            if (verdict != IdMaskVerdict.OK) error(idMaskVerdictMessage(verdict))
+            return IdMaskDecoded(luma, w, h)
+        } finally {
+            recycle(bitmap)
+        }
+    }
+
+    /** Lossless grey PNG of [mask], so a stored mask never picks up JPEG ringing. */
+    fun encodeIdMaskPng(mask: IdMaskDecoded): ByteArray = reportingDecodeFailure {
+        require(mask.width > 0 && mask.height > 0 && mask.luma.size >= mask.width * mask.height) { "蒙版尺寸无效" }
+        val pixels = IntArray(mask.width * mask.height) { i ->
+            val v = mask.luma[i].toInt() and 0xFF
+            (0xFF shl 24) or (v shl 16) or (v shl 8) or v
+        }
+        val bitmap = Bitmap.createBitmap(mask.width, mask.height, Bitmap.Config.ARGB_8888)
+        try {
+            bitmap.setPixels(pixels, 0, mask.width, 0, 0, mask.width, mask.height)
+            val stream = ByteArrayOutputStream()
+            if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)) error("PNG 编码失败")
+            stream.toByteArray()
+        } finally {
+            recycle(bitmap)
+        }
+    }
+
+    /** The stored mask, or [ID_MASK_MSG_MISSING] when it is absent or does not decode. */
+    private fun decodeStoredIdMask(mask: ByteArray?): Bitmap {
+        if (mask == null || mask.isEmpty()) error(ID_MASK_MSG_MISSING)
+        val bitmap = try {
+            BitmapFactory.decodeByteArray(mask, 0, mask.size)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        } ?: error(ID_MASK_MSG_MISSING)
+        if (bitmap.width <= 0 || bitmap.height <= 0) {
+            recycle(bitmap)
+            error(ID_MASK_MSG_MISSING)
+        }
+        return bitmap
+    }
+
+    /**
+     * One upright cell at [cellW]×[cellH]. Without a mask it is the source drawn on white with
+     * [drawPlacement] (the cover is per cell). With one, the source is drawn on a transparent
+     * cell and composited over [background], so the empty cell area becomes the background.
+     * The source sample is freed before the mask work starts.
+     */
+    private fun renderIdCell(
+        bytes: ByteArray,
+        state: IdPhotoState,
+        base: IdPhotoLayout,
+        cellW: Int,
+        cellH: Int,
+        background: Int?,
+        maskBitmap: Bitmap?,
+        featherPx: Int,
+    ): Bitmap {
+        val source = inspectJpeg(bytes)
+        val placement = state.pose.toCellPlacement(
+            base.cellWidth,
+            base.cellHeight,
+            source.oriented.width,
+            source.oriented.height,
+        )
+        val sample = coverSampleSize(source.oriented.width, source.oriented.height, cellW, cellH, placement.zoom)
+        val raw = decodeSampled(bytes, sample)
+        var drawn: Bitmap? = null
+        var orientedW = 0
+        var orientedH = 0
+        try {
+            val exif = exifOrientationTransform(source.orientation, raw.width, raw.height)
+            orientedW = exif.outputWidth
+            orientedH = exif.outputHeight
+            val target = Bitmap.createBitmap(cellW, cellH, Bitmap.Config.ARGB_8888)
+            drawn = target
+            val canvas = Canvas(target)
+            if (maskBitmap == null || background == null) canvas.drawColor(Color.WHITE)
+            drawPlacement(canvas, raw, exif, placement, cellW, cellH)
+        } catch (t: Throwable) {
+            drawn?.let { recycle(it) }
+            throw t
+        } finally {
+            recycle(raw)
+        }
+        val cell = checkNotNull(drawn)
+        if (maskBitmap == null || background == null) return cell
+        try {
+            // The mask is in oriented space (no EXIF), stretched x and y to the sampled oriented
+            // size, then placed with the very matrix the source used.
+            val maskMatrix = mapRectMatrix(
+                0f,
+                0f,
+                maskBitmap.width.toFloat(),
+                maskBitmap.height.toFloat(),
+                Rect(0, 0, orientedW, orientedH),
+            )
+            placementMatrix(orientedW, orientedH, placement, cellW, cellH, maskMatrix)
+            compositeThroughMask(cell, maskBitmap, maskMatrix, background, featherPx)
+            return cell
+        } catch (t: Throwable) {
+            recycle(cell)
+            throw t
+        }
+    }
+
+    /**
+     * Draws [maskBitmap] through [maskMatrix] onto black at [target]'s size, turns its luma into
+     * α, feathers α by [featherPx] in [target] px and composites [target] over [background] in
+     * place. [maskBitmap] is recycled once drawn.
+     */
+    private fun compositeThroughMask(
+        target: Bitmap,
+        maskBitmap: Bitmap,
+        maskMatrix: Matrix,
+        background: Int,
+        featherPx: Int,
+    ) {
+        val w = target.width
+        val h = target.height
+        val pixels = IntArray(w * h)
+        val maskLayer = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        try {
+            val canvas = Canvas(maskLayer)
+            canvas.drawColor(Color.BLACK)
+            canvas.drawBitmap(maskBitmap, maskMatrix, bitmapPaint())
+            maskLayer.getPixels(pixels, 0, w, 0, 0, w, h)
+        } finally {
+            recycle(maskLayer)
+        }
+        recycle(maskBitmap)
+        val alpha = ByteArray(w * h) { i -> idMaskLumaToAlpha(idMaskLuma(pixels[i])).toByte() }
+        val feathered = featherAlpha(alpha, w, h, featherPx)
+        target.getPixels(pixels, 0, w, 0, 0, w, h)
+        compositeIdPixels(pixels, feathered, background)
+        target.setPixels(pixels, 0, w, 0, 0, w, h)
+    }
+
+    /**
+     * White landscape sheet: cut lines first (they sit outside every slot), then [cell] copied
+     * into each slot at whole-px offsets, so slots never spill. [cell] is recycled before the
+     * optional printer turn.
+     */
+    private fun assembleIdSheet(cell: Bitmap, layout: IdPhotoLayout, sheetForPrinter: Boolean): Bitmap {
+        val sheet = try {
+            Bitmap.createBitmap(layout.sheetWidth, layout.sheetHeight, Bitmap.Config.ARGB_8888)
+        } catch (t: Throwable) {
+            recycle(cell)
+            throw t
+        }
+        var handedOff = false
+        try {
+            try {
+                val canvas = Canvas(sheet)
+                canvas.drawColor(Color.WHITE)
+                val linePaint = Paint().apply {
+                    color = ID_CUT_LINE_COLOR
+                    style = Paint.Style.FILL
+                    isAntiAlias = false
+                }
+                for (line in layout.cutLines) {
+                    canvas.drawRect(
+                        line.left.toFloat(),
+                        line.top.toFloat(),
+                        line.right.toFloat(),
+                        line.bottom.toFloat(),
+                        linePaint,
+                    )
+                }
+                val turn = Matrix()
+                for (slot in layout.slots) {
+                    if (layout.rotated) {
+                        // Counter-clockwise: the cell's top lands on the slot's left edge, so the
+                        // clockwise printer turn brings every head upright.
+                        turn.reset()
+                        turn.postRotate(-90f)
+                        turn.postTranslate(slot.left.toFloat(), (slot.top + layout.cellWidth).toFloat())
+                        canvas.drawBitmap(cell, turn, null)
+                    } else {
+                        canvas.drawBitmap(cell, slot.left.toFloat(), slot.top.toFloat(), null)
+                    }
+                }
+            } finally {
+                recycle(cell)
+            }
+            val result = finishSheet(
+                sheet,
+                landscape = true,
+                ontoPortraitSheet = sheetForPrinter,
+                watermark = null,
+                photo = null,
+                context = null,
+            )
+            handedOff = true
+            return result
+        } finally {
+            if (!handedOff) recycle(sheet)
+        }
+    }
+
+    /** Rec. 601 luma of an unpremultiplied ARGB pixel, flattened over black. */
+    private fun idMaskLuma(argb: Int): Int {
+        val a = (argb ushr 24) and 0xFF
+        val r = (argb shr 16) and 0xFF
+        val g = (argb shr 8) and 0xFF
+        val b = argb and 0xFF
+        val y = (299 * r + 587 * g + 114 * b + 500) / 1000
+        return if (a == 255) y else (y * a + 127) / 255
+    }
+
     private fun sourceCut(
         framedCrop: PixelCrop,
         framed: OrientedSize,
@@ -474,21 +971,37 @@ object ImagePipeline {
         destW: Int,
         destH: Int,
     ) {
-        val orientedW = exif.outputWidth
-        val orientedH = exif.outputHeight
+        val matrix = Matrix()
+        matrix.setValues(exif.matrixValues())
+        placementMatrix(exif.outputWidth, exif.outputHeight, placement, destW, destH, matrix)
+        canvas.drawBitmap(source, matrix, bitmapPaint())
+    }
+
+    /**
+     * Oriented space → [destW]×[destH] for [placement], post-applied to [matrix] (identity by
+     * default) one step at a time, so [drawPlacement] performs the same operations in the same
+     * order as before. Cover uses [orientedW]×[orientedH]; pan is rescaled from the placement's
+     * frame to dest px.
+     */
+    private fun placementMatrix(
+        orientedW: Int,
+        orientedH: Int,
+        placement: ViewportPlacement,
+        destW: Int,
+        destH: Int,
+        matrix: Matrix = Matrix(),
+    ): Matrix {
         val cover = coverScale(destW.toFloat(), destH.toFloat(), orientedW, orientedH)
         val scale = cover * clampZoom(placement.zoom)
         val frameW = placement.frameWidth.takeIf { it > 0f } ?: destW.toFloat()
         val frameH = placement.frameHeight.takeIf { it > 0f } ?: destH.toFloat()
         val panX = placement.offsetX * destW / frameW
         val panY = placement.offsetY * destH / frameH
-        val matrix = Matrix()
-        matrix.setValues(exif.matrixValues())
         matrix.postTranslate(-orientedW / 2f, -orientedH / 2f)
         matrix.postScale(scale, scale)
         matrix.postRotate(placement.rotationDegrees)
         matrix.postTranslate(destW / 2f + panX, destH / 2f + panY)
-        canvas.drawBitmap(source, matrix, bitmapPaint())
+        return matrix
     }
 
     private fun rotateBitmap(source: Bitmap, quarterTurns: Int): Bitmap {
@@ -599,10 +1112,8 @@ object ImagePipeline {
     }
 
     private fun uploadSize(oriented: OrientedSize): Pair<Int, Int> {
-        val longEdge = maxOf(oriented.width, oriented.height)
-        val scale = if (longEdge <= 0) 1f else minOf(1f, AI_UPLOAD_MAX_EDGE.toFloat() / longEdge)
-        return (oriented.width * scale).toInt().coerceAtLeast(1) to
-            (oriented.height * scale).toInt().coerceAtLeast(1)
+        val size = aiUploadSize(oriented.width, oriented.height)
+        return size.width to size.height
     }
 
     /**
