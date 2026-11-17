@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -138,11 +139,19 @@ class AiJobs @Inject constructor(
             startedAt = System.currentTimeMillis(),
             error = null,
         )
-        while (true) {
-            val current = _jobs.value
-            if (current.any { it.sourcePhotoId == photoId }) return null
-            if (_jobs.compareAndSet(current, current + row)) break
+        // Every writer of _jobs mutates through MutableStateFlow.update, so this gate and the
+        // append are one atomic step and no concurrent tick can drop the new row.
+        var added = false
+        _jobs.update { current ->
+            if (current.any { it.sourcePhotoId == photoId }) {
+                added = false
+                current
+            } else {
+                added = true
+                current + row
+            }
         }
+        if (!added) return null
         val tracker = JobProgressTracker(id, JobKind.Ai, aiPhases(stats), stats)
         tracker.startPhase("preparing")
         publish(id, tracker)
@@ -176,7 +185,7 @@ class AiJobs @Inject constructor(
                 }
             } catch (e: CancellationException) {
                 if (!committed) {
-                    _jobs.value = _jobs.value.filter { it.id != id }
+                    _jobs.update { list -> list.filter { it.id != id } }
                     _events.tryEmit(StudioJobEvent.Failed(photoId, AiKind.Mask.action, ""))
                 }
             } catch (e: Exception) {
@@ -188,7 +197,7 @@ class AiJobs @Inject constructor(
                 ticker.cancel()
                 withContext(NonCancellable) {
                     delay(KEEP_MS)
-                    _jobs.value = _jobs.value.filter { it.id != id }
+                    _jobs.update { list -> list.filter { it.id != id } }
                     handles.remove(id)
                 }
             }
@@ -219,7 +228,7 @@ class AiJobs @Inject constructor(
         val id = UUID.randomUUID().toString()
         val targetPhotoId = if (kind == AiKind.Generate) UUID.randomUUID().toString() else photoId
         val startedAt = System.currentTimeMillis()
-        _jobs.value = _jobs.value + AiJob(
+        val row = AiJob(
             id = id,
             kind = kind,
             sourcePhotoId = photoId,
@@ -232,6 +241,7 @@ class AiJobs @Inject constructor(
             startedAt = startedAt,
             error = null,
         )
+        _jobs.update { it + row }
         val tracker = JobProgressTracker(id, JobKind.Ai, aiPhases(stats), stats)
         tracker.startPhase("preparing")
         publish(id, tracker)
@@ -296,7 +306,7 @@ class AiJobs @Inject constructor(
                     AiKind.Mask -> error("mask jobs use enqueueMask")
                 }
             } catch (e: CancellationException) {
-                _jobs.value = _jobs.value.filter { it.id != id }
+                _jobs.update { list -> list.filter { it.id != id } }
                 _events.tryEmit(StudioJobEvent.Failed(photoId, kind.action, ""))
             } catch (e: Exception) {
                 val message = e.message ?: e.toString()
@@ -307,7 +317,7 @@ class AiJobs @Inject constructor(
                 ticker.cancel()
                 withContext(NonCancellable) {
                     delay(KEEP_MS)
-                    _jobs.value = _jobs.value.filter { it.id != id }
+                    _jobs.update { list -> list.filter { it.id != id } }
                     handles.remove(id)
                 }
             }
@@ -329,7 +339,7 @@ class AiJobs @Inject constructor(
     }
 
     private fun update(id: String, transform: (AiJob) -> AiJob) {
-        _jobs.value = _jobs.value.map { if (it.id == id) transform(it) else it }
+        _jobs.update { list -> list.map { if (it.id == id) transform(it) else it } }
     }
 
     private val AiKind.purpose: String

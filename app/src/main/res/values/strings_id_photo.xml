@@ -31,6 +31,7 @@
     <string name="studio_id_cutout">AI cut out person</string>
     <string name="studio_id_recut">Cut out again</string>
     <string name="studio_id_cutting">Cutting out…</string>
+    <string name="studio_id_cutting_other">Cutting out another version (%1$s)…</string>
     <string name="studio_id_mask_ready">Cut-out ready</string>
     <string name="studio_id_background">Background</string>
     <string name="studio_id_need_mask">Cut out the person first to change the background.</string>

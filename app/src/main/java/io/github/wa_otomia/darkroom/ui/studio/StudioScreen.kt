@@ -88,6 +88,7 @@ import io.github.wa_otomia.darkroom.core.PhotoMeta
 import io.github.wa_otomia.darkroom.core.SNAP_POSITION_DP
 import io.github.wa_otomia.darkroom.core.defaultLandscape
 import io.github.wa_otomia.darkroom.core.editsInCreationOrder
+import io.github.wa_otomia.darkroom.core.framingVersionKey
 import io.github.wa_otomia.darkroom.core.isConfigured
 import io.github.wa_otomia.darkroom.core.exactQuarterTurns
 import io.github.wa_otomia.darkroom.core.forPreset
@@ -222,11 +223,17 @@ fun StudioScreen(
     var idPanY by rememberSaveable(photoId, source) { mutableStateOf(0f) }
     var idRotation by rememberSaveable(photoId, source) { mutableStateOf(0f) }
     // A tapped background / feather until the row catches up: the catalog write re-renders the
-    // gallery thumb before the row changes, and the preview must follow the tap at once.
-    var idBgPending by remember(photoId, source) { mutableStateOf<String?>(null) }
-    var idFeatherPending by remember(photoId, source) { mutableStateOf<String?>(null) }
-    // Mask job failure for the ID section; already sanitized by AiJobs.
+    // gallery thumb before the row changes, and the preview must follow the tap at once. Kept
+    // until every write started by a tap has completed (PendingIdChoice), never cleared because
+    // an older row value happens to equal the latest tap.
+    var idBgPending by remember(photoId, source) { mutableStateOf(PendingIdChoice()) }
+    var idFeatherPending by remember(photoId, source) { mutableStateOf(PendingIdChoice()) }
+    // Mask job failure for the ID section; already sanitized by AiJobs. Recorded with the version
+    // (framing version key) it belongs to and shown only on that version.
     var maskError by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
+    var maskErrorVersion by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
+    // Version the last cut-out was started on, for a failure whose job row is already gone.
+    var maskCutVersion by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
     var useCurrentFraming by rememberSaveable { mutableStateOf(true) }
     var prompt by rememberSaveable(photoId) { mutableStateOf("") }
     var extraPromptOpen by rememberSaveable(photoId) { mutableStateOf(false) }
@@ -344,7 +351,10 @@ fun StudioScreen(
                     launch { snackbar.showSnackbar(editDoneText) }
                 }
                 is StudioJobEvent.MaskReady -> {
-                    maskError = null
+                    if (maskErrorVersion == framingVersionKey(e.source)) {
+                        maskError = null
+                        maskErrorVersion = null
+                    }
                     launch { snackbar.showSnackbar(maskReadyText) }
                 }
                 is StudioJobEvent.Failed -> {
@@ -353,7 +363,12 @@ fun StudioScreen(
                         if (e.message.isNullOrBlank()) {
                             launch { snackbar.showSnackbar(aiCancelledText) }
                         } else {
+                            // The failed row stays listed for a moment and names its version.
+                            val failedVersion = aiJobs.jobs.value.find {
+                                it.sourcePhotoId == photoId && it.kind == AiKind.Mask
+                            }?.source ?: maskCutVersion
                             maskError = e.message
+                            maskErrorVersion = failedVersion?.let { framingVersionKey(it) }
                         }
                     } else if (e.action != "print") {
                         if (e.message.isNullOrBlank()) {
@@ -435,7 +450,10 @@ fun StudioScreen(
 
     LaunchedEffect(photoId, source) {
         framingReady = false
-        val stored = catalog.get(photoId)
+        // Waits for this screen's own fire-and-forget saves (leave, rotate, version switch) and
+        // reads under the row lock, so a save still on its way is never loaded as older state and
+        // then written back over itself by the debounced save.
+        val stored = catalog.getSettled(photoId)
         val saved = stored?.framingFor(source) ?: photo.framingFor(source)
         val savedId = stored?.idPhotoFor(source) ?: photo.idPhotoFor(source)
         restoreFraming = saved
@@ -566,8 +584,8 @@ fun StudioScreen(
     val idLayout = remember(idPreset) { idPhotoLayout(idPreset) }
     val idStored = photo.idPhotoFor(source)
     val idHasMask = idStored?.hasMask == true
-    val idBg = idBackground(idBgPending ?: idStored?.background)
-    val idFeatherChoice = idFeather(idFeatherPending ?: idStored?.feather)
+    val idBg = idBackground(idBgPending.value ?: idStored?.background)
+    val idFeatherChoice = idFeather(idFeatherPending.value ?: idStored?.feather)
     // Backstop for the load above: a first entry written by a composition that is already gone
     // (left and reopened at once) can land after the load found nothing. Adopt it when it shows,
     // so the screen never shows ordinary framing while the row (and so a print) has ID mode on.
@@ -583,10 +601,10 @@ fun StudioScreen(
         idRotation = late.rotation
     }
     LaunchedEffect(idStored?.background, idBgPending) {
-        if (idBgPending != null && idBgPending == idStored?.background) idBgPending = null
+        idBgPending = idBgPending.settle(idStored?.background)
     }
     LaunchedEffect(idStored?.feather, idFeatherPending) {
-        if (idFeatherPending != null && idFeatherPending == idStored?.feather) idFeatherPending = null
+        idFeatherPending = idFeatherPending.settle(idStored?.feather)
     }
     val setIdPose: (IdPhotoPose) -> Unit = { p ->
         idZoom = p.zoom
@@ -625,40 +643,53 @@ fun StudioScreen(
         catalog.persistIdPhotoPose(photo.id, source, idActive, idPresetId, reset)
     }
     val onCutOut: () -> Unit = {
+        val version = framingVersionKey(source)
         maskError = null
+        maskErrorVersion = null
+        maskCutVersion = version
         try {
             aiJobs.enqueueMask(photo.id, source)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             maskError = e.message ?: e.toString()
+            maskErrorVersion = version
         }
     }
     // Written at once, not with the pose debounce (D2). A tap must land even if Studio closes
-    // right after it; a failure drops the optimistic choice and reports.
-    val writeIdChoice: (suspend () -> Unit, () -> Unit) -> Unit = { write, onFailure ->
+    // right after it; a failure of the latest tap drops the optimistic choice and reports.
+    val writeIdChoice: (suspend () -> Unit, (Boolean) -> Unit) -> Unit = { write, onDone ->
         scope.launch {
+            var ok = false
             try {
                 withContext(NonCancellable) { write() }
+                ok = true
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                onFailure()
                 genError = e.message ?: e.toString()
+            } finally {
+                onDone(ok)
             }
         }
     }
     val onIdBackground: (IdBackground) -> Unit = { bg ->
         val id = photo.id
         val src = source
-        idBgPending = bg.id
-        writeIdChoice({ catalog.setIdPhotoBackground(id, src, bg.id) }, { idBgPending = null })
+        idBgPending = idBgPending.begin(bg.id)
+        val token = idBgPending.seq
+        writeIdChoice({ catalog.setIdPhotoBackground(id, src, bg.id) }) { ok ->
+            idBgPending = idBgPending.finish(token, ok)
+        }
     }
     val onIdFeather: (IdFeather) -> Unit = { f ->
         val id = photo.id
         val src = source
-        idFeatherPending = f.id
-        writeIdChoice({ catalog.setIdPhotoFeather(id, src, f.id) }, { idFeatherPending = null })
+        idFeatherPending = idFeatherPending.begin(f.id)
+        val token = idFeatherPending.seq
+        writeIdChoice({ catalog.setIdPhotoFeather(id, src, f.id) }) { ok ->
+            idFeatherPending = idFeatherPending.finish(token, ok)
+        }
     }
 
     val appliedAiFraming: AppliedFraming? =
@@ -815,6 +846,31 @@ fun StudioScreen(
         .orEmpty()
     val maskBytes = localizedByteProgress(maskJob?.loaded, maskJob?.total).ifEmpty { null }
     val maskUi = maskJob?.let { it.progress?.toUi(maskPhaseLabel, maskBytes) ?: indeterminateUi(maskPhaseLabel, maskBytes) }
+    // The progress row and Cancel belong to the version the job started on; another version's
+    // section names that version instead (one mask job per photo keeps the button gated).
+    val currentVersionKey = framingVersionKey(source)
+    val maskJobHere = maskJob?.takeIf { it.source == currentVersionKey }
+    val maskJobElsewhereLabel = maskJob?.takeIf { it.source != currentVersionKey }?.let { job ->
+        if (job.source == framingVersionKey("original")) {
+            stringResource(R.string.original)
+        } else {
+            val ordered = editsInCreationOrder(photo.edits)
+            val index = ordered.indexOfFirst { it.id == job.source }
+            val edit = ordered.getOrNull(index)
+            if (edit == null) {
+                versionFallback
+            } else {
+                versionLabel(
+                    index + 1,
+                    resolveEditPresetName(edit.presetTitle, edit.presetId, versionFallback) { id ->
+                        presets.presets.find { it.id == id }?.title
+                    },
+                    versionFallback,
+                )
+            }
+        }
+    }
+    val maskErrorHere = maskErrorFor(maskError, maskErrorVersion, currentVersionKey)
 
     val composePanel: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -955,10 +1011,11 @@ fun StudioScreen(
                     background = idBg,
                     feather = idFeatherChoice,
                     canCutOut = grokPub.keySet && !aiBusy,
-                    maskJob = maskJob?.let { job ->
+                    maskJob = maskJobHere?.let { job ->
                         IdMaskJobUi(maskUi ?: indeterminateUi(maskPhaseLabel)) { aiJobs.cancel(job.id) }
                     },
-                    maskError = maskError,
+                    maskJobElsewhere = maskJobElsewhereLabel,
+                    maskError = maskErrorHere,
                     onCutOut = onCutOut,
                     onOpenSettings = { onSettings("grok") },
                     onBackground = onIdBackground,

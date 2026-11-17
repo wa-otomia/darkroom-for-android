@@ -87,6 +87,9 @@ import io.github.wa_otomia.darkroom.ui.theme.Paper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.abs
@@ -426,20 +429,25 @@ private fun IdPhotoPose.sameAs(other: IdPhotoPose): Boolean =
 /** What [rememberIdPreviewCutout] has for the current inputs. */
 internal data class IdPreviewCutout(val bitmap: ImageBitmap?, val failed: Boolean)
 
-private data class CutoutKey(
-    val file: String,
-    val maskRev: String,
-    val argb: Int,
-    val feather: String,
-    val cellWidth: Int,
-    val cellHeight: Int,
-    val zoomStep: Int,
-)
+/** Last render request of one preview; plain (not snapshot) state, read only by the effect. */
+private class CutoutRequestMemo {
+    var lastRequested: CutoutKey? = null
+}
+
+/**
+ * One cut-out render at a time. The blocking decode and composite cannot be interrupted, and
+ * withContext returns only after its block has finished, so holding this lock across it makes a
+ * newer render wait for a cancelled one instead of running beside it.
+ */
+private val cutoutRenderLock = Mutex()
 
 /**
  * The orientation-corrected background swap for the preview (D7), built off the main thread by
  * [ImagePipeline.renderIdPreviewCutout] and cached per (source, mask revision, colour, feather,
- * zoom step). A zoom-only change is debounced; the last cut-out stays on screen meanwhile.
+ * zoom step). A zoom step change is debounced (also before the first cut-out is ready) and
+ * renders run one at a time; the last cut-out stays on screen meanwhile. A mask revision found
+ * missing or undecodable is not retried until the revision changes, and stays reported across
+ * zoom, feather and size changes.
  * Null bitmap while nothing matching is ready, or when the background is the original.
  * Nothing here is saved state: bitmaps never reach the saved-instance bundle.
  */
@@ -473,6 +481,7 @@ internal fun rememberIdPreviewCutout(
     }
     var held by remember(photoId, source) { mutableStateOf<Pair<CutoutKey, ImageBitmap>?>(null) }
     var failedKey by remember(photoId, source) { mutableStateOf<CutoutKey?>(null) }
+    val memo = remember(photoId, source) { CutoutRequestMemo() }
     LaunchedEffect(key, imageWidth, imageHeight) {
         if (key == null) {
             held = null
@@ -480,11 +489,10 @@ internal fun rememberIdPreviewCutout(
         }
         // The feather radius in source px needs the image size; wait for the probe.
         if (imageWidth <= 0 || imageHeight <= 0) return@LaunchedEffect
-        val previous = held?.first
-        if (previous == key) return@LaunchedEffect
-        if (previous != null && previous.copy(zoomStep = key.zoomStep) == key) {
-            delay(CUTOUT_ZOOM_DEBOUNCE_MS)
-        }
+        val start = cutoutStart(key, held?.first, memo.lastRequested, failedKey)
+        if (start == CutoutStart.Skip) return@LaunchedEffect
+        memo.lastRequested = key
+        if (start == CutoutStart.Debounced) delay(CUTOUT_ZOOM_DEBOUNCE_MS)
         val featherSourcePx = idFeatherSourcePx(
             feather.radiusPx(1),
             key.cellWidth,
@@ -494,14 +502,19 @@ internal fun rememberIdPreviewCutout(
             key.zoomStep * CUTOUT_ZOOM_STEP,
         )
         try {
-            val bitmap = withContext(Dispatchers.IO) {
-                val mask = catalog.readIdPhotoMask(photoId, source, key.maskRev) ?: error(ID_MASK_MSG_MISSING)
-                ImagePipeline.renderIdPreviewCutout(
-                    imageFile.readBytes(),
-                    mask,
-                    key.argb,
-                    featherSourcePx,
-                ).asImageBitmap()
+            val bitmap = cutoutRenderLock.withLock {
+                withContext(Dispatchers.IO) {
+                    val mask = catalog.readIdPhotoMask(photoId, source, key.maskRev) ?: error(ID_MASK_MSG_MISSING)
+                    ensureActive()
+                    val bytes = imageFile.readBytes()
+                    ensureActive()
+                    ImagePipeline.renderIdPreviewCutout(
+                        bytes,
+                        mask,
+                        key.argb,
+                        featherSourcePx,
+                    ).asImageBitmap()
+                }
             }
             held = key to bitmap
             failedKey = null
@@ -511,7 +524,8 @@ internal fun rememberIdPreviewCutout(
             // Only a missing or undecodable mask is reported as such (it also blocks print and
             // export). A source decode failure, an I/O error or running out of memory is a
             // transient preview failure: no note, and the held cut-out stays so the next
-            // zoom-only change is still debounced.
+            // zoom-only change is still debounced. A failed mask revision is remembered by
+            // (file, revision), so zoom, feather and size changes neither hide the note nor retry.
             if (e.message == ID_MASK_MSG_MISSING) {
                 held = null
                 failedKey = key
@@ -530,5 +544,6 @@ internal fun rememberIdPreviewCutout(
                 zoomStep = key.zoomStep,
             ) == key
     }
-    return IdPreviewCutout(bitmap = usable?.second, failed = key != null && failedKey == key)
+    val failed = key != null && failedKey?.sameMask(key) == true
+    return IdPreviewCutout(bitmap = usable?.second, failed = failed)
 }

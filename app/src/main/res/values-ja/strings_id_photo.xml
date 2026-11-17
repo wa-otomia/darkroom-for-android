@@ -30,6 +30,7 @@
     <string name="studio_id_cutout">AI で人物を切り抜く</string>
     <string name="studio_id_recut">もう一度切り抜く</string>
     <string name="studio_id_cutting">切り抜き中…</string>
+    <string name="studio_id_cutting_other">別のバージョン（%1$s）を切り抜き中…</string>
     <string name="studio_id_mask_ready">切り抜きが完了しました</string>
     <string name="studio_id_background">背景色</string>
     <string name="studio_id_need_mask">背景を変えるには、先に人物を切り抜いてください。</string>

@@ -41,6 +41,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,6 +54,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -83,6 +85,9 @@ class CatalogRepository @Inject constructor(
      * version deletion and photo deletion. Never held across a network call.
      */
     private val rowLock = Mutex()
+
+    /** Fire-and-forget Studio saves not yet finished; [getSettled] waits for them. */
+    private val pendingPersists: MutableSet<Job> = ConcurrentHashMap.newKeySet()
 
     /** Ids hidden from [photos] because a deletion is waiting for its undo window to close. */
     private val hiddenIds = MutableStateFlow<Set<String>>(emptySet())
@@ -166,6 +171,25 @@ class CatalogRepository @Inject constructor(
     }
 
     suspend fun get(id: String): PhotoMeta? = db.photoDao().get(id)?.toMeta()
+
+    /**
+     * [get] after every fire-and-forget save started so far ([persistFraming],
+     * [persistIdPhotoPose]) has finished, read under [rowLock]. Studio loads a version's state
+     * with it, so a save from a closing screen, a rotation or a version switch that is still
+     * rendering the gallery thumb is never read back as the older state.
+     */
+    suspend fun getSettled(id: String): PhotoMeta? {
+        pendingPersists.toList().joinAll()
+        return withContext(Dispatchers.IO) { rowLock.withLock { get(id) } }
+    }
+
+    /** Starts [block] on the repository scope and tracks it until it completes. */
+    private fun launchPersist(block: suspend () -> Unit) {
+        val job = scope.launch(start = CoroutineStart.LAZY) { block() }
+        pendingPersists += job
+        job.invokeOnCompletion { pendingPersists -= job }
+        job.start()
+    }
 
     /**
      * The row plus the bytes of [source]'s stored mask revision (null when it has none or the
@@ -303,7 +327,7 @@ class CatalogRepository @Inject constructor(
     }
 
     fun persistFraming(photoId: String, source: String, framing: Framing?) {
-        scope.launch { saveFraming(photoId, source, framing) }
+        launchPersist { saveFraming(photoId, source, framing) }
     }
 
     suspend fun saveFraming(photoId: String, source: String, framing: Framing?) = withContext(Dispatchers.IO) {
@@ -339,7 +363,7 @@ class CatalogRepository @Inject constructor(
 
     /** Fire-and-forget [saveIdPhotoPose] on the repository scope, so it outlives the caller. */
     fun persistIdPhotoPose(photoId: String, source: String, active: Boolean, presetId: String, pose: IdPhotoPose) {
-        scope.launch { saveIdPhotoPose(photoId, source, active, presetId, pose) }
+        launchPersist { saveIdPhotoPose(photoId, source, active, presetId, pose) }
     }
 
     suspend fun setIdPhotoBackground(photoId: String, source: String, background: String) {

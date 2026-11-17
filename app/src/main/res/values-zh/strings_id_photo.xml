@@ -30,6 +30,7 @@
     <string name="studio_id_cutout">AI 抠出人像</string>
     <string name="studio_id_recut">重新抠图</string>
     <string name="studio_id_cutting">正在抠图…</string>
+    <string name="studio_id_cutting_other">正在为另一版本（%1$s）抠图…</string>
     <string name="studio_id_mask_ready">抠图完成</string>
     <string name="studio_id_background">背景色</string>
     <string name="studio_id_need_mask">请先抠出人像，再更换背景。</string>

@@ -227,7 +227,7 @@ private fun IdPhotoSizeDropdown(
 // Process tab (EDID040)
 // ---------------------------------------------------------------------------------------------
 
-/** Mask job chrome shown inside the section; null when no mask job runs for this photo. */
+/** Mask job chrome shown inside the section; null when no mask job runs for this version. */
 internal data class IdMaskJobUi(val ui: ProgressUi, val onCancel: () -> Unit)
 
 /**
@@ -244,6 +244,7 @@ internal fun IdPhotoProcessSection(
     feather: IdFeather,
     canCutOut: Boolean,
     maskJob: IdMaskJobUi?,
+    maskJobElsewhere: String?,
     maskError: String?,
     onCutOut: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -297,11 +298,14 @@ internal fun IdPhotoProcessSection(
                 AmberTrack(ui = maskJob.ui, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
             }
         }
+        if (maskJobElsewhere != null) {
+            StudioNote(stringResource(R.string.studio_id_cutting_other, maskJobElsewhere), topPadding = 0)
+        }
         if (!maskError.isNullOrBlank()) {
             UserErrorMessage(maskError)
         }
 
-        val paletteEnabled = hasMask && maskJob == null
+        val paletteEnabled = hasMask && maskJob == null && maskJobElsewhere == null
         Column(Modifier.fillMaxWidth()) {
             SectionLabel(stringResource(R.string.studio_id_background))
             if (!hasMask) {
