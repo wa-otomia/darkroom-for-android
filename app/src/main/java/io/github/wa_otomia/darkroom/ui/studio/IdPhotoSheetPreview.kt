@@ -528,6 +528,9 @@ internal fun rememberIdPreviewCutout(
     LaunchedEffect(key, imageWidth, imageHeight) {
         if (key == null) {
             held = null
+            // A give-up only covers the key itself and zoom/size-only steps right after it; coming
+            // back from the original background composites afresh and freezes again (EDID040-R08).
+            gaveUpKey = null
             return@LaunchedEffect
         }
         // The feather radius in source px needs the image size; wait for the probe.
@@ -594,7 +597,8 @@ internal fun rememberIdPreviewCutout(
     val current = held
     // The held cut-out stays on screen while a newer one is computed (frozen unless only the
     // zoom step or cell size moved); another source file never borrows it.
-    val view = cutoutView(current?.first, key, failedKey, gaveUpKey)
+    // Without a known source size no render can start, so the controls are never frozen for it.
+    val view = cutoutView(current?.first, key, failedKey, gaveUpKey, sizeKnown = imageWidth > 0 && imageHeight > 0)
     val shown = current?.takeIf { view.showHeld }
     val failed = key != null && failedKey?.sameMask(key) == true
     return IdPreviewCutout(

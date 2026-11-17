@@ -101,19 +101,23 @@ internal data class CutoutView(val showHeld: Boolean, val frozen: Boolean)
  * cut-out lands, when this mask revision is known missing or undecodable ([failedMask]; the
  * source is shown with the missing-mask note) or when the bounded retries for [key] are used up
  * ([gaveUp], also after a later zoom-only change; the source is shown rather than an old colour).
+ * Without a known source size ([sizeKnown] false) no render can start, so nothing is frozen and
+ * the source is shown until the size arrives.
  */
 internal fun cutoutView(
     held: CutoutKey?,
     key: CutoutKey?,
     failedMask: CutoutKey?,
     gaveUp: CutoutKey?,
+    sizeKnown: Boolean = true,
 ): CutoutView {
     val shown = held?.takeIf { key != null && it.file == key.file }
     return when (cutoutTransition(shown, key)) {
         CutoutTransition.ORIGINAL -> CutoutView(showHeld = false, frozen = false)
         CutoutTransition.NONE, CutoutTransition.ZOOM_ONLY -> CutoutView(showHeld = true, frozen = false)
         CutoutTransition.FREEZE -> {
-            val settled = key != null && ((failedMask != null && failedMask.sameMask(key)) || gaveUpCovers(gaveUp, key))
+            val settled = !sizeKnown ||
+                key != null && ((failedMask != null && failedMask.sameMask(key)) || gaveUpCovers(gaveUp, key))
             CutoutView(showHeld = shown != null && !settled, frozen = !settled)
         }
     }

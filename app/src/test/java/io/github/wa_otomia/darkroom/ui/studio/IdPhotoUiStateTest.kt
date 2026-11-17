@@ -161,6 +161,18 @@ class IdPhotoUiStateTest {
     }
 
     @Test
+    fun unknownSourceSizeNeverFreezes() {
+        // No render can start without the source size (missing file, unreadable header, legacy 0x0
+        // row), so the source is shown and the controls stay live instead of freezing for good.
+        assertEquals(CutoutView(showHeld = false, frozen = false), cutoutView(null, navy10, null, null, sizeKnown = false))
+        val red = navy10.copy(argb = 0xFFFF0000.toInt())
+        assertEquals(CutoutView(showHeld = false, frozen = false), cutoutView(navy10, red, null, null, sizeKnown = false))
+        // A held cut-out of the same key, or a zoom-only step, is still shown.
+        assertEquals(CutoutView(showHeld = true, frozen = false), cutoutView(navy10, navy10, null, null, sizeKnown = false))
+        assertEquals(CutoutView(showHeld = true, frozen = false), cutoutView(navy10, navy10.copy(zoomStep = 14), null, null, sizeKnown = false))
+    }
+
+    @Test
     fun zoomOnlyNeverFreezes() {
         val view = cutoutView(navy10, navy10.copy(zoomStep = 14), null, null)
         assertTrue(view.showHeld)
