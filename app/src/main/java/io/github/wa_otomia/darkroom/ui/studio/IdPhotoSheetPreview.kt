@@ -176,8 +176,9 @@ internal fun IdPhotoSheetPreview(
     }
     // One painter for every slot: Coil 2 does not merge identical in-flight requests, so a
     // per-slot AsyncImage decodes the source once per slot on a cold cache. Not created while
-    // the cut-out stands in, so the source is not decoded for nothing.
-    val sourcePainter = if (cutout == null) {
+    // the cut-out stands in, so the source is not decoded for nothing, nor before the oriented
+    // size is known (same gate as AspectCropper), so the request never uses the fallback box.
+    val sourcePainter = if (cutout == null && imageWidth > 0 && imageHeight > 0) {
         rememberAsyncImagePainter(
             model = request,
             onState = { state ->

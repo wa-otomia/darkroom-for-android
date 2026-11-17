@@ -227,8 +227,45 @@ private fun IdPhotoSizeDropdown(
 // Process tab (EDID040)
 // ---------------------------------------------------------------------------------------------
 
-/** Mask job chrome shown inside the section; null when no mask job runs for this version. */
+/** Mask job chrome (progress and Cancel); null when no mask job runs for this photo. */
 internal data class IdMaskJobUi(val ui: ProgressUi, val onCancel: () -> Unit)
+
+/**
+ * The running mask job's status, progress track and Cancel (EDID040-R06). [elsewhere] names the
+ * version the job runs on when that is not the one on screen.
+ */
+@Composable
+internal fun IdMaskJobRow(job: IdMaskJobUi, elsewhere: String?) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (elsewhere != null) {
+                        stringResource(R.string.studio_id_cutting_other, elsewhere)
+                    } else {
+                        stringResource(R.string.studio_id_cutting)
+                    },
+                    color = Paper,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                )
+                Text(
+                    listOfNotNull(job.ui.phaseLabel.ifBlank { null }, job.ui.detail)
+                        .joinToString(" · "),
+                    color = PaperDim,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                )
+            }
+            GhostButton(
+                stringResource(R.string.common_cancel),
+                fillMaxWidth = false,
+                onClick = job.onCancel,
+            )
+        }
+        AmberTrack(ui = job.ui, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+    }
+}
 
 /**
  * Replaces the AI generate block in ID mode: what the AI does, the cut-out button and its gate,
@@ -272,40 +309,13 @@ internal fun IdPhotoProcessSection(
             onClick = onCutOut,
         )
         if (maskJob != null) {
-            Column(Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            stringResource(R.string.studio_id_cutting),
-                            color = Paper,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                        )
-                        Text(
-                            listOfNotNull(maskJob.ui.phaseLabel.ifBlank { null }, maskJob.ui.detail)
-                                .joinToString(" · "),
-                            color = PaperDim,
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp,
-                        )
-                    }
-                    GhostButton(
-                        stringResource(R.string.common_cancel),
-                        fillMaxWidth = false,
-                        onClick = maskJob.onCancel,
-                    )
-                }
-                AmberTrack(ui = maskJob.ui, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
-            }
-        }
-        if (maskJobElsewhere != null) {
-            StudioNote(stringResource(R.string.studio_id_cutting_other, maskJobElsewhere), topPadding = 0)
+            IdMaskJobRow(maskJob, maskJobElsewhere)
         }
         if (!maskError.isNullOrBlank()) {
             UserErrorMessage(maskError)
         }
 
-        val paletteEnabled = hasMask && maskJob == null && maskJobElsewhere == null
+        val paletteEnabled = hasMask && maskJob == null
         Column(Modifier.fillMaxWidth()) {
             SectionLabel(stringResource(R.string.studio_id_background))
             if (!hasMask) {

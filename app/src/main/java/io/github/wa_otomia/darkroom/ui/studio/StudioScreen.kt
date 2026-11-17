@@ -868,10 +868,12 @@ fun StudioScreen(
         .orEmpty()
     val maskBytes = localizedByteProgress(maskJob?.loaded, maskJob?.total).ifEmpty { null }
     val maskUi = maskJob?.let { it.progress?.toUi(maskPhaseLabel, maskBytes) ?: indeterminateUi(maskPhaseLabel, maskBytes) }
-    // The progress row and Cancel belong to the version the job started on; another version's
-    // section names that version instead (one mask job per photo keeps the button gated).
+    // Progress and Cancel show on every version and outside ID mode too, since the job gates
+    // Generate and deletes everywhere (EDID040-R06); another version's job is named by label.
     val currentVersionKey = framingVersionKey(source)
-    val maskJobHere = maskJob?.takeIf { it.source == currentVersionKey }
+    val maskJobUi = maskJob?.let { job ->
+        IdMaskJobUi(maskUi ?: indeterminateUi(maskPhaseLabel)) { aiJobs.cancel(job.id) }
+    }
     val maskJobElsewhereLabel = maskJob?.takeIf { it.source != currentVersionKey }?.let { job ->
         if (job.source == framingVersionKey("original")) {
             stringResource(R.string.original)
@@ -1033,9 +1035,7 @@ fun StudioScreen(
                     background = idBg,
                     feather = idFeatherChoice,
                     canCutOut = grokPub.keySet && !aiBusy,
-                    maskJob = maskJobHere?.let { job ->
-                        IdMaskJobUi(maskUi ?: indeterminateUi(maskPhaseLabel)) { aiJobs.cancel(job.id) }
-                    },
+                    maskJob = maskJobUi,
                     maskJobElsewhere = maskJobElsewhereLabel,
                     maskError = maskErrorHere,
                     onCutOut = onCutOut,
@@ -1044,6 +1044,9 @@ fun StudioScreen(
                     onFeather = onIdFeather,
                 )
             } else {
+                if (maskJobUi != null) {
+                    IdMaskJobRow(maskJobUi, maskJobElsewhereLabel)
+                }
                 Column {
                     SectionLabel(stringResource(R.string.grok_title))
                     if (!grokPub.keySet) {
