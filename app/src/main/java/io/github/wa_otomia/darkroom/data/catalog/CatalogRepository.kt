@@ -18,7 +18,9 @@ import io.github.wa_otomia.darkroom.core.framingVersionKey
 import io.github.wa_otomia.darkroom.core.idBackground
 import io.github.wa_otomia.darkroom.core.idFeather
 import io.github.wa_otomia.darkroom.core.idMaskRequired
+import io.github.wa_otomia.darkroom.core.hasVersion
 import io.github.wa_otomia.darkroom.core.idPhotoFor
+import io.github.wa_otomia.darkroom.core.orphanIdMaskFailureDirs
 import io.github.wa_otomia.darkroom.core.mergeIdPhotoPose
 import io.github.wa_otomia.darkroom.core.withIdPhoto
 import io.github.wa_otomia.darkroom.core.galleryThumbSource
@@ -165,10 +167,21 @@ class CatalogRepository @Inject constructor(
 
     private fun idMaskFailureDir(photoId: String) = File(File(context.cacheDir, "idmask-failed"), photoId)
 
-    /** Keeps [bytes] as the version's failed mask reply: temp file plus rename. */
-    fun saveIdMaskFailure(photoId: String, source: String, bytes: ByteArray) {
-        writeAtomically(idMaskFailureFile(photoId, source), bytes)
-    }
+    /**
+     * Keeps [bytes] as the version's failed mask reply: temp file plus rename. Under [rowLock] and
+     * only while the photo and the version still exist, so a reply that arrives after a delete
+     * ([deleteNow], [deleteEdit]) never recreates the folder (EDID040-R09). Returns whether it
+     * was kept.
+     */
+    suspend fun saveIdMaskFailure(photoId: String, source: String, bytes: ByteArray): Boolean =
+        withContext(Dispatchers.IO) {
+            rowLock.withLock {
+                val current = get(photoId) ?: return@withLock false
+                if (!current.hasVersion(source)) return@withLock false
+                writeAtomically(idMaskFailureFile(photoId, source), bytes)
+                true
+            }
+        }
 
     fun clearIdMaskFailure(photoId: String, source: String) {
         idMaskFailureFile(photoId, source).delete()
@@ -427,7 +440,7 @@ class CatalogRepository @Inject constructor(
         rowLock.withLock {
             val current = get(photoId) ?: return@withLock false
             val key = framingVersionKey(source)
-            if (key != ORIGINAL_VERSION_ID && current.edits.none { it.id == key }) return@withLock false
+            if (!current.hasVersion(key)) return@withLock false
             val rev = UUID.randomUUID().toString().replace("-", "").take(MASK_REV_LENGTH)
             val file = idPhotoMaskFile(photoId, key, rev)
             writeAtomically(file, png)
@@ -674,7 +687,10 @@ class CatalogRepository @Inject constructor(
      */
     suspend fun pruneOrphans(): Int = withContext(Dispatchers.IO) {
         val dirs = library.listFiles()?.filter { it.isDirectory }.orEmpty()
-        if (dirs.isEmpty()) return@withContext 0
+        // Listed before the rows are read: a failed reply is only kept while its row exists.
+        val failedRoot = File(context.cacheDir, "idmask-failed")
+        val failedDirs = failedRoot.listFiles()?.filter { it.isDirectory }.orEmpty()
+        if (dirs.isEmpty() && failedDirs.isEmpty()) return@withContext 0
         val known = db.photoDao().list().mapTo(HashSet()) { it.id }
         val cutoff = System.currentTimeMillis() - ORPHAN_MIN_AGE_MS
         var removed = 0
@@ -682,6 +698,10 @@ class CatalogRepository @Inject constructor(
             if (dir.name in known) continue
             if (dir.lastModified() > cutoff) continue
             if (dir.deleteRecursively()) removed++
+        }
+        // Failed mask replies of deleted photos (EDID040-R09).
+        for (name in orphanIdMaskFailureDirs(failedDirs.map { it.name }, known)) {
+            if (File(failedRoot, name).deleteRecursively()) removed++
         }
         if (removed > 0) activityLog.record("catalog", "prune $removed orphan folders")
         removed

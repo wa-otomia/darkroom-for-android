@@ -291,4 +291,19 @@ class IdPhotoStateCodecTest {
         assertEquals(idOriginal.feather, merged.feather)
         assertEquals(idOriginal.maskRev, merged.maskRev)
     }
+
+    @Test
+    fun hasVersionCoversOriginalAndExistingEditsOnly() {
+        val withEdit = photo().copy(edits = listOf(EditRecord("e1", "p", "c", "e1.jpg")))
+        assertTrue(withEdit.hasVersion(ORIGINAL_VERSION_ID))
+        assertTrue(withEdit.hasVersion("e1"))
+        assertFalse(withEdit.hasVersion("e2"))
+        assertFalse(photo().hasVersion("e1"))
+    }
+
+    @Test
+    fun orphanFailureDirsAreThoseWithoutARow() {
+        assertEquals(listOf("gone"), orphanIdMaskFailureDirs(listOf("p", "gone"), setOf("p", "q")))
+        assertEquals(emptyList<String>(), orphanIdMaskFailureDirs(emptyList(), setOf("p")))
+    }
 }

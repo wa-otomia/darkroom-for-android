@@ -81,6 +81,17 @@ internal fun cutoutTransition(prev: CutoutKey?, next: CutoutKey?): CutoutTransit
     else -> CutoutTransition.FREEZE
 }
 
+/**
+ * Whether the bounded retries given up for [gaveUp] still settle [key]: the same key, or one that
+ * differs only in zoom step or cell size, so a pinch or size change after a give-up never brings
+ * the freeze back (EDID040-R08).
+ */
+internal fun gaveUpCovers(gaveUp: CutoutKey?, key: CutoutKey?): Boolean {
+    if (gaveUp == null || key == null) return false
+    val transition = cutoutTransition(gaveUp, key)
+    return transition == CutoutTransition.NONE || transition == CutoutTransition.ZOOM_ONLY
+}
+
 /** What the preview shows: the held cut-out or the source, and whether the controls are frozen. */
 internal data class CutoutView(val showHeld: Boolean, val frozen: Boolean)
 
@@ -89,7 +100,7 @@ internal data class CutoutView(val showHeld: Boolean, val frozen: Boolean)
  * EDID040-R08). A held cut-out of another source file is never shown. A freeze ends when the new
  * cut-out lands, when this mask revision is known missing or undecodable ([failedMask]; the
  * source is shown with the missing-mask note) or when the bounded retries for [key] are used up
- * ([gaveUp]; the source is shown rather than an old colour).
+ * ([gaveUp], also after a later zoom-only change; the source is shown rather than an old colour).
  */
 internal fun cutoutView(
     held: CutoutKey?,
@@ -102,7 +113,7 @@ internal fun cutoutView(
         CutoutTransition.ORIGINAL -> CutoutView(showHeld = false, frozen = false)
         CutoutTransition.NONE, CutoutTransition.ZOOM_ONLY -> CutoutView(showHeld = true, frozen = false)
         CutoutTransition.FREEZE -> {
-            val settled = key != null && ((failedMask != null && failedMask.sameMask(key)) || gaveUp == key)
+            val settled = key != null && ((failedMask != null && failedMask.sameMask(key)) || gaveUpCovers(gaveUp, key))
             CutoutView(showHeld = shown != null && !settled, frozen = !settled)
         }
     }

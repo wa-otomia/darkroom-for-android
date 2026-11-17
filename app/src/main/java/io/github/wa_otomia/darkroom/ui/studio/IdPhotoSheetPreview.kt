@@ -535,7 +535,8 @@ internal fun rememberIdPreviewCutout(
         val start = cutoutStart(key, held?.first, memo.lastRequested, failedKey)
         if (start == CutoutStart.Skip) return@LaunchedEffect
         memo.lastRequested = key
-        gaveUpKey = null
+        // A zoom-only step after a give-up keeps it: the retry runs without freezing the controls.
+        if (!gaveUpCovers(gaveUpKey, key)) gaveUpKey = null
         if (start == CutoutStart.Debounced) delay(CUTOUT_ZOOM_DEBOUNCE_MS)
         val featherSourcePx = idFeatherSourcePx(
             feather.radiusPx(1),

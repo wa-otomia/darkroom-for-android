@@ -190,4 +190,24 @@ class IdPhotoUiStateTest {
         // Only for that key: the next change freezes again.
         assertTrue(cutoutView(navy10, white.copy(feather = "medium"), null, gaveUp = white).frozen)
     }
+
+    @Test
+    fun zoomOnlyChangeAfterGiveUpNeverRefreezes() {
+        val white = navy10.copy(argb = -1)
+        val pinched = white.copy(zoomStep = white.zoomStep + 1)
+        val resized = white.copy(cellWidth = white.cellWidth + 40, cellHeight = white.cellHeight + 60)
+        // A pinch or size preset after the give-up keeps the source on screen and the controls live.
+        assertEquals(CutoutView(showHeld = false, frozen = false), cutoutView(navy10, pinched, null, gaveUp = white))
+        assertEquals(CutoutView(showHeld = false, frozen = false), cutoutView(navy10, resized, null, gaveUp = white))
+        assertTrue(gaveUpCovers(white, pinched))
+        assertTrue(gaveUpCovers(white, white))
+        // Colour, feather, inward feather, mask or file changes are not covered.
+        assertFalse(gaveUpCovers(white, navy10))
+        assertFalse(gaveUpCovers(white, white.copy(feather = "medium")))
+        assertFalse(gaveUpCovers(white, white.copy(featherInward = !white.featherInward)))
+        assertFalse(gaveUpCovers(white, white.copy(maskRev = "other")))
+        assertFalse(gaveUpCovers(white, white.copy(file = "other.jpg")))
+        assertFalse(gaveUpCovers(null, white))
+        assertFalse(gaveUpCovers(white, null))
+    }
 }

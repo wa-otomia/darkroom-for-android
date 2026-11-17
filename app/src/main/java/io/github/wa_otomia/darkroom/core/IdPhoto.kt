@@ -423,6 +423,19 @@ data class IdPhotoState(
 
 fun PhotoMeta.idPhotoFor(source: String?): IdPhotoState? = idPhotos[framingVersionKey(source)]
 
+/** Whether the version [source] (the original or one of [PhotoMeta.edits]) still exists. */
+fun PhotoMeta.hasVersion(source: String?): Boolean {
+    val key = framingVersionKey(source)
+    return key == ORIGINAL_VERSION_ID || edits.any { it.id == key }
+}
+
+/**
+ * Names of `idmask-failed/<photoId>` folders whose photo has no catalog row: a reply kept for a
+ * photo that has since been deleted (EDID040-R09).
+ */
+fun orphanIdMaskFailureDirs(dirNames: Collection<String>, knownIds: Set<String>): List<String> =
+    dirNames.filter { it !in knownIds }
+
 /**
  * A version's ID state after a Studio save of its toggle, size and pose (EDID010-R03), or null to
  * keep [old] as stored. Background, feather and the mask revision stay as they are. Without a

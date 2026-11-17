@@ -800,10 +800,17 @@ fun StudioScreen(
 
     val startExport: () -> Unit = {
         if (!exporting) {
-            // EDEX010-R04: the live ID state with the row's background, feather and mask.
+            // EDEX010-R04: the live ID state with the on-screen background, feather and inward
+            // choice (pending taps included) and the row's mask.
             val idExport: IdPhotoState? = if (idActive) {
                 (idStored ?: IdPhotoState())
-                    .copy(active = true, presetId = idPresetId, background = idBg.id, feather = idFeatherChoice.id)
+                    .copy(
+                        active = true,
+                        presetId = idPresetId,
+                        background = idBg.id,
+                        feather = idFeatherChoice.id,
+                        featherInward = idFeatherInward,
+                    )
                     .withPose(idPose)
             } else {
                 null
