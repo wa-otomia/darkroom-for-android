@@ -2,6 +2,9 @@ package io.github.wa_otomia.darkroom.data.ai
 
 import android.util.Base64
 import io.github.wa_otomia.darkroom.core.AiProvider
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NEED_KEY
+import io.github.wa_otomia.darkroom.core.ID_PHOTO_MASK_PROMPT
+import io.github.wa_otomia.darkroom.core.ProviderSettings
 import io.github.wa_otomia.darkroom.core.buildGrokEditJson
 import io.github.wa_otomia.darkroom.core.imagesEditsUrl
 import io.github.wa_otomia.darkroom.core.imagineErrorMessage
@@ -12,6 +15,7 @@ import io.github.wa_otomia.darkroom.core.parseImageEditResponse
 import io.github.wa_otomia.darkroom.core.parseModelIds
 import io.github.wa_otomia.darkroom.core.sanitizeAiSecrets
 import io.github.wa_otomia.darkroom.data.imaging.ImagePipeline
+import io.github.wa_otomia.darkroom.data.imaging.ImagePipeline.IdMaskUpload
 import io.github.wa_otomia.darkroom.data.settings.ActivityLog
 import io.github.wa_otomia.darkroom.data.settings.SettingsRepository
 import io.github.wa_otomia.darkroom.di.ApplicationScope
@@ -72,6 +76,12 @@ data class AiProgress(
     val error: String? = null,
 )
 
+/**
+ * Raw matte bytes as returned by the provider, plus the upload they must be validated against
+ * (expected size, content area inside an OpenAI padding canvas). Not validated here.
+ */
+data class IdMaskResponse(val bytes: ByteArray, val upload: IdMaskUpload)
+
 @Singleton
 class AiImageClient @Inject constructor(
     private val settings: SettingsRepository,
@@ -131,6 +141,81 @@ class AiImageClient @Inject constructor(
         withContext(Dispatchers.IO) {
             val cfg = settings.readAi().activeSettings
             val provider = settings.readAi().active
+            execute(
+                cfg = cfg,
+                provider = provider,
+                photoId = photoId,
+                purpose = purpose,
+                missingKeyProgress = "未配置 AI 钥匙",
+                missingKeyMessage = "未配置 AI 钥匙。去设置页填入 API key 后再修图。",
+                onProgress = onProgress,
+            ) { onBytes ->
+                val upload = ImagePipeline.grokUploadJpeg(image)
+                when (provider) {
+                    AiProvider.GROK -> grokEditBody(cfg, prompt, upload, onBytes)
+                    AiProvider.OPENAI -> openAiEditBody(cfg, prompt, upload, onBytes)
+                }
+            }
+        }
+
+    /**
+     * Requests a person matte for the whole version image (AIPV030-R04). The settings are read
+     * once at execution time; the prompt is always [ID_PHOTO_MASK_PROMPT]. OpenAI only returns
+     * fixed sizes, so its upload is padded onto the closest supported canvas and the request asks
+     * for exactly that canvas as PNG. The caller validates the returned bytes against [IdMaskResponse.upload].
+     */
+    suspend fun mask(
+        image: ByteArray,
+        photoId: String,
+        onProgress: (AiProgress) -> Unit = {},
+    ): IdMaskResponse =
+        withContext(Dispatchers.IO) {
+            val ai = settings.readAi()
+            val cfg = ai.activeSettings
+            val provider = ai.active
+            var prepared: IdMaskUpload? = null
+            val bytes = execute(
+                cfg = cfg,
+                provider = provider,
+                photoId = photoId,
+                purpose = "mask",
+                missingKeyProgress = ID_MASK_MSG_NEED_KEY,
+                missingKeyMessage = ID_MASK_MSG_NEED_KEY,
+                onProgress = onProgress,
+            ) { onBytes ->
+                val upload = ImagePipeline.idMaskUpload(image, padToCanvas = provider == AiProvider.OPENAI)
+                prepared = upload
+                when (provider) {
+                    AiProvider.GROK -> grokEditBody(cfg, ID_PHOTO_MASK_PROMPT, upload.jpeg, onBytes)
+                    AiProvider.OPENAI -> openAiEditBody(
+                        cfg,
+                        ID_PHOTO_MASK_PROMPT,
+                        upload.jpeg,
+                        onBytes,
+                        size = "${upload.expectedWidth}x${upload.expectedHeight}",
+                        outputFormat = "png",
+                    )
+                }
+            }
+            IdMaskResponse(bytes, checkNotNull(prepared))
+        }
+
+    /**
+     * Shared transport for [edit] and [mask]: key check, activity log, request body built by
+     * [buildBody] (upload preparation included, so its failures are logged like request failures),
+     * upload/download progress, cancellation and sanitized failure logging.
+     */
+    private suspend fun execute(
+        cfg: ProviderSettings,
+        provider: AiProvider,
+        photoId: String,
+        purpose: String,
+        missingKeyProgress: String,
+        missingKeyMessage: String,
+        onProgress: (AiProgress) -> Unit,
+        buildBody: (onBytes: (Long, Long) -> Unit) -> RequestBody,
+    ): ByteArray =
+        withContext(Dispatchers.IO) {
             val t0 = System.currentTimeMillis()
             fun emit(phase: String, loaded: Long? = null, total: Long? = null, error: String? = null) {
                 val elapsed = System.currentTimeMillis() - t0
@@ -140,8 +225,8 @@ class AiImageClient @Inject constructor(
                 _progress.tryEmit(update)
             }
             if (cfg.apiKey.isBlank()) {
-                emit("error", error = "未配置 AI 钥匙")
-                error("未配置 AI 钥匙。去设置页填入 API key 后再修图。")
+                emit("error", error = missingKeyProgress)
+                error(missingKeyMessage)
             }
             emit("preparing")
             val url = imagesEditsUrl(cfg.baseUrl, provider.defaultBaseUrl)
@@ -150,16 +235,9 @@ class AiImageClient @Inject constructor(
                 "POST $url ${provider.id} ${cfg.model} ${cfg.resolution}/${cfg.quality} photo=$photoId purpose=$purpose",
             )
             try {
-                val upload = ImagePipeline.grokUploadJpeg(image)
-                val requestBody = when (provider) {
-                    AiProvider.GROK -> grokEditBody(cfg, prompt, upload) { written, total ->
-                        emit("uploading", written, total)
-                        if (written >= total && total > 0) emit("processing")
-                    }
-                    AiProvider.OPENAI -> openAiEditBody(cfg, prompt, upload) { written, total ->
-                        emit("uploading", written, total)
-                        if (written >= total && total > 0) emit("processing")
-                    }
+                val requestBody = buildBody { written, total ->
+                    emit("uploading", written, total)
+                    if (written >= total && total > 0) emit("processing")
                 }
                 val req = Request.Builder()
                     .url(url)
@@ -238,6 +316,8 @@ class AiImageClient @Inject constructor(
         prompt: String,
         upload: ByteArray,
         onBytes: (Long, Long) -> Unit,
+        size: String = "auto",
+        outputFormat: String = "jpeg",
     ): RequestBody {
         val jpeg = "image/jpeg".toMediaType()
         val multipart = MultipartBody.Builder()
@@ -246,8 +326,8 @@ class AiImageClient @Inject constructor(
             .addFormDataPart("image", "image.jpg", upload.toRequestBody(jpeg))
             .addFormDataPart("prompt", prompt)
             .addFormDataPart("quality", cfg.quality)
-            .addFormDataPart("size", "auto")
-            .addFormDataPart("output_format", "jpeg")
+            .addFormDataPart("size", size)
+            .addFormDataPart("output_format", outputFormat)
             .addFormDataPart("n", "1")
             .build()
         return CountingRequestBody(multipart, onBytes)

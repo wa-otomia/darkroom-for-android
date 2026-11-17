@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 構図タブ：入口、サイズプリセット、注意書き -->
+    <string name="studio_id_photo">証明写真</string>
+    <string name="studio_id_size">サイズ</string>
+    <plurals name="studio_id_per_sheet">
+        <item quantity="other">用紙 1 枚に %d 枚</item>
+    </plurals>
+    <string name="studio_id_authority_note">サイズと背景は一般的な例です。発行機関の最新の要件を確認してください。</string>
+    <string name="studio_id_edge_warning">このサイズは用紙の端に近いため、印刷時に端の背景がわずかに切れることがあります。</string>
+    <string name="studio_id_no_watermark">証明写真は印刷・書き出しとも透かしを入れません。</string>
+    <string name="studio_id_sheet_a11y">証明写真の面付け：%1$s</string>
+    <string name="studio_id_mask_missing">切り抜きマスクがありません。もう一度切り抜くか、元の背景を選んでください。</string>
+
+    <string name="studio_id_preset_35x45">ICAO 標準：シェンゲン/EU、英国、オーストラリア、シンガポール、日本・韓国のパスポートなど</string>
+    <string name="studio_id_preset_33x48">中国のパスポート・ビザ</string>
+    <string name="studio_id_preset_25x35">中国の一寸（履歴書・証明書・出願）</string>
+    <string name="studio_id_preset_22x32">中国の小一寸（運転免許など）</string>
+    <string name="studio_id_preset_35x49">中国の二寸</string>
+    <string name="studio_id_preset_2x2in">米国パスポート・ビザ、インドビザ</string>
+    <string name="studio_id_preset_50x70">カナダのパスポート</string>
+    <string name="studio_id_preset_30x40">履歴書・在留申請、韓国の半名刺判</string>
+    <string name="studio_id_preset_24x30">日本の運転免許証</string>
+    <string name="studio_id_preset_40x60">ベトナム・タイなど 4×6 cm のビザ</string>
+    <string name="studio_id_preset_35x50">マレーシアのパスポート</string>
+
+    <!-- 処理タブ：切り抜き、背景色、ぼかし -->
+    <string name="studio_id_section">証明写真の背景</string>
+    <string name="studio_id_explain">AI は人物のマスクだけを作ります。人物の画素はすべて元の写真のままで、背景はこの端末で置き換えます。このバージョンの写真全体が、設定で選んだ AI サービスにアップロードされます。</string>
+    <string name="studio_id_cutout">AI で人物を切り抜く</string>
+    <string name="studio_id_recut">もう一度切り抜く</string>
+    <string name="studio_id_cutting">切り抜き中…</string>
+    <string name="studio_id_cutting_other">別のバージョン（%1$s）を切り抜き中…</string>
+    <string name="studio_id_mask_ready">切り抜きが完了しました</string>
+    <string name="studio_id_background">背景色</string>
+    <string name="studio_id_need_mask">背景を変えるには、先に人物を切り抜いてください。</string>
+
+    <string name="studio_id_bg_original">元の背景</string>
+    <string name="studio_id_bg_original_use">写真の背景をそのまま使う</string>
+    <string name="studio_id_bg_navy">濃紺</string>
+    <string name="studio_id_bg_navy_use">アプリの既定色</string>
+    <string name="studio_id_bg_id_blue">証明写真ブルー</string>
+    <string name="studio_id_bg_id_blue_use">中国本土で一般的な青背景</string>
+    <string name="studio_id_bg_red">赤</string>
+    <string name="studio_id_bg_red_use">中国本土の赤背景（婚姻登記など）</string>
+    <string name="studio_id_bg_white">白</string>
+    <string name="studio_id_bg_white_use">中国のパスポート・ビザ、米国、韓国、シンガポール、カナダなど</string>
+    <string name="studio_id_bg_light_grey">ライトグレー</string>
+    <string name="studio_id_bg_light_grey_use">英国、オーストラリア、ドイツなどのシェンゲン諸国</string>
+    <string name="studio_id_bg_off_white">オフホワイト</string>
+    <string name="studio_id_bg_off_white_use">英国のクリーム色、米国のオフホワイト</string>
+    <string name="studio_id_bg_pale_blue">淡いブルー</string>
+    <string name="studio_id_bg_pale_blue_use">日本のパスポート・履歴書</string>
+
+    <string name="studio_id_feather">境界のぼかし</string>
+    <string name="studio_id_feather_none">なし</string>
+    <string name="studio_id_feather_weak">弱</string>
+    <string name="studio_id_feather_medium">中</string>
+    <string name="studio_id_feather_strong">強</string>
+
+    <!-- 出力タブ -->
+    <string name="studio_id_preset_print_off">証明写真モードでは「プリセットで編集してキューに追加」は使えません。</string>
+
+    <!-- エラー（ui/UserErrors.kt で対応付け） -->
+    <string name="id_error_mask_aspect">切り抜きに失敗しました：返されたマスクの比率が写真と一致しません。</string>
+    <string name="id_error_mask_not_binary">切り抜きに失敗しました：白黒のマスクが返されませんでした。</string>
+    <string name="id_error_mask_no_person">切り抜きに失敗しました：写真に人物が見つかりません。</string>
+    <string name="id_error_mask_no_background">切り抜きに失敗しました：背景を分離できませんでした。</string>
+    <string name="id_error_mask_undecodable">切り抜きに失敗しました：返された画像を読み込めません。</string>
+    <string name="id_error_mask_need_key">切り抜きには API キーが必要です。設定で入力してください。</string>
+    <string name="id_error_mask_version_gone">切り抜き結果を破棄しました：このバージョンは削除されています。</string>
+    <string name="id_error_mask_missing">証明写真のマスクがないか破損しています。もう一度切り抜くか、元の背景を選んでください。</string>
+    <string name="id_error_mask_save">切り抜きマスクを保存できませんでした。空き容量を確認してもう一度お試しください。</string>
+</resources>

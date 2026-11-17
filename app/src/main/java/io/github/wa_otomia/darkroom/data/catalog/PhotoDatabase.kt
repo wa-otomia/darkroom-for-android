@@ -11,9 +11,10 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.wa_otomia.darkroom.core.EditRecord
-import io.github.wa_otomia.darkroom.core.Framing
 import io.github.wa_otomia.darkroom.core.PhotoMeta
 import io.github.wa_otomia.darkroom.core.PrintRecord
+import io.github.wa_otomia.darkroom.core.decodeVersionStates
+import io.github.wa_otomia.darkroom.core.encodeVersionStates
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
 
@@ -36,21 +37,25 @@ data class PhotoEntity(
 
 private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
-fun PhotoEntity.toMeta(): PhotoMeta = PhotoMeta(
-    id = id,
-    filename = filename,
-    createdAt = createdAt,
-    ingestedAt = ingestedAt,
-    width = width,
-    height = height,
-    bytes = bytes,
-    edits = runCatching { json.decodeFromString<List<EditRecord>>(editsJson) }.getOrDefault(emptyList()),
-    prints = runCatching { json.decodeFromString<List<PrintRecord>>(printsJson) }.getOrDefault(emptyList()),
-    parentId = parentId,
-    generatePrompt = generatePrompt,
-    tags = runCatching { json.decodeFromString<List<String>>(tagsJson) }.getOrDefault(emptyList()),
-    framings = runCatching { json.decodeFromString<Map<String, Framing>>(framingsJson) }.getOrDefault(emptyMap()),
-)
+fun PhotoEntity.toMeta(): PhotoMeta {
+    val (framings, idPhotos) = decodeVersionStates(framingsJson)
+    return PhotoMeta(
+        id = id,
+        filename = filename,
+        createdAt = createdAt,
+        ingestedAt = ingestedAt,
+        width = width,
+        height = height,
+        bytes = bytes,
+        edits = runCatching { json.decodeFromString<List<EditRecord>>(editsJson) }.getOrDefault(emptyList()),
+        prints = runCatching { json.decodeFromString<List<PrintRecord>>(printsJson) }.getOrDefault(emptyList()),
+        parentId = parentId,
+        generatePrompt = generatePrompt,
+        tags = runCatching { json.decodeFromString<List<String>>(tagsJson) }.getOrDefault(emptyList()),
+        framings = framings,
+        idPhotos = idPhotos,
+    )
+}
 
 fun PhotoMeta.toEntity(): PhotoEntity = PhotoEntity(
     id = id,
@@ -65,7 +70,7 @@ fun PhotoMeta.toEntity(): PhotoEntity = PhotoEntity(
     editsJson = json.encodeToString(edits),
     printsJson = json.encodeToString(prints),
     tagsJson = json.encodeToString(tags),
-    framingsJson = json.encodeToString(framings),
+    framingsJson = encodeVersionStates(framings, idPhotos),
 )
 
 @Dao

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 构图标签：入口、尺寸预设、提示 -->
+    <string name="studio_id_photo">证件照</string>
+    <string name="studio_id_size">尺寸</string>
+    <plurals name="studio_id_per_sheet">
+        <item quantity="other">每张 %d 枚</item>
+    </plurals>
+    <string name="studio_id_authority_note">尺寸与背景仅为常见选择，请以签发机构最新要求为准。</string>
+    <string name="studio_id_edge_warning">该尺寸贴近相纸边缘，打印时边缘背景可能被裁去少量。</string>
+    <string name="studio_id_no_watermark">证件照打印与导出均不添加水印。</string>
+    <string name="studio_id_sheet_a11y">证件照排版：%1$s</string>
+    <string name="studio_id_mask_missing">抠图蒙版缺失。请重新抠图，或改选原背景。</string>
+
+    <string name="studio_id_preset_35x45">ICAO 通用：申根/欧盟、英国、澳大利亚、新加坡、日本护照、韩国护照等</string>
+    <string name="studio_id_preset_33x48">中国护照、中国签证</string>
+    <string name="studio_id_preset_25x35">中国一寸（简历、证书、报名）</string>
+    <string name="studio_id_preset_22x32">中国小一寸（驾驶证等）</string>
+    <string name="studio_id_preset_35x49">中国二寸</string>
+    <string name="studio_id_preset_2x2in">美国护照/签证、印度签证</string>
+    <string name="studio_id_preset_50x70">加拿大护照</string>
+    <string name="studio_id_preset_30x40">日本履历书/在留申请、韩国半名片</string>
+    <string name="studio_id_preset_24x30">日本驾照</string>
+    <string name="studio_id_preset_40x60">越南、泰国等 4×6 cm 签证</string>
+    <string name="studio_id_preset_35x50">马来西亚护照</string>
+
+    <!-- 处理标签：抠图、背景色、羽化 -->
+    <string name="studio_id_section">证件照背景</string>
+    <string name="studio_id_explain">AI 只生成人像蒙版，人像像素始终来自原片，背景在本机替换。会把该版本的整张照片上传到设置中的 AI 服务。</string>
+    <string name="studio_id_cutout">AI 抠出人像</string>
+    <string name="studio_id_recut">重新抠图</string>
+    <string name="studio_id_cutting">正在抠图…</string>
+    <string name="studio_id_cutting_other">正在为另一版本（%1$s）抠图…</string>
+    <string name="studio_id_mask_ready">抠图完成</string>
+    <string name="studio_id_background">背景色</string>
+    <string name="studio_id_need_mask">请先抠出人像，再更换背景。</string>
+
+    <string name="studio_id_bg_original">原背景</string>
+    <string name="studio_id_bg_original_use">保留照片原有背景</string>
+    <string name="studio_id_bg_navy">深蓝</string>
+    <string name="studio_id_bg_navy_use">应用默认色</string>
+    <string name="studio_id_bg_id_blue">证件蓝</string>
+    <string name="studio_id_bg_id_blue_use">中国大陆常见蓝底</string>
+    <string name="studio_id_bg_red">红</string>
+    <string name="studio_id_bg_red_use">中国大陆红底（结婚登记等）</string>
+    <string name="studio_id_bg_white">白</string>
+    <string name="studio_id_bg_white_use">中国护照/签证、美国、韩国、新加坡、加拿大等</string>
+    <string name="studio_id_bg_light_grey">浅灰</string>
+    <string name="studio_id_bg_light_grey_use">英国、澳大利亚、德国等申根国家</string>
+    <string name="studio_id_bg_off_white">米白</string>
+    <string name="studio_id_bg_off_white_use">英国奶油色、美国米白</string>
+    <string name="studio_id_bg_pale_blue">淡蓝</string>
+    <string name="studio_id_bg_pale_blue_use">日本护照、履历书</string>
+
+    <string name="studio_id_feather">羽化</string>
+    <string name="studio_id_feather_none">无</string>
+    <string name="studio_id_feather_weak">弱</string>
+    <string name="studio_id_feather_medium">中</string>
+    <string name="studio_id_feather_strong">强</string>
+
+    <!-- 输出标签 -->
+    <string name="studio_id_preset_print_off">证件照模式下不能使用“按预设修图并加入队列”。</string>
+
+    <!-- 错误（ui/UserErrors.kt 映射） -->
+    <string name="id_error_mask_aspect">抠图失败：返回的蒙版比例与照片不符。</string>
+    <string name="id_error_mask_not_binary">抠图失败：返回图不是黑白蒙版。</string>
+    <string name="id_error_mask_no_person">抠图失败：照片中未识别到人像。</string>
+    <string name="id_error_mask_no_background">抠图失败：未能分离出背景。</string>
+    <string name="id_error_mask_undecodable">抠图失败：无法读取返回的图片。</string>
+    <string name="id_error_mask_need_key">抠图需要 API 密钥，请在设置中填写。</string>
+    <string name="id_error_mask_version_gone">抠图结果已丢弃：该版本已删除。</string>
+    <string name="id_error_mask_missing">证件照蒙版缺失或损坏。请重新抠图，或改选原背景。</string>
+    <string name="id_error_mask_save">无法保存抠图蒙版。请检查剩余存储空间后重试。</string>
+</resources>
