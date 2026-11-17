@@ -47,8 +47,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
+import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import coil.size.Precision
 import coil.size.Scale
@@ -174,6 +174,21 @@ internal fun IdPhotoSheetPreview(
             .crossfade(true)
             .build()
     }
+    // One painter for every slot: Coil 2 does not merge identical in-flight requests, so a
+    // per-slot AsyncImage decodes the source once per slot on a cold cache. Not created while
+    // the cut-out stands in, so the source is not decoded for nothing.
+    val sourcePainter = if (cutout == null) {
+        rememberAsyncImagePainter(
+            model = request,
+            onState = { state ->
+                decoding = state is AsyncImagePainter.State.Loading ||
+                    state is AsyncImagePainter.State.Empty
+            },
+            contentScale = ContentScale.FillBounds,
+        )
+    } else {
+        null
+    }
 
     Box(
         modifier
@@ -248,15 +263,11 @@ internal fun IdPhotoSheetPreview(
                                                 contentScale = ContentScale.FillBounds,
                                                 modifier = imageModifier,
                                             )
-                                        } else {
-                                            AsyncImage(
-                                                model = request,
+                                        } else if (sourcePainter != null) {
+                                            Image(
+                                                painter = sourcePainter,
                                                 contentDescription = null,
                                                 contentScale = ContentScale.FillBounds,
-                                                onState = { state ->
-                                                    decoding = state is AsyncImagePainter.State.Loading ||
-                                                        state is AsyncImagePainter.State.Empty
-                                                },
                                                 modifier = imageModifier,
                                             )
                                         }

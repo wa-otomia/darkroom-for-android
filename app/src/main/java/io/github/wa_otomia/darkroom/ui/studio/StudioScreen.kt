@@ -206,6 +206,10 @@ fun StudioScreen(
         mutableStateOf(defaultLandscape(photo?.width ?: 0, photo?.height ?: 0))
     }
     var framingReady by remember(photoId, source) { mutableStateOf(false) }
+    // The last composed version's pose, for saves that run outside composition (leaving the
+    // screen, an edit job switching the version).
+    val poseRef = remember { mutableStateOf(FramingPoseSnap("", "", false, null)) }
+    val idPoseRef = remember { mutableStateOf(IdPoseSnap("", "", false, false, DEFAULT_ID_PHOTO_PRESET_ID, IdPhotoPose())) }
     // The loaded row, written back unchanged until the image size is known (an edit without
     // stored dimensions waits for a probe), so leaving early cannot rewrite it half-resolved.
     var restoreFraming by remember(photoId, source) { mutableStateOf<Framing?>(null) }
@@ -346,6 +350,16 @@ fun StudioScreen(
                     }
                 }
                 is StudioJobEvent.Edited -> {
+                    // A version switch like selectSource: the version being left is saved now,
+                    // since its debounced framing / ID saves are cancelled by the switch.
+                    val snap = poseRef.value
+                    if (snap.ready && snap.photoId == photoId && snap.source != e.editId) {
+                        catalog.persistFraming(snap.photoId, snap.source, snap.framing)
+                    }
+                    val id = idPoseRef.value
+                    if (id.due && id.photoId == photoId && id.source != e.editId) {
+                        catalog.persistIdPhotoPose(id.photoId, id.source, id.active, id.presetId, id.pose)
+                    }
                     sourceOverride = e.editId
                     genError = null
                     launch { snackbar.showSnackbar(editDoneText) }
@@ -412,6 +426,12 @@ fun StudioScreen(
     val queuedIds = printJobs.filter { jobFieldKey(it.state) == "queued" }.map { it.id }
     val queueIndex = myPrint?.let { queuedIds.indexOf(it.id) }?.let { if (it >= 0) it + 1 else 0 } ?: 0
     LaunchedEffect(myPrint?.id) { printStripCollapsed = false }
+    // While an edit runs, the shown version is pinned: otherwise the new edit row would switch
+    // "newest" by itself and drop the pending saves of the version being left. The Edited event
+    // then switches through the save above.
+    LaunchedEffect(editJob?.id) {
+        if (editJob != null && sourceOverride == null) sourceOverride = source
+    }
     LaunchedEffect(activeAi?.id) { aiStripCollapsed = false }
     LaunchedEffect(exporting) { if (exporting) exportStripCollapsed = false }
     val portraitOverlay = stringResource(R.string.crop_overlay)
@@ -522,8 +542,6 @@ fun StudioScreen(
         imageWidth = orientedW,
         imageHeight = orientedH,
     )
-    val poseRef = remember { mutableStateOf(FramingPoseSnap("", "", false, null)) }
-    val idPoseRef = remember { mutableStateOf(IdPoseSnap("", "", false, false, DEFAULT_ID_PHOTO_PRESET_ID, IdPhotoPose())) }
     val framingToPersist: Framing? =
         restoreFraming ?: persistableFraming(currentFraming, orientedW, orientedH)
     val idPose = IdPhotoPose(idZoom, idPanX, idPanY, idRotation)
@@ -615,13 +633,17 @@ fun StudioScreen(
     // EDID010-R01/R04: the first entry of a version starts at zoom 1, pan 0 and the right angle
     // nearest the ordinary rotation, with the size last chosen anywhere. Nothing here touches the
     // ordinary pose, so leaving restores it exactly.
+    // Ignored until the version's load has applied its framing and ID state: a first entry
+    // before then would take the default rotation, and the load would overwrite the toggle.
     val onIdToggle: (Boolean) -> Unit = { on ->
-        if (on && !idKnown) {
-            setIdPose(idInitialPose(rotationDegrees))
-            idPresetId = settings.lastIdPhotoPreset()
-            idKnown = true
+        if (framingReady) {
+            if (on && !idKnown) {
+                setIdPose(idInitialPose(rotationDegrees))
+                idPresetId = settings.lastIdPhotoPreset()
+                idKnown = true
+            }
+            idActive = on
         }
-        idActive = on
     }
     // EDID030-R01: a size change keeps zoom and rotation and re-clamps the pan in the new cell.
     val onIdPreset: (String) -> Unit = { id ->
@@ -910,13 +932,13 @@ fun StudioScreen(
                 StudioSwitchRow(
                     label = stringResource(R.string.studio_id_photo),
                     checked = idActive,
-                    enabled = !cropLocked,
+                    enabled = !cropLocked && framingReady,
                     onCheckedChange = onIdToggle,
                 )
                 if (idActive) {
                     IdPhotoSizeSection(
                         presetId = idPreset.id,
-                        enabled = !cropLocked,
+                        enabled = !cropLocked && framingReady,
                         onPresetChange = onIdPreset,
                     )
                 }
