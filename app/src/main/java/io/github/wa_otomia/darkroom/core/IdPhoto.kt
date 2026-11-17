@@ -368,6 +368,9 @@ val DEFAULT_ID_BACKGROUND_AFTER_MASK = IdBackground.NAVY
 /** "本地抠图" starts off (EDID040-R10): AI cut-out stays the default. */
 const val DEFAULT_ID_PHOTO_LOCAL_CUTOUT = false
 
+/** "AI 羽化" starts off (EDID040-R12): the on-device feather stays the default. */
+const val DEFAULT_ID_PHOTO_AI_FEATHER = false
+
 enum class IdFeather(val id: String, val radiusMm: Double) {
     NONE("none", 0.0),
     WEAK("weak", 0.1),
@@ -401,6 +404,11 @@ data class IdPhotoState(
     val maskRev: String? = null,
     /** Shrink the mask by the feather radius before smoothing, so the blend stays inside (EDID040-R07). */
     val featherInward: Boolean = true,
+    /**
+     * The feather level id the AI baked into the current mask (EDID040-R13), or null when the
+     * mask was not AI-feathered. A baked mask gets no further on-device feather.
+     */
+    val aiFeather: String? = null,
 ) {
     val pose: IdPhotoPose get() = IdPhotoPose(zoom, panX, panY, rotation)
 
@@ -408,6 +416,12 @@ data class IdPhotoState(
         copy(zoom = p.zoom, panX = p.panX, panY = p.panY, rotation = p.rotation)
 
     val hasMask: Boolean get() = !maskRev.isNullOrBlank()
+
+    /** The level the AI baked into the mask, or null (EDID040-R13). */
+    val aiFeatherLevel: IdFeather? get() = idAiFeatherLevel(aiFeather)
+
+    /** The on-device feather to render with: none for an AI-feathered mask (EDID040-R13). */
+    fun localFeather(): IdFeather = if (aiFeatherLevel != null) IdFeather.NONE else idFeather(feather)
 
     /** Known ids, finite numbers, zoom in range, rotation in [0, 360), blank mask rev = none. */
     fun normalized(): IdPhotoState = IdPhotoState(
@@ -421,7 +435,14 @@ data class IdPhotoState(
         feather = idFeather(feather).id,
         maskRev = maskRev?.trim()?.takeIf { it.isNotEmpty() },
         featherInward = featherInward,
+        aiFeather = aiFeatherLevel?.id,
     )
+}
+
+/** A known, non-"none" feather level for [id], or null (EDID040-R13). */
+fun idAiFeatherLevel(id: String?): IdFeather? {
+    val key = id?.trim()
+    return IdFeather.entries.firstOrNull { it.id == key && it != IdFeather.NONE }
 }
 
 fun PhotoMeta.idPhotoFor(source: String?): IdPhotoState? = idPhotos[framingVersionKey(source)]
@@ -621,11 +642,7 @@ fun parseIdMaskFailureRecord(raw: String?): IdMaskFailureRecord? {
 // AI mask request (AIPV030-R04)
 // ---------------------------------------------------------------------------------------------
 
-/**
- * Fixed instruction for the matte request (AIPV030-R04). Presets and extra prompts never join it.
- * One sentence per literal, joined by exactly one space.
- */
-const val ID_PHOTO_MASK_PROMPT: String =
+private const val ID_MASK_PROMPT_HEAD: String =
     "Task: produce an alpha matte for replacing the background of a portrait or ID photo. " +
         "This is a segmentation task, not a photo edit: do not relight, recolour, restyle or re-render the photo. " +
         "Output only the matte, at exactly the same width, height, framing and composition as the input; " +
@@ -637,13 +654,94 @@ const val ID_PHOTO_MASK_PROMPT: String =
         "other people, shadows cast on the background, and any border or padding. " +
         "Paint the background pure black (#000000), even where it is white or light-coloured in the photo. " +
         "Paint the person as one flat, solid, pure white (#FFFFFF) silhouette with no shading, lighting, gradients, texture, " +
-        "facial features or outlines inside it; eyes, mouth, glasses, hair texture and clothing details must not be visible. " +
-        "Keep the edge tight to the person, with no glow, halo or margin around it. " +
+        "facial features or outlines inside it; eyes, mouth, glasses, hair texture and clothing details must not be visible. "
+
+private const val ID_MASK_PROMPT_EDGE_SHARP: String =
+    "Keep the edge tight to the person, with no glow, halo or margin around it. " +
         "Only where fine hair strands or flyaways overlap the background, use grey levels to show partial transparency " +
         "(lighter means more hair, darker means more background); the main mass of the hair stays solid white, " +
-        "and everywhere else make a clean, sharp edge. " +
-        "If no person is visible, return an all-black image. " +
-        "Use only black, white and that grey hair transition: no colours, text, watermarks or other content."
+        "and everywhere else make a clean, sharp edge. "
+
+private const val ID_MASK_PROMPT_NO_PERSON: String = "If no person is visible, return an all-black image. "
+
+private const val ID_MASK_PROMPT_TAIL_SHARP: String =
+    "Use only black, white and that grey hair transition: no colours, text, watermarks or other content."
+
+private const val ID_MASK_PROMPT_TAIL_FEATHER: String =
+    "Use only black, white and the grey edge gradient: no colours, text, watermarks or other content."
+
+/**
+ * Fixed instruction for the matte request (AIPV030-R04). Presets and extra prompts never join it.
+ * One sentence per literal, joined by exactly one space.
+ */
+const val ID_PHOTO_MASK_PROMPT: String =
+    ID_MASK_PROMPT_HEAD + ID_MASK_PROMPT_EDGE_SHARP + ID_MASK_PROMPT_NO_PERSON + ID_MASK_PROMPT_TAIL_SHARP
+
+/**
+ * The feather an AI cut-out asks for (EDID040-R13), frozen when the job is queued: the level,
+ * its direction and the level's print radius in oriented full-size source px.
+ */
+data class IdMaskAiFeather(val feather: IdFeather, val inward: Boolean, val radiusSourcePx: Float)
+
+/**
+ * The AI feather a cut-out tapped now asks for (EDID040-R13), or null when [enabled] is off,
+ * the cut-out is [local] or the level is none. The radius is the level's print radius in source
+ * px for a [cellWidth]×[cellHeight] cell over the [imageWidth]×[imageHeight] oriented version
+ * at [zoom] ([idFeatherSourcePx]).
+ */
+fun idMaskAiFeatherRequest(
+    enabled: Boolean,
+    local: Boolean,
+    feather: IdFeather,
+    inward: Boolean,
+    cellWidth: Int,
+    cellHeight: Int,
+    imageWidth: Int,
+    imageHeight: Int,
+    zoom: Float,
+): IdMaskAiFeather? {
+    if (!enabled || local || feather == IdFeather.NONE) return null
+    val radius = idFeatherSourcePx(feather.radiusPx(1), cellWidth, cellHeight, imageWidth, imageHeight, zoom)
+    return IdMaskAiFeather(feather, inward, radius)
+}
+
+/**
+ * The asked edge gradient width in upload px (AIPV030-R04): max(2, round(2·r·[contentWidth] /
+ * [sourceWidth])), r = [radiusSourcePx]; 2 for a non-finite or non-positive input.
+ */
+fun idMaskAiFeatherWidthPx(radiusSourcePx: Float, sourceWidth: Int, contentWidth: Int): Int {
+    if (!radiusSourcePx.isFinite() || radiusSourcePx <= 0f || sourceWidth <= 0 || contentWidth <= 0) return 2
+    val px = 2.0 * radiusSourcePx * contentWidth / sourceWidth
+    if (!px.isFinite()) return 2
+    return maxOf(2, Math.round(px).coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+}
+
+/**
+ * The matte instruction (AIPV030-R04): exactly [ID_PHOTO_MASK_PROMPT] without [feather] (or with
+ * a "none" level). With one, the edge sentences ask for a [widthPx]-wide gradient over the whole
+ * outline, hair included, inside it when inward and centred on it otherwise, noting the
+ * [uploadWidth]×[uploadHeight] input size (EDID040-R13).
+ */
+fun idPhotoMaskPrompt(feather: IdMaskAiFeather?, widthPx: Int, uploadWidth: Int, uploadHeight: Int): String {
+    if (feather == null || feather.feather == IdFeather.NONE) return ID_PHOTO_MASK_PROMPT
+    val n = widthPx.coerceAtLeast(2)
+    val direction = if (feather.inward) {
+        "The gradient lies entirely inside the person's outline: it starts at full white about $n pixels inside the edge " +
+            "and reaches pure black exactly at the outline, so nothing outside the person is lit. "
+    } else {
+        "The gradient is centred on the person's outline, about half inside and half outside it. "
+    }
+    return ID_MASK_PROMPT_HEAD +
+        "Feather the whole outline of the person, including the hair, fine strands and flyaways: along every edge, " +
+        "blend from pure white to pure black through a smooth, even grey gradient about $n pixels wide " +
+        "(the input image is ${uploadWidth}x$uploadHeight pixels). " +
+        direction +
+        "Fine hair strands become softly translucent instead of crisp. " +
+        "Away from the edge, the person stays solid white and the background solid black, " +
+        "with no glow or halo beyond the gradient. " +
+        ID_MASK_PROMPT_NO_PERSON +
+        ID_MASK_PROMPT_TAIL_FEATHER
+}
 
 val OPENAI_MASK_CANVASES: List<Pair<Int, Int>> = listOf(1024 to 1024, 1536 to 1024, 1024 to 1536)
 

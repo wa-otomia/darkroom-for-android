@@ -265,6 +265,30 @@ class IdPhotoUiStateTest {
     }
 
     @Test
+    fun aiFeatherSwitchFollowsTheLocalSwitchAndTheMode() {
+        assertTrue(idAiFeatherSwitchEnabled(local = false, busy = false, compositing = false))
+        assertFalse(idAiFeatherSwitchEnabled(local = true, busy = false, compositing = false))
+        assertFalse(idAiFeatherSwitchEnabled(local = false, busy = true, compositing = false))
+        assertFalse(idAiFeatherSwitchEnabled(local = false, busy = false, compositing = true))
+        assertTrue(idAiFeatherAsked(aiFeather = true, local = false))
+        assertFalse(idAiFeatherAsked(aiFeather = true, local = true))
+        assertFalse(idAiFeatherAsked(aiFeather = false, local = false))
+    }
+
+    @Test
+    fun featherLevelsSelectableBeforeAMaskOnlyWhenTheAiWillFeather() {
+        // EDID040-R07: with a mask on a replaced background.
+        assertTrue(idFeatherSelectable(hasMask = true, needsMask = true, aiFeatherAsked = false, busy = false))
+        assertFalse(idFeatherSelectable(hasMask = true, needsMask = false, aiFeatherAsked = false, busy = false))
+        assertFalse(idFeatherSelectable(hasMask = false, needsMask = true, aiFeatherAsked = false, busy = false))
+        // EDID040-R12: before any mask and on the original background when the AI will feather.
+        assertTrue(idFeatherSelectable(hasMask = false, needsMask = false, aiFeatherAsked = true, busy = false))
+        assertTrue(idFeatherSelectable(hasMask = true, needsMask = false, aiFeatherAsked = true, busy = false))
+        // Never while busy.
+        assertFalse(idFeatherSelectable(hasMask = true, needsMask = true, aiFeatherAsked = true, busy = true))
+    }
+
+    @Test
     fun localFailureRecognisedByItsModeOrLegacyMessage() {
         // The stored mode decides, whatever the message: a corrupt or deleted version fails a
         // local job without the local prefix and must not blame the AI.

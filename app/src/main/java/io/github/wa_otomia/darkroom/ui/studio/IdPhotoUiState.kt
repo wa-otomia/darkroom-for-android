@@ -201,6 +201,24 @@ internal fun idShowNeedKey(local: Boolean, keySet: Boolean): Boolean = !local &&
 internal fun idLocalSwitchEnabled(busy: Boolean, compositing: Boolean): Boolean = !busy && !compositing
 
 /**
+ * The "AI 羽化" switch (EDID040-R12): disabled like the on-device switch, and while the on-device
+ * cut-out is on (the AI never sees that job). Disabled, it still shows its state.
+ */
+internal fun idAiFeatherSwitchEnabled(local: Boolean, busy: Boolean, compositing: Boolean): Boolean =
+    !local && !busy && !compositing
+
+/** Whether the next cut-out asks the AI to feather (EDID040-R12): the switch on, the AI mode. */
+internal fun idAiFeatherAsked(aiFeather: Boolean, local: Boolean): Boolean = aiFeather && !local
+
+/**
+ * Feather levels and the inward switch are selectable (EDID040-R07, R12) with a mask on a
+ * replaced background, or, when the next cut-out asks the AI to feather, before any mask and on
+ * the original background too; never while a mask job runs or the preview is compositing.
+ */
+internal fun idFeatherSelectable(hasMask: Boolean, needsMask: Boolean, aiFeatherAsked: Boolean, busy: Boolean): Boolean =
+    !busy && ((hasMask && needsMask) || aiFeatherAsked)
+
+/**
  * True when a failure record without an image came from the on-device cut-out, so the viewer
  * does not blame the AI for the missing image (EDID040-R11 keeps no image for such failures).
  * The record's [local] mode decides, whatever the message (an undecodable or deleted version

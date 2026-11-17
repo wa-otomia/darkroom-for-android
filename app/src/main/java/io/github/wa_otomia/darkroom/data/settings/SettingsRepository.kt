@@ -22,6 +22,7 @@ import io.github.wa_otomia.darkroom.core.mergeBuiltinPresets
 import io.github.wa_otomia.darkroom.core.mergeFgsPause
 import io.github.wa_otomia.darkroom.core.mergeProviderSettings
 import io.github.wa_otomia.darkroom.core.newPresetId
+import io.github.wa_otomia.darkroom.core.DEFAULT_ID_PHOTO_AI_FEATHER
 import io.github.wa_otomia.darkroom.core.DEFAULT_ID_PHOTO_LOCAL_CUTOUT
 import io.github.wa_otomia.darkroom.core.normalizeIdPhotoPresetId
 import io.github.wa_otomia.darkroom.core.normalizeAiBaseUrl
@@ -86,6 +87,8 @@ class SettingsRepository @Inject constructor(
     // EDID040-R10: app-wide, not per version; resetAll() leaves it alone.
     private val _idPhotoLocalCutout = MutableStateFlow(DEFAULT_ID_PHOTO_LOCAL_CUTOUT)
     val idPhotoLocalCutoutFlow: StateFlow<Boolean> = _idPhotoLocalCutout
+    private val _idPhotoAiFeather = MutableStateFlow(DEFAULT_ID_PHOTO_AI_FEATHER)
+    val idPhotoAiFeatherFlow: StateFlow<Boolean> = _idPhotoAiFeather
 
     init {
         if (prefs.getString(KEY_FTP_PASSWORD, "").isNullOrBlank()) {
@@ -117,6 +120,7 @@ class SettingsRepository @Inject constructor(
         _autoEditPreset.value = readAutoEditPreset()
         _watermark.value = readWatermark()
         _idPhotoLocalCutout.value = idPhotoLocalCutout()
+        _idPhotoAiFeather.value = idPhotoAiFeather()
         publishAi()
     }
 
@@ -390,6 +394,14 @@ class SettingsRepository @Inject constructor(
         _idPhotoLocalCutout.value = on
     }
 
+    /** "AI 羽化" (EDID040-R12): off unless the user turned it on. Settings reset keeps it. */
+    fun idPhotoAiFeather(): Boolean = prefs.getBoolean(KEY_ID_PHOTO_AI_FEATHER, DEFAULT_ID_PHOTO_AI_FEATHER)
+
+    fun setIdPhotoAiFeather(on: Boolean) {
+        prefs.edit().putBoolean(KEY_ID_PHOTO_AI_FEATHER, on).apply()
+        _idPhotoAiFeather.value = on
+    }
+
     fun createPreset(title: String, prompt: String, category: String): AiPresetStore {
         val fields = validateAiPresetFields(title, prompt, category)
         val store = readPresets()
@@ -467,6 +479,9 @@ class SettingsRepository @Inject constructor(
         private const val KEY_ID_PHOTO_PRESET = "id_photo_preset"
         // Boolean, missing = DEFAULT_ID_PHOTO_LOCAL_CUTOUT; not written by resetAll() (EDID040-R10).
         private const val KEY_ID_PHOTO_LOCAL_CUTOUT = "id_photo_local_cutout"
+
+        // Boolean, missing = DEFAULT_ID_PHOTO_AI_FEATHER; not written by resetAll() (EDID040-R12).
+        private const val KEY_ID_PHOTO_AI_FEATHER = "id_photo_ai_feather"
         // Missing = never saved (migrate once); "" = none; otherwise a preset ID (AUTG040).
         private const val KEY_AUTO_EDIT_PRESET = "auto_edit_preset"
 

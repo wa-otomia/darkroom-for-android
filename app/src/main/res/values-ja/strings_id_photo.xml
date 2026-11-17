@@ -33,6 +33,9 @@
     <string name="studio_id_recut">もう一度切り抜く</string>
     <string name="studio_id_cutout_local">端末内で人物を切り抜く</string>
     <string name="studio_id_local_cutout">端末内で切り抜く</string>
+    <string name="studio_id_ai_feather">AIで境界をぼかす</string>
+    <string name="studio_id_ai_feather_note">切り抜き時に、下で選んだぼかしでAIが髪を含む柔らかい輪郭を直接作ります。端末側ではぼかしを重ねません。既存のマスクは切り抜き直すまで変わりません。</string>
+    <string name="studio_id_ai_feather_baked">このマスクはAIが「%1$s」でぼかしたため、端末側ではぼかしを重ねません。ぼかしの変更は切り抜き直すと反映されます。</string>
     <string name="studio_id_local_explain">Google ML Kit を使ってこの端末内で人物を切り抜きます。写真と切り抜き結果はアップロードされず、API キーも不要です。髪などの輪郭は AI による切り抜きより粗くなることがあります。</string>
     <string name="studio_id_cutting">切り抜き中…</string>
     <string name="studio_id_cutting_other">別のバージョン（%1$s）を切り抜き中…</string>

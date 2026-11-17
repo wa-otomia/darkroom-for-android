@@ -9,9 +9,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * improve-id-photo-matting: reply checks (AIPV030-R04), hair-keeping inward feather
- * (EDID040-R07) and the on-device mapping (EDID040-R11). Every image here is synthetic; the
- * user's evidence photos never enter the repository.
+ * improve-id-photo-matting: reply checks (AIPV030-R04), the inward feather of fine parts
+ * (EDID040-R07), the AI feather (EDID040-R12/R13) and the on-device mapping (EDID040-R11).
+ * Every image here is synthetic; the user's evidence photos never enter the repository.
  */
 class IdPhotoMattingTest {
     /** A mutable luma/alpha canvas, row-major, unsigned. */
@@ -317,262 +317,243 @@ class IdPhotoMattingTest {
     }
 
     @Test
-    fun softAlphaSeparatesHairFromHardRims() {
-        val w = 30
-        val h = 10
-        val img = Img(w, h)
-        img.rect(20, 0, 30, 10, 255)
-        for (y in 0 until h) img[19, y] = 128 // one-px rim between 0 and 255
-        for (y in 0 until h) img[5, y] = 100 // isolated hair strand in black
-        val soft = idMaskSoftAlpha(img.px, w, h, 1)
-        for (y in 0 until h) {
-            assertEquals(0, u(soft[y * w + 19]))
-            assertEquals(100, u(soft[y * w + 5]))
-            assertEquals(0, u(soft[y * w + 25])) // 255 is never soft
-            assertEquals(0, u(soft[y * w + 0])) // 0 is never soft
-        }
-        // A strand 2 px from the body is soft at s=1 but on the rim at s=2.
-        val near = Img(w, h)
-        near.rect(20, 0, 30, 10, 255)
-        for (y in 0 until h) near[18, y] = 100
-        assertEquals(100, u(idMaskSoftAlpha(near.px, w, h, 1)[5 * w + 18]))
-        assertEquals(0, u(idMaskSoftAlpha(near.px, w, h, 2)[5 * w + 18]))
-    }
-
-    @Test
-    fun keepSoftNeverSpillsAndNeverExceedsTheMask() {
-        // Properties 1 and 2.
+    fun fineFeatherNeverSpillsAndNeverExceedsTheMask() {
         for (seed in 1L..6L) {
-            val w = 60
-            val h = 45
-            val a = randomMask(w, h, seed, noiseEvery = 6)
-            for (r in listOf(1, 2, 5, 10)) for (s in listOf(1, 2, 3)) {
-                val out = featherAlphaInwardKeepSoft(a, w, h, r, s)
+            val w = 61
+            val h = 47
+            val a = randomMask(w, h, seed, noiseEvery = 9)
+            for (r in listOf(1, 2, 5, 10)) {
+                val out = featherAlphaInwardFine(a, w, h, r)
                 for (i in a.indices) {
-                    if (u(a[i]) == 0) assertEquals("seed=$seed r=$r s=$s i=$i", 0, u(out[i]))
-                    assertTrue("seed=$seed r=$r s=$s i=$i", u(out[i]) <= u(a[i]))
+                    if (u(a[i]) == 0) assertEquals("seed=$seed r=$r i=$i", 0, u(out[i]))
+                    assertTrue("seed=$seed r=$r i=$i", u(out[i]) <= u(a[i]))
                 }
             }
         }
     }
 
+    /** A long 1 px wide horizontal strand of [value] over black, nothing else. */
+    private fun strand(w: Int, h: Int, value: Int): Img {
+        val img = Img(w, h)
+        for (x in 0 until w) img[x, h / 2] = value
+        return img
+    }
+
     @Test
-    fun keepSoftKeepsEverySoftPixelExactly() {
-        // Property 3, generic: any soft pixel keeps its α.
-        for (seed in 7L..10L) {
-            val w = 50
-            val h = 40
-            val a = randomMask(w, h, seed, noiseEvery = 8)
-            for (r in listOf(2, 10)) {
-                val soft = idMaskSoftAlpha(a, w, h, 1)
-                val out = featherAlphaInwardKeepSoft(a, w, h, r, 1)
-                var seen = 0
-                for (i in a.indices) if (u(soft[i]) != 0) {
-                    assertEquals("seed=$seed r=$r i=$i", u(a[i]), u(out[i]))
-                    seen++
+    fun flyawayStrandFadesWithTheFeatherInsteadOfVanishingOrStaying() {
+        val w = 120
+        val h = 41
+        val strong = strand(w, h, 255)
+        val expected = mapOf(2 to 51, 5 to 23, 10 to 12)
+        for ((r, v) in expected) {
+            val out = featherAlphaInwardFine(strong.px, w, h, r)
+            // The old inward feather erased it outright.
+            assertEquals(0, u(featherAlphaInward(strong.px, w, h, r)[(h / 2) * w + w / 2]))
+            for (x in 2 * r until w - 2 * r) {
+                assertEquals("r=$r x=$x", v, u(out[(h / 2) * w + x]))
+            }
+            // Nothing spreads off the strand.
+            for (y in 0 until h) if (y != h / 2) for (x in 0 until w) assertEquals(0, u(out[y * w + x]))
+        }
+        // Stronger levels fade it more.
+        val grey = strand(w, h, 128)
+        assertEquals(26, u(featherAlphaInwardFine(grey.px, w, h, 2)[(h / 2) * w + w / 2]))
+    }
+
+    @Test
+    fun wideShapesWithoutFinePartsFeatherExactlyAsBefore() {
+        for (r in listOf(2, 5, 10)) {
+            val w = 96
+            val h = 80
+            val img = Img(w, h)
+            // Axis-aligned blocks wider than 2r+1, plus a 1 px grey ring around them.
+            img.rect(8, 8, 40, 60, 255)
+            img.rect(50, 30, 90, 75, 255)
+            for (ring in listOf(false, true)) {
+                val a = img.px.copyOf()
+                if (ring) {
+                    for (y in 0 until h) for (x in 0 until w) {
+                        val i = y * w + x
+                        if (u(a[i]) != 0) continue
+                        var near = false
+                        for (dy in -1..1) for (dx in -1..1) {
+                            val xx = x + dx
+                            val yy = y + dy
+                            if (xx in 0 until w && yy in 0 until h && img[xx, yy] == 255) near = true
+                        }
+                        if (near) a[i] = 128.toByte()
+                    }
                 }
-                assertTrue(seen > 0)
+                assertArrayEquals("ring=$ring r=$r", featherAlphaInward(a, w, h, r), featherAlphaInwardFine(a, w, h, r))
             }
         }
     }
 
     @Test
-    fun flyawayStrandSurvivesTheInwardFeather() {
-        // Property 3, the spec scenario: a 1 px α=128 strand in black, no 255 within s px.
-        val w = 60
+    fun monotoneRampsAreNotFineParts() {
+        // Black → 12 px ramp → white core → 12 px ramp → black, wide enough for r = 10.
+        val w = 120
+        val h = 30
+        val img = Img(w, h)
+        for (y in 0 until h) for (x in 0 until w) {
+            img[x, y] = when {
+                x < 20 -> 0
+                x < 32 -> (x - 19) * 255 / 13
+                x < 88 -> 255
+                x < 100 -> (100 - x) * 255 / 13
+                else -> 0
+            }
+        }
+        for (r in listOf(2, 5, 10)) {
+            val out = featherAlphaInwardFine(img.px, w, h, r)
+            assertArrayEquals("r=$r", featherAlphaInward(img.px, w, h, r), out)
+            val row = (0 until w).map { u(out[(h / 2) * w + it]) }
+            for (x in 1..w / 2) assertTrue("r=$r x=$x", row[x] >= row[x - 1])
+            for (x in 0 until w) assertTrue(row[x] <= img[x, h / 2])
+        }
+    }
+
+    @Test
+    fun strandAttachedToTheHeadStaysConnected() {
+        // A 2 px strand leaving a wide head: its far end fades like a lone strand, never above α.
+        val w = 120
         val h = 60
         val img = Img(w, h)
-        img.rect(45, 0, 60, 60, 255) // the body, 15 px away
-        for (y in 5 until 55) img[30, y] = 128
-        for (r in listOf(2, 10)) {
-            val out = featherAlphaInwardKeepSoft(img.px, w, h, r, 1)
-            val old = featherAlphaInward(img.px, w, h, r)
-            for (y in 5 until 55) {
-                assertEquals("r=$r y=$y", 128, u(out[y * w + 30]))
-                assertEquals("r=$r y=$y", 0, u(old[y * w + 30]))
-            }
-            // Pixels next to the strand stay background.
-            for (y in 0 until h) {
-                assertEquals(0, u(out[y * w + 29]))
-                assertEquals(0, u(out[y * w + 31]))
-            }
-        }
-    }
-
-    /** Binary rectangles, optionally with a one-px 128 ring (8-neighbourhood) around each. */
-    private fun hardMask(w: Int, h: Int, ring: Boolean): ByteArray {
-        val img = Img(w, h)
-        val rects = listOf(intArrayOf(5, 5, 25, 30), intArrayOf(32, 8, 55, 20), intArrayOf(32, 26, 70, 44))
-        for (r in rects) img.rect(r[0], r[1], r[2], r[3], 255)
-        if (ring) {
-            for (r in rects) {
-                for (y in r[1] - 1..r[3]) for (x in r[0] - 1..r[2]) {
-                    if (x in 0 until w && y in 0 until h && img[x, y] == 0) img[x, y] = 128
-                }
-            }
-        }
-        return img.px
+        img.rect(0, 20, 60, 60, 255)
+        img.rect(60, 30, 120, 32, 255)
+        val r = 5
+        val out = featherAlphaInwardFine(img.px, w, h, r)
+        val far = u(out[30 * w + 100])
+        assertEquals(Math.round(255.0 * 2 / 11 + 1e-9).toInt(), far)
+        for (x in 60 until 120) assertTrue(u(out[30 * w + x]) > 0)
+        for (i in img.px.indices) assertTrue(u(out[i]) <= u(img.px[i]))
     }
 
     @Test
-    fun hardEdgesFeatherExactlyAsBefore() {
-        // Property 4: only 0/255, or a single-px transition touching both, gives featherAlphaInward.
-        val w = 80
-        val h = 50
-        for (ring in listOf(false, true)) {
-            val a = hardMask(w, h, ring)
-            if (ring) assertTrue(idMaskSoftAlpha(a, w, h, 1).all { it.toInt() == 0 })
-            for (r in listOf(2, 5, 10)) {
-                assertArrayEquals("ring=$ring r=$r", featherAlphaInward(a, w, h, r), featherAlphaInwardKeepSoft(a, w, h, r, 1))
-            }
-        }
-        // A random binary mask too.
-        val bin = randomMask(64, 48, 3).map { if (u(it) >= 128) 255.toByte() else 0.toByte() }.toByteArray()
-        for (r in listOf(2, 5, 10)) {
-            assertArrayEquals(featherAlphaInward(bin, 64, 48, r), featherAlphaInwardKeepSoft(bin, 64, 48, r, 1))
-        }
-    }
-
-    /**
-     * A row profile black → one grey px → white → one grey px → black, resampled bilinearly
-     * (render px centre mapped to mask coords, shifted by [offset] mask px) at [m] render px per
-     * mask px, then turned into α as compositeThroughMask does.
-     */
-    private fun resampledHardEdge(m: Double, grey: Int, offset: Double, h: Int): Pair<ByteArray, Int> {
-        val profile = IntArray(12) { 0 } + intArrayOf(grey) + IntArray(16) { 255 } + intArrayOf(grey) + IntArray(12) { 0 }
-        val w = (profile.size * m).toInt()
-        fun at(j: Int) = profile[j.coerceIn(0, profile.size - 1)]
-        val row = IntArray(w) { i ->
-            val x = (i + 0.5) / m - 0.5 + offset
-            val x0 = Math.floor(x).toInt()
-            val t = x - x0
-            idMaskLumaToAlpha(Math.round(at(x0) * (1 - t) + at(x0 + 1) * t).toInt())
-        }
-        return ByteArray(w * h) { i -> row[i % w].toByte() } to w
-    }
-
-    @Test
-    fun resampledHardEdgesStillFeatherInward() {
-        // EDID040-R07 硬边仍向内羽化: a one-grey-px hard edge stretched by the preview / export
-        // bilinear draw is still a rim at s = idMaskRimRadius(m), so it feathers exactly inward.
-        val h = 6
-        var oldRuleMisses = 0
-        for (m in listOf(0.3, 0.5, 0.7, 0.865, 1.0, 1.33, 1.5, 1.8, 2.5)) {
-            val s = idMaskRimRadius(m.toFloat())
-            for (grey in listOf(48, 64, 128, 192, 210)) {
-                for (k in 0 until 20) {
-                    val (a, w) = resampledHardEdge(m, grey, k / 20.0, h)
-                    assertTrue("m=$m grey=$grey k=$k", idMaskSoftAlpha(a, w, h, s).all { it.toInt() == 0 })
-                    for (r in listOf(2, 5)) {
-                        assertArrayEquals(
-                            "m=$m grey=$grey k=$k r=$r",
-                            featherAlphaInward(a, w, h, r),
-                            featherAlphaInwardKeepSoft(a, w, h, r, s),
-                        )
-                    }
-                    // The former one-mask-px rim, s = ceil(m), mistook some of these for hair.
-                    val oldS = Math.ceil(m - 1e-6).toInt().coerceAtLeast(1)
-                    if (idMaskSoftAlpha(a, w, h, oldS).any { it.toInt() != 0 }) oldRuleMisses++
-                }
-            }
-        }
-        assertTrue(oldRuleMisses > 0)
-    }
-
-    @Test
-    fun noDarkRingBetweenHairAndHead() {
-        // Property 5: black → 12 px linear soft edge → white core, r = 10.
+    fun fineFeatherKeepsTheWideInteriorOpaque() {
         val w = 90
-        val h = 8
-        val r = 10
+        val h = 70
         val img = Img(w, h)
-        for (y in 0 until h) {
-            for (x in 0 until w) {
-                img[x, y] = when {
-                    x < 20 -> 0
-                    x < 32 -> Math.round(255.0 * (x - 19) / 13).toInt()
-                    else -> 255
+        img.rect(10, 10, 80, 65, 255)
+        for (x in 0 until w step 3) img[x, 5] = 200
+        for (r in listOf(2, 5, 10)) {
+            val out = featherAlphaInwardFine(img.px, w, h, r)
+            for (y in 0 until h) for (x in 0 until w) {
+                var all = true
+                for (dy in -2 * r..2 * r) for (dx in -2 * r..2 * r) {
+                    if (img[(x + dx).coerceIn(0, w - 1), (y + dy).coerceIn(0, h - 1)] != 255) all = false
                 }
-            }
-        }
-        val out = featherAlphaInwardKeepSoft(img.px, w, h, r, 1)
-        for (y in 0 until h) {
-            for (x in 1 until w) {
-                assertTrue("y=$y x=$x", u(out[y * w + x]) >= u(out[y * w + x - 1]))
-                assertTrue(u(out[y * w + x]) <= img[x, y])
-            }
-            // The soft edge keeps its α; the core within 2r is at least the adjacent soft α.
-            for (x in 20 until 32) assertEquals(img[x, y], u(out[y * w + x]))
-            for (x in 32 until 32 + 2 * r) assertTrue("x=$x", u(out[y * w + x]) >= img[31, y])
-            for (x in 0 until 20) assertEquals(0, u(out[y * w + x]))
-        }
-        // Without the hair rule the edge is eroded away (the dark ring this fixes).
-        val old = featherAlphaInward(img.px, w, h, r)
-        assertTrue(u(old[4 * w + 32]) < img[31, 4])
-    }
-
-    @Test
-    fun keepSoftLeavesTheWideInteriorOpaque() {
-        // Property 6.
-        for (seed in 11L..13L) {
-            val w = 70
-            val h = 52
-            val a = randomMask(w, h, seed, noiseEvery = 400)
-            for (r in listOf(1, 2, 5, 10)) {
-                val out = featherAlphaInwardKeepSoft(a, w, h, r, 1)
-                val wide = erodeAlpha(a, w, h, 2 * r)
-                for (i in a.indices) if (u(wide[i]) == 255) assertEquals(255, u(out[i]))
+                if (all) assertEquals("r=$r ($x,$y)", 255, u(out[y * w + x]))
             }
         }
     }
 
     @Test
     fun zeroRadiusIsIdentityAndSymmetricIsUnchanged() {
-        // Properties 7 and 8.
-        val a = randomMask(33, 21, 5, noiseEvery = 5)
-        for (s in listOf(1, 3)) {
-            val out = featherAlphaInwardKeepSoft(a, 33, 21, 0, s)
+        val a = randomMask(33, 21, 5, noiseEvery = 7)
+        for (r in listOf(0, -1)) {
+            val out = featherAlphaInwardFine(a, 33, 21, r)
             assertArrayEquals(a, out)
             assertNotSame(a, out)
-            assertArrayEquals(a, featherAlphaFor(a, 33, 21, 0, inward = true, rimRadius = s))
+            assertArrayEquals(a, featherAlphaFor(a, 33, 21, r, inward = true))
         }
         for (r in listOf(1, 2, 5, 10)) {
-            assertArrayEquals(featherAlpha(a, 33, 21, r), featherAlphaFor(a, 33, 21, r, inward = false, rimRadius = 4))
+            assertArrayEquals(featherAlpha(a, 33, 21, r), featherAlphaFor(a, 33, 21, r, inward = false))
+            assertArrayEquals(featherAlphaInwardFine(a, 33, 21, r), featherAlphaFor(a, 33, 21, r, inward = true))
         }
     }
 
-    @Test
-    fun rimRadiusIsTwoMaskPixelsRoundedUp() {
-        assertEquals(1, idMaskRimRadius(0.2f))
-        assertEquals(1, idMaskRimRadius(0.5f))
-        assertEquals(2, idMaskRimRadius(0.865f))
-        assertEquals(2, idMaskRimRadius(1f))
-        assertEquals(3, idMaskRimRadius(1.2f))
-        assertEquals(4, idMaskRimRadius(1.8f))
-        assertEquals(4, idMaskRimRadius(2f))
-        assertEquals(7, idMaskRimRadius(3.5f))
-        assertEquals(1, idMaskRimRadius(Float.NaN))
-        assertEquals(1, idMaskRimRadius(-3f))
-        assertEquals(1, idMaskRimRadius(Float.POSITIVE_INFINITY))
-    }
+    // ---------------------------------------------------------------------------------------
+    // AI feather (EDID040-R12/R13, AIPV030-R04)
+    // ---------------------------------------------------------------------------------------
 
-    @Test
-    fun stretchedHardEdgeIsStillARim() {
-        // A mask px spanning 3 render px stretches the one-px transition to ~3 px; s = 3 keeps
-        // it hard while s = 1 would call its middle soft.
-        val w = 40
-        val h = 6
-        val img = Img(w, h)
-        for (y in 0 until h) for (x in 0 until w) {
+    /** A disc of white with a [ramp] px inward gradient to black at its outline. */
+    private fun featheredDisc(size: Int, radius: Int, ramp: Int): Img {
+        val img = Img(size, size)
+        val c = size / 2.0
+        for (y in 0 until size) for (x in 0 until size) {
+            val d = Math.hypot(x + 0.5 - c, y + 0.5 - c)
+            val inside = radius - d
             img[x, y] = when {
-                x < 18 -> 0
-                x < 21 -> 64 * (x - 17)
-                else -> 255
+                inside <= 0 -> 0
+                inside >= ramp -> 255
+                else -> Math.round(inside / ramp * 255).toInt()
             }
         }
-        assertNotEquals(0, u(idMaskSoftAlpha(img.px, w, h, 1)[2 * w + 19]))
-        assertTrue(idMaskSoftAlpha(img.px, w, h, idMaskRimRadius(3f)).all { it.toInt() == 0 })
-        assertArrayEquals(featherAlphaInward(img.px, w, h, 4), featherAlphaInwardKeepSoft(img.px, w, h, 4, 3))
+        return img
+    }
+
+    @Test
+    fun aiFeatheredReplyPassesOnlyWithTheWidenedRadius() {
+        val img = featheredDisc(400, 80, 16)
+        assertEquals(IdMaskVerdict.SHADED, validateIdMask(img.px, img.w, img.h, 0))
+        assertEquals(IdMaskVerdict.OK, validateIdMask(img.px, img.w, img.h, 0, extraInteriorRadius = 16))
+        // A negative extra is the plain check.
+        assertEquals(IdMaskVerdict.SHADED, validateIdMask(img.px, img.w, img.h, 0, extraInteriorRadius = -5))
+    }
+
+    @Test
+    fun aiFeatherWidthRoundsAndHasAFloor() {
+        assertEquals(16, idMaskAiFeatherWidthPx(20f, 3000, 1200))
+        assertEquals(2, idMaskAiFeatherWidthPx(0.5f, 3000, 1200))
+        assertEquals(3, idMaskAiFeatherWidthPx(3.125f, 2000, 1000))
+        for (bad in listOf(0f, -1f, Float.NaN, Float.POSITIVE_INFINITY)) {
+            assertEquals(2, idMaskAiFeatherWidthPx(bad, 3000, 1200))
+        }
+        assertEquals(2, idMaskAiFeatherWidthPx(20f, 0, 1200))
+        assertEquals(2, idMaskAiFeatherWidthPx(20f, 3000, 0))
+    }
+
+    @Test
+    fun aiFeatherRequestOnlyForTheAiModeAndARealLevel() {
+        fun req(enabled: Boolean, local: Boolean, f: IdFeather) =
+            idMaskAiFeatherRequest(enabled, local, f, true, 717, 921, 3000, 4000, 1f)
+        assertEquals(null, req(false, false, IdFeather.MEDIUM))
+        assertEquals(null, req(true, true, IdFeather.MEDIUM))
+        assertEquals(null, req(true, false, IdFeather.NONE))
+        val r = req(true, false, IdFeather.MEDIUM)!!
+        assertEquals(IdFeather.MEDIUM, r.feather)
+        assertTrue(r.inward)
+        assertEquals(idFeatherSourcePx(IdFeather.MEDIUM.radiusPx(1), 717, 921, 3000, 4000, 1f), r.radiusSourcePx, 1e-6f)
+        assertFalse(idMaskAiFeatherRequest(true, false, IdFeather.WEAK, false, 717, 921, 3000, 4000, 1f)!!.inward)
+    }
+
+    @Test
+    fun featheredPromptVariants() {
+        assertEquals(ID_PHOTO_MASK_PROMPT, idPhotoMaskPrompt(null, 16, 1152, 1536))
+        assertEquals(ID_PHOTO_MASK_PROMPT, idPhotoMaskPrompt(IdMaskAiFeather(IdFeather.NONE, true, 9f), 16, 1152, 1536))
+        val inward = idPhotoMaskPrompt(IdMaskAiFeather(IdFeather.MEDIUM, true, 9f), 16, 1152, 1536)
+        val centred = idPhotoMaskPrompt(IdMaskAiFeather(IdFeather.STRONG, false, 9f), 1, 1152, 1536)
+        for (p in listOf(inward, centred)) {
+            assertTrue(p.startsWith("Task: produce an alpha matte"))
+            for (fragment in listOf("main person only", "chair backs", "flat, solid, pure white", "all-black", "1152x1536 pixels", "hair")) {
+                assertTrue(fragment, p.contains(fragment))
+            }
+            assertFalse(p.contains("clean, sharp edge"))
+            assertFalse(p.contains("that grey hair transition"))
+            assertTrue(p.endsWith("Use only black, white and the grey edge gradient: no colours, text, watermarks or other content."))
+            assertTrue(p.all { it.code < 128 })
+            assertFalse(p.contains("  "))
+        }
+        assertTrue(inward.contains("about 16 pixels wide"))
+        assertTrue(inward.contains("entirely inside the person's outline"))
+        assertFalse(inward.contains("centred on"))
+        // The width never drops under 2 in the text.
+        assertTrue(centred.contains("about 2 pixels wide"))
+        assertTrue(centred.contains("centred on the person's outline"))
+        assertFalse(centred.contains("entirely inside"))
+    }
+
+    @Test
+    fun aiFeatherStateNormalizesAndRendersWithoutLocalFeather() {
+        assertEquals(null, IdPhotoState(aiFeather = "none").normalized().aiFeather)
+        assertEquals(null, IdPhotoState(aiFeather = "bogus").normalized().aiFeather)
+        assertEquals(null, IdPhotoState(aiFeather = " ").normalized().aiFeather)
+        assertEquals("medium", IdPhotoState(aiFeather = " medium ").normalized().aiFeather)
+        assertEquals(IdFeather.STRONG, IdPhotoState(feather = "strong").localFeather())
+        assertEquals(IdFeather.NONE, IdPhotoState(feather = "strong", aiFeather = "weak").localFeather())
+        assertEquals(IdFeather.WEAK, IdPhotoState(feather = "weak", aiFeather = "none").localFeather())
+        assertFalse(DEFAULT_ID_PHOTO_AI_FEATHER)
     }
 
     // ---------------------------------------------------------------------------------------

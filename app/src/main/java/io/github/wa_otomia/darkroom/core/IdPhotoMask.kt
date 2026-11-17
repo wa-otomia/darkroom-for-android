@@ -1,7 +1,6 @@
 package io.github.wa_otomia.darkroom.core
 
 import kotlin.math.abs
-import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 // Mask checks, feathering and compositing for ID photo backgrounds (AIPV030-R04, EDID040).
@@ -80,11 +79,18 @@ fun idMaskInteriorRadius(width: Int, height: Int): Int =
  * 3. white (≥223) < 1 % → NO_PERSON; 4. white > 99 % → NO_BACKGROUND;
  * 5. non-black (>32) share of the top, left and right bands ([idMaskBorderBand], union, bottom
  *    excluded) > 60 % → BACKGROUND_KEPT;
- * 6. mid-grey with no black pixel within [idMaskInteriorRadius] (Chebyshev, edges replicated),
- *    as a share of non-black pixels, > 15 % → SHADED.
+ * 6. mid-grey with no black pixel within [idMaskInteriorRadius] + [extraInteriorRadius]
+ *    (Chebyshev, edges replicated), as a share of non-black pixels, > 15 % → SHADED. The extra
+ *    radius is the edge gradient an AI-feathered reply was asked for (EDID040-R13), in area px.
  * An empty area has no person.
  */
-fun validateIdMask(luma: ByteArray, width: Int, height: Int, colouredCount: Long): IdMaskVerdict {
+fun validateIdMask(
+    luma: ByteArray,
+    width: Int,
+    height: Int,
+    colouredCount: Long,
+    extraInteriorRadius: Int = 0,
+): IdMaskVerdict {
     if (width <= 0 || height <= 0 || luma.size < width.toLong() * height) return IdMaskVerdict.NO_PERSON
     val n = width * height
     val total = n.toDouble()
@@ -128,7 +134,8 @@ fun validateIdMask(luma: ByteArray, width: Int, height: Int, colouredCount: Long
             nonBlackCount++
         }
     }
-    val farFromBlack = erodeAlpha(nonBlack, width, height, idMaskInteriorRadius(width, height))
+    val interiorRadius = idMaskInteriorRadius(width, height) + extraInteriorRadius.coerceAtLeast(0)
+    val farFromBlack = erodeAlpha(nonBlack, width, height, interiorRadius)
     var interiorGrey = 0L
     for (i in 0 until n) {
         val v = luma[i].toInt() and 0xFF
@@ -295,73 +302,44 @@ fun dilateAlpha(alpha: ByteArray, width: Int, height: Int, radius: Int): ByteArr
 }
 
 /**
- * Hair soft edge (EDID040-R07): pixels with 0 < α < 255 that are not on a hard-edge rim keep
- * their α, everything else is 0. A pixel is on the rim when its (2s+1)² window, s = [rimRadius]
- * (at least 1), holds both an α 0 and an α 255 pixel (edges replicated).
+ * Inward feather that also feathers fine parts (EDID040-R07): with e = [erodeAlpha] by r,
+ * F = [featherAlpha] of e (the body, as [featherAlphaInward]) and T = α − [dilateAlpha] of e (the
+ * opening residue: strands and flyaways narrower than 2r+1 that the opening cannot restore),
+ * `out = max(F, min(T, featherAlpha(T, r)))`. Fine parts are smoothed by the same radius and
+ * clipped to their own footprint, so they fade with the feather instead of vanishing or staying
+ * crisp. α 0 stays 0, no pixel ends above its α, and a mask the opening restores (wide parts,
+ * monotone ramps) gives exactly F. A radius of 0 or less returns a copy.
  */
-fun idMaskSoftAlpha(alpha: ByteArray, width: Int, height: Int, rimRadius: Int): ByteArray {
-    if (width <= 0 || height <= 0 || alpha.size < width * height) return ByteArray(alpha.size)
-    val s = rimRadius.coerceAtLeast(1)
-    val low = erodeAlpha(alpha, width, height, s)
-    val high = dilateAlpha(alpha, width, height, s)
-    val out = ByteArray(alpha.size)
-    for (i in 0 until width * height) {
-        val v = alpha[i].toInt() and 0xFF
-        if (v == 0 || v == 255) continue
-        val rim = (low[i].toInt() and 0xFF) == 0 && (high[i].toInt() and 0xFF) == 255
-        if (!rim) out[i] = v.toByte()
+fun featherAlphaInwardFine(alpha: ByteArray, width: Int, height: Int, radius: Int): ByteArray {
+    if (radius <= 0 || width <= 0 || height <= 0 || alpha.size < width * height) return alpha.copyOf()
+    val n = width * height
+    val eroded = erodeAlpha(alpha, width, height, radius)
+    val out = featherAlpha(eroded, width, height, radius)
+    val opened = dilateAlpha(eroded, width, height, radius)
+    val fine = ByteArray(n)
+    var any = false
+    for (i in 0 until n) {
+        val t = (alpha[i].toInt() and 0xFF) - (opened[i].toInt() and 0xFF)
+        if (t > 0) {
+            fine[i] = t.toByte()
+            any = true
+        }
+    }
+    if (!any) return out
+    val smoothed = featherAlpha(fine, width, height, radius)
+    for (i in 0 until n) {
+        val keep = minOf(fine[i].toInt() and 0xFF, smoothed[i].toInt() and 0xFF)
+        if (keep > (out[i].toInt() and 0xFF)) out[i] = keep.toByte()
     }
     return out
 }
 
 /**
- * Inward feather that keeps hair (EDID040-R07): `out = max(F, min(α, Q))` with
- * F = [featherAlphaInward] by [radius] and Q = [dilateAlpha] of [idMaskSoftAlpha] by 2·[radius].
- * Soft hair keeps its exact α, a mask with no soft pixel gives exactly F, α 0 stays 0 and no
- * pixel ends above its α. A radius of 0 or less returns a copy.
+ * [featherAlphaInwardFine] when [inward], otherwise the symmetric [featherAlpha] (which also
+ * spreads fine parts outward).
  */
-fun featherAlphaInwardKeepSoft(alpha: ByteArray, width: Int, height: Int, radius: Int, rimRadius: Int): ByteArray {
-    if (radius <= 0 || width <= 0 || height <= 0 || alpha.size < width * height) return alpha.copyOf()
-    val inward = featherAlphaInward(alpha, width, height, radius)
-    val soft = idMaskSoftAlpha(alpha, width, height, rimRadius)
-    if (soft.all { it.toInt() == 0 }) return inward
-    val near = dilateAlpha(soft, width, height, 2 * radius)
-    for (i in 0 until width * height) {
-        val keep = minOf(alpha[i].toInt() and 0xFF, near[i].toInt() and 0xFF)
-        if (keep > (inward[i].toInt() and 0xFF)) inward[i] = keep.toByte()
-    }
-    return inward
-}
-
-/**
- * [featherAlphaInwardKeepSoft] when [inward], otherwise the symmetric [featherAlpha] (which
- * smooths hair too). [rimRadius] is [idMaskRimRadius] for the render.
- */
-fun featherAlphaFor(
-    alpha: ByteArray,
-    width: Int,
-    height: Int,
-    radius: Int,
-    inward: Boolean,
-    rimRadius: Int = 1,
-): ByteArray =
-    if (inward) {
-        featherAlphaInwardKeepSoft(alpha, width, height, radius, rimRadius)
-    } else {
-        featherAlpha(alpha, width, height, radius)
-    }
-
-/**
- * Hard-edge rim radius in render px: one mask px spans [maskPxInRender] = m render px. A hard
- * edge with one grey mask px, once bilinearly resampled and thresholded by [idMaskLumaToAlpha],
- * leaves a partial-α band up to about two mask px wide, so s = max(1, ceil(2·m)) keeps every
- * px of that band within s of both an α 0 and an α 255 px. A non-finite or non-positive span
- * gives 1.
- */
-fun idMaskRimRadius(maskPxInRender: Float): Int {
-    if (!maskPxInRender.isFinite() || maskPxInRender <= 0.5f) return 1
-    return ceil(2.0 * maskPxInRender.toDouble() - 1e-6).toInt().coerceAtLeast(1)
-}
+fun featherAlphaFor(alpha: ByteArray, width: Int, height: Int, radius: Int, inward: Boolean): ByteArray =
+    if (inward) featherAlphaInwardFine(alpha, width, height, radius) else featherAlpha(alpha, width, height, radius)
 
 /**
  * `out = src·a + bg·(1−a)` with `a = srcA/255 · α/255`. The result is opaque; an opaque

@@ -290,7 +290,10 @@ internal fun IdMaskJobRow(job: IdMaskJobUi, elsewhere: String?) {
  * "cut out on this device" switch row ([local], EDID040-R10), the cut-out button and its gate,
  * the running job, the last failure, "view this cut-out's result" whenever [onViewCutoutResult]
  * is set (a failure record exists for the version, EDID040-R09), the palette, the feather
- * selector and the inward feather switch row below it (EDID040-R07).
+ * selector and the inward feather switch row below it (EDID040-R07). The "AI 羽化" switch row
+ * ([aiFeather], EDID040-R12) sits under the on-device one; when the next cut-out asks the AI to
+ * feather, the levels are selectable before any mask, and [bakedFeather] (the level an
+ * AI-feathered mask was made with, EDID040-R13) explains why a change needs a new cut-out.
  * [compositing] freezes the cut-out button, palette, feather and inward switch while the preview
  * builds a new composite (EDID040-R08). Side-effect free: every action is a callback.
  */
@@ -300,6 +303,9 @@ internal fun IdPhotoProcessSection(
     keySet: Boolean,
     local: Boolean,
     localSwitchEnabled: Boolean,
+    aiFeather: Boolean,
+    aiFeatherSwitchEnabled: Boolean,
+    bakedFeather: IdFeather?,
     hasMask: Boolean,
     background: IdBackground,
     feather: IdFeather,
@@ -311,6 +317,7 @@ internal fun IdPhotoProcessSection(
     maskError: String?,
     onCutOut: () -> Unit,
     onLocalChange: (Boolean) -> Unit,
+    onAiFeatherChange: (Boolean) -> Unit,
     onOpenSettings: () -> Unit,
     onBackground: (IdBackground) -> Unit,
     onFeather: (IdFeather) -> Unit,
@@ -332,6 +339,16 @@ internal fun IdPhotoProcessSection(
                 enabled = localSwitchEnabled,
                 onCheckedChange = onLocalChange,
             )
+            // EDID040-R12: an app setting; it only shapes the next AI cut-out.
+            StudioSwitchRow(
+                label = stringResource(R.string.studio_id_ai_feather),
+                checked = aiFeather,
+                enabled = aiFeatherSwitchEnabled,
+                onCheckedChange = onAiFeatherChange,
+            )
+            if (aiFeather && !local) {
+                StudioNote(stringResource(R.string.studio_id_ai_feather_note), topPadding = 0)
+            }
             if (idShowNeedKey(local = local, keySet = keySet)) {
                 Text(
                     stringResource(R.string.grok_need_key),
@@ -388,7 +405,13 @@ internal fun IdPhotoProcessSection(
             StudioNote(stringResource(R.string.studio_id_authority_note))
         }
 
-        val featherEnabled = paletteEnabled && background.needsMask
+        val aiFeatherAsked = idAiFeatherAsked(aiFeather = aiFeather, local = local)
+        val featherEnabled = idFeatherSelectable(
+            hasMask = hasMask,
+            needsMask = background.needsMask,
+            aiFeatherAsked = aiFeatherAsked,
+            busy = maskJob != null || compositing,
+        )
         Column(Modifier.fillMaxWidth()) {
             SectionLabel(stringResource(R.string.studio_id_feather))
             FlowRow(
@@ -399,7 +422,7 @@ internal fun IdPhotoProcessSection(
                 IdFeather.entries.forEach { option ->
                     IdFeatherChip(
                         label = stringResource(idFeatherLabelRes(option)),
-                        selected = hasMask && option == feather,
+                        selected = (hasMask || aiFeatherAsked) && option == feather,
                         enabled = featherEnabled,
                         onClick = { onFeather(option) },
                     )
@@ -413,6 +436,11 @@ internal fun IdPhotoProcessSection(
                 enabled = featherEnabled && feather != IdFeather.NONE,
                 onCheckedChange = onFeatherInward,
             )
+            if (hasMask && bakedFeather != null) {
+                StudioNote(
+                    stringResource(R.string.studio_id_ai_feather_baked, stringResource(idFeatherLabelRes(bakedFeather))),
+                )
+            }
         }
     }
 }

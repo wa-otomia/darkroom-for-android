@@ -96,6 +96,7 @@ import io.github.wa_otomia.darkroom.core.framingFor
 import io.github.wa_otomia.darkroom.core.idBackground
 import io.github.wa_otomia.darkroom.core.idFeather
 import io.github.wa_otomia.darkroom.core.idInitialPose
+import io.github.wa_otomia.darkroom.core.idMaskAiFeatherRequest
 import io.github.wa_otomia.darkroom.core.idMaskRequired
 import io.github.wa_otomia.darkroom.core.idPhotoFor
 import io.github.wa_otomia.darkroom.core.idPhotoLayout
@@ -187,6 +188,8 @@ fun StudioScreen(
     val appSettings by settings.settings.collectAsState()
     // An app setting, not per version (EDID040-R10); read at the tap to freeze the job's mode.
     val idLocalCutout by settings.idPhotoLocalCutoutFlow.collectAsState()
+    // EDID040-R12: also an app setting, read at the tap with the level to freeze the request.
+    val idAiFeather by settings.idPhotoAiFeatherFlow.collectAsState()
     val scope = rememberCoroutineScope()
     val printJobs by printQueue.printJobs.collectAsState(initial = emptyList())
     val runningProgress by printQueue.runningProgress.collectAsState(initial = null)
@@ -693,7 +696,19 @@ fun StudioScreen(
         maskCutVersion = version
         try {
             // The mode is frozen into the job here (EDID040-R10): what the switch shows now.
-            aiJobs.enqueueMask(photo.id, source, local = idLocalCutout)
+            // EDID040-R13: so is the AI feather, with the level and size on screen now.
+            val aiFeather = idMaskAiFeatherRequest(
+                enabled = idAiFeather,
+                local = idLocalCutout,
+                feather = idFeatherChoice,
+                inward = idFeatherInward,
+                cellWidth = idLayout.cellWidth,
+                cellHeight = idLayout.cellHeight,
+                imageWidth = orientedW,
+                imageHeight = orientedH,
+                zoom = idZoom,
+            )
+            aiJobs.enqueueMask(photo.id, source, local = idLocalCutout, aiFeather = aiFeather)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -1084,6 +1099,13 @@ fun StudioScreen(
                     keySet = grokPub.keySet,
                     local = idLocalCutout,
                     localSwitchEnabled = idLocalSwitchEnabled(busy = aiBusy, compositing = idCompositing),
+                    aiFeather = idAiFeather,
+                    aiFeatherSwitchEnabled = idAiFeatherSwitchEnabled(
+                        local = idLocalCutout,
+                        busy = aiBusy,
+                        compositing = idCompositing,
+                    ),
+                    bakedFeather = idStored?.aiFeatherLevel,
                     hasMask = idHasMask,
                     background = idBg,
                     feather = idFeatherChoice,
@@ -1095,6 +1117,7 @@ fun StudioScreen(
                     maskError = maskErrorHere,
                     onCutOut = onCutOut,
                     onLocalChange = { settings.setIdPhotoLocalCutout(it) },
+                    onAiFeatherChange = { settings.setIdPhotoAiFeather(it) },
                     onOpenSettings = { onSettings("grok") },
                     onBackground = onIdBackground,
                     onFeather = onIdFeather,
@@ -1296,7 +1319,8 @@ fun StudioScreen(
                 imageFile = imageFile,
                 maskRev = idStored?.maskRev,
                 background = idBg,
-                feather = idFeatherChoice,
+                // EDID040-R13: an AI-feathered mask gets no on-device feather.
+                feather = if (idStored?.aiFeatherLevel != null) IdFeather.NONE else idFeatherChoice,
                 featherInward = idFeatherInward,
                 zoom = idZoom,
                 layout = idLayout,

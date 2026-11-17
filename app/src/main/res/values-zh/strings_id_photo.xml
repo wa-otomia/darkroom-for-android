@@ -33,6 +33,9 @@
     <string name="studio_id_recut">重新抠图</string>
     <string name="studio_id_cutout_local">本地抠出人像</string>
     <string name="studio_id_local_cutout">本地抠图</string>
+    <string name="studio_id_ai_feather">AI 羽化</string>
+    <string name="studio_id_ai_feather_note">抠图时由 AI 按下方所选羽化直接生成柔和边缘（含发丝），本机不再叠加羽化。已有蒙版需重新抠图才会改用 AI 羽化。</string>
+    <string name="studio_id_ai_feather_baked">当前蒙版已由 AI 按“%1$s”羽化，本机不再叠加羽化。更改羽化后需重新抠图才会生效。</string>
     <string name="studio_id_local_explain">在本机用 Google ML Kit 分割人像，照片与抠图结果不上传，也不需要 API 密钥。边缘（尤其发丝）通常比 AI 抠图粗糙。</string>
     <string name="studio_id_cutting">正在抠图…</string>
     <string name="studio_id_cutting_other">正在为另一版本（%1$s）抠图…</string>

@@ -33,6 +33,9 @@
     <string name="studio_id_recut">다시 오려내기</string>
     <string name="studio_id_cutout_local">기기에서 인물 오려내기</string>
     <string name="studio_id_local_cutout">기기에서 오려내기</string>
+    <string name="studio_id_ai_feather">AI로 가장자리 부드럽게</string>
+    <string name="studio_id_ai_feather_note">오려낼 때 아래에서 고른 단계로 AI가 머리카락을 포함한 부드러운 가장자리를 직접 만듭니다. 기기에서는 더 부드럽게 처리하지 않습니다. 기존 마스크는 다시 오려내야 바뀝니다.</string>
+    <string name="studio_id_ai_feather_baked">이 마스크는 AI가 “%1$s” 단계로 가장자리를 부드럽게 했으므로 기기에서는 더 처리하지 않습니다. 단계를 바꾸면 다시 오려낸 뒤 적용됩니다.</string>
     <string name="studio_id_local_explain">이 기기에서 Google ML Kit로 인물을 오려냅니다. 사진과 결과는 업로드되지 않으며 API 키가 필요 없습니다. 머리카락 등 가장자리는 AI 오려내기보다 거칠 수 있습니다.</string>
     <string name="studio_id_cutting">오려내는 중…</string>
     <string name="studio_id_cutting_other">다른 버전(%1$s)을 오려내는 중…</string>

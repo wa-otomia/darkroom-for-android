@@ -227,13 +227,8 @@ class IdPhotoMaskTest {
             assertArrayEquals("r=$r", featherAlpha(a, 50, 37, r), featherAlphaFor(a, 50, 37, r, inward = false))
             assertArrayEquals(
                 "r=$r",
-                featherAlphaInwardKeepSoft(a, 50, 37, r, 1),
+                featherAlphaInwardFine(a, 50, 37, r),
                 featherAlphaFor(a, 50, 37, r, inward = true),
-            )
-            assertArrayEquals(
-                "r=$r",
-                featherAlphaInwardKeepSoft(a, 50, 37, r, 3),
-                featherAlphaFor(a, 50, 37, r, inward = true, rimRadius = 3),
             )
         }
     }

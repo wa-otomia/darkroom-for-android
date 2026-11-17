@@ -7,6 +7,7 @@ import io.github.wa_otomia.darkroom.core.GENERATED_PHOTO_TAG
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_MISSING
 import io.github.wa_otomia.darkroom.core.IdBackground
 import io.github.wa_otomia.darkroom.core.IdFeather
+import io.github.wa_otomia.darkroom.core.IdMaskAiFeather
 import io.github.wa_otomia.darkroom.core.IdPhotoPose
 import io.github.wa_otomia.darkroom.core.IdPhotoState
 import io.github.wa_otomia.darkroom.core.PhotoMeta
@@ -512,7 +513,12 @@ class CatalogRepository @Inject constructor(
      * written to a temp name and renamed before the row changes; the previous revision's file is
      * deleted only after the row points at the new one.
      */
-    suspend fun saveIdPhotoMask(photoId: String, source: String, png: ByteArray): Boolean = withContext(Dispatchers.IO) {
+    suspend fun saveIdPhotoMask(
+        photoId: String,
+        source: String,
+        png: ByteArray,
+        aiFeather: IdMaskAiFeather? = null,
+    ): Boolean = withContext(Dispatchers.IO) {
         rowLock.withLock {
             val current = get(photoId) ?: return@withLock false
             val key = framingVersionKey(source)
@@ -523,10 +529,19 @@ class CatalogRepository @Inject constructor(
             val old = current.idPhotoFor(key)
             val firstMask = old?.hasMask != true
             val base = old ?: IdPhotoState()
+            // EDID040-R13: an AI-feathered mask records its level and takes the asked feather;
+            // any other mask clears the record and keeps the first-mask default.
+            val baked = aiFeather?.takeIf { it.feather != IdFeather.NONE }
             val state = base.copy(
                 maskRev = rev,
                 background = if (firstMask) IdBackground.NAVY.id else base.background,
-                feather = if (firstMask) IdFeather.WEAK.id else base.feather,
+                feather = when {
+                    baked != null -> baked.feather.id
+                    firstMask -> IdFeather.WEAK.id
+                    else -> base.feather
+                },
+                featherInward = baked?.inward ?: base.featherInward,
+                aiFeather = baked?.feather?.id,
             ).normalized()
             val next = current.withIdPhoto(key, state)
             try {

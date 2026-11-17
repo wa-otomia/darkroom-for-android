@@ -103,6 +103,24 @@ class IdPhotoStateCodecTest {
     }
 
     @Test
+    fun aiFeatherDefaultsNullAndRoundTrips() {
+        // EDID040-R13: legacy JSON reads as not AI-feathered; the record survives a round trip
+        // and a pose save, and a bad value decodes to none.
+        val legacy = """{"e1":{"idPhoto":{"active":true,"presetId":"35x45","background":"navy","feather":"weak","maskRev":"abc"}}}"""
+        val (_, old) = decodeVersionStates(legacy)
+        assertEquals(null, old.getValue("e1").aiFeather)
+        val baked = IdPhotoState(active = true, background = "white", feather = "medium", maskRev = "r1", aiFeather = "medium")
+        val raw = encodeVersionStates(emptyMap(), mapOf("e1" to baked))
+        assertTrue(raw.contains("\"aiFeather\":\"medium\""))
+        val (_, back) = decodeVersionStates(raw)
+        assertEquals(baked, back["e1"])
+        val merged = mergeIdPhotoPose(baked, active = false, presetId = "kr-visa", pose = IdPhotoPose(), createIfMissing = false)!!
+        assertEquals("medium", merged.aiFeather)
+        val bogus = """{"e1":{"idPhoto":{"active":true,"maskRev":"abc","aiFeather":"none"}}}"""
+        assertEquals(null, decodeVersionStates(bogus).second.getValue("e1").normalized().aiFeather)
+    }
+
+    @Test
     fun presetLookupFallsBackToDefault() {
         assertEquals("35x45", idPhotoPreset(null).id)
         assertEquals("35x45", idPhotoPreset("").id)
