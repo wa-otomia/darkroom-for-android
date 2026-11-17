@@ -30,6 +30,12 @@ const val DEVICE_BACKOFF_CAP_MS = 60_000L
 const val DEVICE_MIN_LIFETIME_MS = 600_000L
 const val TOKEN_REFRESH_WINDOW_MS = 5 * 60_000L
 
+/** Upper bound for device-flow interval and expires_in, so seconds-to-ms never overflows. */
+const val DEVICE_MAX_SECONDS = 86_400L
+
+/** Upper bound for a token's expires_in (ten years). */
+const val TOKEN_MAX_LIFETIME_S = 10 * 365 * 86_400L
+
 private val XaiJson = Json { ignoreUnknownKeys = true }
 
 private fun parseObject(body: String?): JsonObject? =
@@ -186,15 +192,18 @@ sealed interface PollStep {
 }
 
 fun initialPollState(auth: DeviceAuthorization, nowMs: Long): PollState {
-    val interval = auth.intervalS?.takeIf { it > 0 }?.let { it * 1000 } ?: DEVICE_DEFAULT_INTERVAL_MS
-    val lifetime = maxOf((auth.expiresInS ?: 0L) * 1000, DEVICE_MIN_LIFETIME_MS)
+    val interval = auth.intervalS?.takeIf { it > 0 }?.let { it.coerceAtMost(DEVICE_MAX_SECONDS) * 1000 }
+        ?: DEVICE_DEFAULT_INTERVAL_MS
+    val lifetime = maxOf((auth.expiresInS ?: 0L).coerceIn(0, DEVICE_MAX_SECONDS) * 1000, DEVICE_MIN_LIFETIME_MS)
     return PollState(intervalMs = interval, deadlineMs = nowMs + lifetime)
 }
 
 private fun waitOrExpire(state: PollState, nowMs: Long): PollStep {
     val remaining = state.deadlineMs - nowMs
     if (remaining <= 0) return PollStep.Done(LoginFailure.EXPIRED)
-    return PollStep.Wait(minOf(state.intervalMs, remaining), state)
+    // A non-positive interval would poll back to back; fall back to the RFC 8628 default.
+    val safe = if (state.intervalMs > 0) state else state.copy(intervalMs = DEVICE_DEFAULT_INTERVAL_MS)
+    return PollStep.Wait(minOf(safe.intervalMs, remaining), safe)
 }
 
 /** The first request is also preceded by one interval. */
@@ -215,6 +224,7 @@ fun classifyTokenPoll(status: Int?, body: String?, nowWallMs: Long): PollOutcome
         else -> PollOutcome.Stop(LoginFailure.FAILED)
     }
     status == 403 -> PollOutcome.Stop(LoginFailure.FORBIDDEN)
+    status == 404 -> PollOutcome.Stop(LoginFailure.UNAVAILABLE)
     isTransientStatus(status) -> PollOutcome.Transient
     else -> PollOutcome.Stop(LoginFailure.FAILED)
 }
@@ -267,7 +277,7 @@ fun parseTokenResponse(body: String, nowWallMs: Long, requireRefresh: Boolean): 
     }
     val refresh = root.string("refresh_token")?.takeIf { it.isNotBlank() }
     if (requireRefresh && refresh == null) return TokenParse.Incomplete
-    val expiresIn = root.number("expires_in")?.takeIf { it > 0 }
+    val expiresIn = root.number("expires_in")?.takeIf { it > 0 }?.coerceAtMost(TOKEN_MAX_LIFETIME_S)
     val expiresAt = if (expiresIn != null) nowWallMs + expiresIn * 1000 else jwtExpiryMs(access)
     return TokenParse.Ok(
         accessToken = access,

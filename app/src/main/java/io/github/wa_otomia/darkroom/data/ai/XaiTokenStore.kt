@@ -2,6 +2,7 @@ package io.github.wa_otomia.darkroom.data.ai
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.wa_otomia.darkroom.core.StoredXaiCredential
@@ -18,6 +19,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.security.KeyStore
+import java.security.UnrecoverableKeyException
+import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -28,8 +31,11 @@ import javax.inject.Singleton
 /**
  * Subscription tokens encrypted with a non-exportable AndroidKeyStore AES-256-GCM key, in
  * noBackupFilesDir so they never reach cloud backup or device transfer (AIPV050-R07, SYPM040-R04).
- * Any failure to read them back counts as signed out: the file is deleted, nothing is thrown and
- * nothing about the content is logged.
+ * Only a permanently unreadable credential counts as signed out (bad header or version, missing key,
+ * failed authentication tag, invalidated or unrecoverable key, corrupt content or a disallowed
+ * endpoint): the file is deleted, plus the key when the key itself is the cause. Any other failure
+ * (I/O, a busy Keystore) reads as signed out for this call only and deletes nothing, so the next
+ * load() tries again. Nothing is thrown and nothing about the content is logged.
  */
 @Singleton
 class KeystoreXaiTokenStore @Inject constructor(
@@ -47,8 +53,13 @@ class KeystoreXaiTokenStore @Inject constructor(
         if (cacheValid) return cached
         val result = try {
             readFile()
-        } catch (_: Exception) {
-            discard()
+        } catch (e: Exception) {
+            when (e) {
+                is KeyPermanentlyInvalidatedException, is UnrecoverableKeyException -> discard(dropKey = true)
+                is CorruptCredentialException, is AEADBadTagException -> discard(dropKey = false)
+                // Possibly transient: keep the file and the key, and leave the cache invalid.
+                else -> return null
+            }
             null
         }
         cached = result
@@ -99,19 +110,24 @@ class KeystoreXaiTokenStore @Inject constructor(
         val f = file
         if (!f.isFile) return null
         val bytes = f.readBytes()
-        if (bytes.size <= 1 + IV_BYTES || bytes[0] != VERSION) throw IOException("bad header")
-        val key = key(create = false) ?: throw IOException("no key")
+        if (bytes.size <= 1 + IV_BYTES || bytes[0] != VERSION) throw CorruptCredentialException()
+        val key = key(create = false) ?: throw CorruptCredentialException()
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(TAG_BITS, bytes, 1, IV_BYTES))
         cipher.updateAAD(AAD)
         val plain = cipher.doFinal(bytes, 1 + IV_BYTES, bytes.size - 1 - IV_BYTES)
-        return decode(String(plain, Charsets.UTF_8)) ?: throw IOException("bad content")
+        val text = String(plain, Charsets.UTF_8)
+        return runCatching { decode(text) }.getOrNull() ?: throw CorruptCredentialException()
     }
 
-    /** Unreadable credential: drop the file and the key so the next sign-in starts clean. */
-    private fun discard() {
+    /** Permanently unreadable credential, distinct from I/O or Keystore errors that may pass. */
+    private class CorruptCredentialException : Exception()
+
+    /** Drops the file, and the key when the key itself is unusable, so the next sign-in starts clean. */
+    private fun discard(dropKey: Boolean) {
         file.delete()
         tmp.delete()
+        if (!dropKey) return
         runCatching {
             val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
             if (ks.containsAlias(KEY_ALIAS)) ks.deleteEntry(KEY_ALIAS)

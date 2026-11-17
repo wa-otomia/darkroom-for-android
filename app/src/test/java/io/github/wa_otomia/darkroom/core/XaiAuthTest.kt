@@ -173,6 +173,41 @@ class XaiAuthTest {
     }
 
     @Test
+    fun hugeIntervalAndExpiryDoNotOverflow() {
+        for (body in listOf(
+            """{"device_code":"dc","user_code":"ABCD-EFGH","verification_uri":"https://accounts.x.ai/device","expires_in":1e30,"interval":1e30}""",
+            """{"device_code":"dc","user_code":"ABCD-EFGH","verification_uri":"https://accounts.x.ai/device","expires_in":"9223372036854775807","interval":"9223372036854775807"}""",
+        )) {
+            val parsed = parseDeviceAuthorization(body) as DeviceAuthParse.Ok
+            val s = initialPollState(parsed.auth, nowMs = 1_000)
+            assertEquals(DEVICE_MAX_SECONDS * 1000, s.intervalMs)
+            assertEquals(1_000 + DEVICE_MAX_SECONDS * 1000, s.deadlineMs)
+            val first = waitOf(firstPollStep(s, 1_000))
+            assertTrue(first.delayMs > 0)
+            for (outcome in listOf(PollOutcome.Pending, PollOutcome.SlowDown, PollOutcome.Transient)) {
+                assertTrue(waitOf(nextPollStep(s, outcome, 2_000)).delayMs > 0)
+            }
+        }
+    }
+
+    @Test
+    fun nonPositiveIntervalNeverPollsBackToBack() {
+        val step = waitOf(firstPollStep(PollState(intervalMs = -1_000, deadlineMs = 600_000), 0))
+        assertEquals(DEVICE_DEFAULT_INTERVAL_MS, step.delayMs)
+        assertEquals(DEVICE_DEFAULT_INTERVAL_MS, step.state.intervalMs)
+        assertEquals(DEVICE_DEFAULT_INTERVAL_MS, waitOf(nextPollStep(PollState(0, 600_000), PollOutcome.Pending, 0)).delayMs)
+    }
+
+    @Test
+    fun hugeTokenExpiresInDoesNotOverflow() {
+        val now = 1_700_000_000_000L
+        val ok = parseTokenResponse(
+            """{"access_token":"at","refresh_token":"rt","expires_in":"9223372036854775807"}""", now, requireRefresh = true,
+        ) as TokenParse.Ok
+        assertEquals(now + TOKEN_MAX_LIFETIME_S * 1000, ok.expiresAtMs)
+    }
+
+    @Test
     fun deadlineIsAtLeastTenMinutes() {
         assertEquals(600_000, initialPollState(auth(expiresIn = 300), 0).deadlineMs)
         assertEquals(900_000, initialPollState(auth(expiresIn = 900), 0).deadlineMs)
@@ -234,6 +269,7 @@ class XaiAuthTest {
         assertEquals(PollOutcome.Stop(LoginFailure.INVALID_CLIENT), classifyTokenPoll(400, err("invalid_scope"), 0))
         assertEquals(PollOutcome.Stop(LoginFailure.FAILED), classifyTokenPoll(400, err("something_new"), 0))
         assertEquals(PollOutcome.Stop(LoginFailure.FORBIDDEN), classifyTokenPoll(403, null, 0))
+        assertEquals(PollOutcome.Stop(LoginFailure.UNAVAILABLE), classifyTokenPoll(404, null, 0))
         assertEquals(PollOutcome.Transient, classifyTokenPoll(null, null, 0))
         assertEquals(PollOutcome.Transient, classifyTokenPoll(429, null, 0))
         assertEquals(PollOutcome.Transient, classifyTokenPoll(502, null, 0))

@@ -192,7 +192,7 @@ fun DarkroomNav(
                     photos = photos,
                     transfers = transfers,
                     aiJobs = aiJobList,
-                    grokReady = grokPub.credentialReady,
+                    grokCredential = grokPub.credential,
                     printerReady = appSettings.printerMac.isNotBlank(),
                     autoEdit = appSettings.autoEdit,
                     autoWatermark = appSettings.autoWatermark,
