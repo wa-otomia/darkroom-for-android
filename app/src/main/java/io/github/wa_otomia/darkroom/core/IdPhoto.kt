@@ -573,6 +573,15 @@ fun idMaskFailureMessage(message: String?): String {
  */
 fun idMaskFailureReply(reply: ByteArray?): ByteArray? = reply?.takeIf { it.isNotEmpty() }
 
+/**
+ * True when a cut-out job that threw [error] ends as a user cancel (no failure record): the
+ * error is a cancellation, or the job was already cancelled ([jobActive] false). A cancel that
+ * lands while a reply is decoded can surface as the decode's own error instead of a
+ * cancellation, so the job's state decides (EDID040-R09).
+ */
+fun idMaskEndsAsCancel(error: Throwable, jobActive: Boolean): Boolean =
+    error is kotlin.coroutines.cancellation.CancellationException || !jobActive
+
 /** The record of a failed cut-out with [message], at [at], given the [reply] bytes received. */
 fun idMaskFailureRecord(message: String?, reply: ByteArray?, at: Long): IdMaskFailureRecord =
     IdMaskFailureRecord(idMaskFailureMessage(message), at, idMaskFailureReply(reply) != null)

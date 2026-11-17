@@ -63,6 +63,20 @@ class IdMaskFailureRecordTest {
     }
 
     @Test
+    fun userCancelNeverEndsAsAFailure() {
+        // A cancellation always ends as a cancel.
+        assertTrue(idMaskEndsAsCancel(kotlin.coroutines.cancellation.CancellationException("x"), jobActive = true))
+        assertTrue(idMaskEndsAsCancel(kotlin.coroutines.cancellation.CancellationException("x"), jobActive = false))
+        // A cancel that lands while the reply is decoded surfaces as the decode's own error:
+        // the cancelled job still ends as a cancel, with no failure record.
+        for (m in listOf(ID_MASK_MSG_UNDECODABLE, ID_MASK_MSG_ASPECT, ID_MASK_MSG_NOT_BINARY, "HTTP 500")) {
+            assertTrue(m, idMaskEndsAsCancel(IllegalStateException(m), jobActive = false))
+            // The same error in a job nobody cancelled is a failure.
+            assertFalse(m, idMaskEndsAsCancel(IllegalStateException(m), jobActive = true))
+        }
+    }
+
+    @Test
     fun recordRoundTripsWithStableKeys() {
         val record = IdMaskFailureRecord(ID_MASK_MSG_NOT_BINARY, 1_763_000_000_000L, hasImage = true)
         val raw = encodeIdMaskFailureRecord(record)
