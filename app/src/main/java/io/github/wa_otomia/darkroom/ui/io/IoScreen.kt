@@ -20,8 +20,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,7 +28,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -75,7 +72,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -132,10 +128,8 @@ import io.github.wa_otomia.darkroom.ui.transferProgressUi
 import io.github.wa_otomia.darkroom.ui.theme.Amber
 import io.github.wa_otomia.darkroom.ui.theme.AmberSoft
 import io.github.wa_otomia.darkroom.ui.theme.MonoFont
-import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
-import io.github.wa_otomia.darkroom.ui.theme.Surface1
 import io.github.wa_otomia.darkroom.ui.theme.Surface2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -884,10 +878,11 @@ private fun LocalNetworkBlockedNotice(
     onGrant: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    TitledNotice(
+    NoticeCard(
         title = stringResource(R.string.ftp_local_network_title),
-        description = stringResource(R.string.ftp_local_network_desc),
+        text = stringResource(R.string.ftp_local_network_desc),
         icon = Icons.Outlined.WifiOff,
+        modifier = Modifier.padding(top = 12.dp),
     ) {
         if (!permanentlyBlocked) {
             TonalButton(
@@ -906,66 +901,17 @@ private fun LocalNetworkBlockedNotice(
 
 @Composable
 private fun NotificationBlockedNotice(onOpenSettings: () -> Unit) {
-    TitledNotice(
+    NoticeCard(
         title = stringResource(R.string.lib_io_notif_blocked_title),
-        description = stringResource(R.string.lib_io_notif_blocked_desc),
+        text = stringResource(R.string.lib_io_notif_blocked_desc),
         icon = Icons.Outlined.NotificationsOff,
+        modifier = Modifier.padding(top = 12.dp),
     ) {
         TonalButton(
             stringResource(R.string.lib_io_open_settings),
             fillMaxWidth = false,
             onClick = onOpenSettings,
         )
-    }
-}
-
-/**
- * [io.github.wa_otomia.darkroom.ui.components.NoticeCard] look (Surface1, 16dp corners, 1dp Amber
- * 50% outline, Amber icon) with a separate Amber title and PaperDim description, which NoticeCard's
- * single text cannot carry. Amber on Surface1 8.10:1; PaperDim on Surface1 5.16:1.
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun TitledNotice(
-    title: String,
-    description: String,
-    icon: ImageVector,
-    actions: @Composable RowScope.() -> Unit,
-) {
-    Column(
-        Modifier
-            .padding(top = 12.dp)
-            .fillMaxWidth()
-            .clip(PanelShape)
-            .background(Surface1)
-            .border(1.dp, Amber.copy(alpha = 0.5f), PanelShape)
-            .padding(14.dp),
-    ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = Amber,
-                modifier = Modifier.padding(top = 1.dp, end = 10.dp).size(18.dp),
-            )
-            Column(Modifier.weight(1f)) {
-                Text(title, color = Amber, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
-                Text(
-                    description,
-                    color = PaperDim,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-        }
-        FlowRow(
-            modifier = Modifier.padding(top = 10.dp, start = 28.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            actions()
-        }
     }
 }
 

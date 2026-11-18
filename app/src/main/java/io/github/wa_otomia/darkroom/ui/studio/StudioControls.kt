@@ -1,6 +1,5 @@
 package io.github.wa_otomia.darkroom.ui.studio
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -29,7 +27,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.BrandingWatermark
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Rotate90DegreesCcw
 import androidx.compose.material.icons.outlined.Rotate90DegreesCw
@@ -57,7 +54,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,15 +63,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import io.github.wa_otomia.darkroom.R
+import io.github.wa_otomia.darkroom.ui.components.ChipShape
+import io.github.wa_otomia.darkroom.ui.components.ChipVisualHeight
 import io.github.wa_otomia.darkroom.ui.components.DarkroomTextField
 import io.github.wa_otomia.darkroom.ui.components.IconCircleButton
+import io.github.wa_otomia.darkroom.ui.components.MinTouchTarget
 import io.github.wa_otomia.darkroom.ui.components.SelectPill
 import io.github.wa_otomia.darkroom.ui.components.TonalButton
 import io.github.wa_otomia.darkroom.ui.components.darkroomSwitchColors
 import io.github.wa_otomia.darkroom.ui.components.pressScale
 import io.github.wa_otomia.darkroom.ui.theme.Amber
-import io.github.wa_otomia.darkroom.ui.theme.AmberSoft
-import io.github.wa_otomia.darkroom.ui.theme.DarkroomMotion
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
 import io.github.wa_otomia.darkroom.ui.theme.PaperFaint
@@ -177,11 +174,6 @@ private fun chipMaxWidth() = 160.dp * LocalDensity.current.fontScale.coerceIn(1f
 private val VersionTileShape = RoundedCornerShape(12.dp)
 private val VersionTileSize = 72.dp
 
-/** Hand-drawn 36dp pills use a fixed radius, not a stadium, so a wrapped label never hits the curve. */
-private val StudioPillShape = RoundedCornerShape(18.dp)
-private val StudioPillVisualHeight = 36.dp
-private val StudioTouchTarget = 48.dp
-
 /**
  * One entry in the single-choice strip that picks which version of *this* photo
  * the cropper shows. Carries selection semantics, so TalkBack reports which one
@@ -256,7 +248,7 @@ internal fun StudioNavChip(
     val pressed by interaction.collectIsPressedAsState()
     Box(
         modifier = Modifier
-            .heightIn(min = StudioTouchTarget)
+            .heightIn(min = MinTouchTarget)
             .widthIn(max = chipMaxWidth())
             .clickable(
                 interactionSource = interaction,
@@ -271,8 +263,8 @@ internal fun StudioNavChip(
         Box(
             Modifier
                 .pressScale(interaction)
-                .heightIn(min = StudioPillVisualHeight)
-                .clip(StudioPillShape)
+                .heightIn(min = ChipVisualHeight)
+                .clip(ChipShape)
                 .background(if (pressed && enabled) Surface3 else Surface2)
                 .padding(horizontal = 14.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center,
@@ -551,93 +543,6 @@ internal fun FramingControls(
                 lineHeight = 16.sp,
                 modifier = Modifier.align(Alignment.CenterVertically).padding(start = 4.dp),
             )
-        }
-    }
-}
-
-/**
- * An on/off switch drawn as a choice pill (EDID010-R01): AmberSoft fill and Amber label when on,
- * Surface2 and Paper when off, 36dp inside a 48dp touch box. TalkBack hears the label, the
- * Switch role and the on/off state, also while disabled (a disabled toggleable ignores taps but
- * keeps its semantics). Not a [SelectPill]: that one announces selected/not selected and a
- * radio role, while this is a switch.
- */
-@Composable
-internal fun StudioToggleChip(
-    label: String,
-    checked: Boolean,
-    enabled: Boolean,
-    modifier: Modifier = Modifier,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    val state = stringResource(if (checked) R.string.studio_toggle_on else R.string.studio_toggle_off)
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val fill by animateColorAsState(
-        targetValue = when {
-            // Pressed while on still changes the fill, so the press shows with animations off
-            // (pressScale is inert then). Amber stays 4.66:1 on it over Surface1.
-            checked && pressed && enabled -> Amber.copy(alpha = 0.28f)
-            checked -> AmberSoft
-            pressed && enabled -> Surface3
-            else -> Surface2
-        },
-        animationSpec = DarkroomMotion.stateChange(),
-        label = "studioTogglePillFill",
-    )
-    val content by animateColorAsState(
-        targetValue = when {
-            !enabled -> PaperDim
-            checked -> Amber
-            else -> Paper
-        },
-        animationSpec = DarkroomMotion.stateChange(),
-        label = "studioTogglePillContent",
-    )
-    Box(
-        modifier = modifier
-            .heightIn(min = StudioTouchTarget)
-            .widthIn(min = StudioTouchTarget)
-            .toggleable(
-                value = checked,
-                interactionSource = interaction,
-                indication = null,
-                enabled = enabled,
-                role = Role.Switch,
-                onValueChange = onCheckedChange,
-            )
-            .semantics { stateDescription = state },
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            Modifier
-                .pressScale(interaction)
-                .heightIn(min = StudioPillVisualHeight)
-                .clip(StudioPillShape)
-                .background(fill)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            // The check mark and the heavier weight show "on" without relying on hue alone
-            // (the on/off fills differ by only ~1.2:1). Decorative: the state is announced.
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (checked) {
-                    Icon(
-                        Icons.Outlined.Check,
-                        contentDescription = null,
-                        tint = content,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                }
-                Text(
-                    text = label,
-                    color = content,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                    fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Medium,
-                )
-            }
         }
     }
 }

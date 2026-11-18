@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -680,9 +679,7 @@ fun GalleryScreen(
                     detail = stringResource(R.string.lib_gallery_import_label, importDone, importTotal),
                     indeterminate = importIndeterminate || importTotal == 0,
                 ),
-                // The panel runs to the screen edge behind the floating navigation pill; this
-                // keeps its progress text above the pill.
-                extra = { Spacer(Modifier.height(clearance)) },
+                // JobScrim lifts its content by LocalBottomBarClearance, above the floating pill.
             )
         }
     }

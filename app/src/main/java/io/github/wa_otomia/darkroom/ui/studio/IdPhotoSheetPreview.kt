@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -82,6 +81,7 @@ import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
 import io.github.wa_otomia.darkroom.data.imaging.ImagePipeline
 import io.github.wa_otomia.darkroom.data.progress.indeterminateUi
 import io.github.wa_otomia.darkroom.ui.components.AmberTrack
+import io.github.wa_otomia.darkroom.ui.components.FrameChipShape
 import io.github.wa_otomia.darkroom.ui.components.SnapDragState
 import io.github.wa_otomia.darkroom.ui.components.detectSnappingTransformGestures
 import io.github.wa_otomia.darkroom.ui.components.drawSnapGuides
@@ -102,9 +102,6 @@ import kotlin.math.abs
 private val SheetWhite = Color.White
 private val CutLine = Color(ID_CUT_LINE_COLOR)
 private val SheetHairline = Paper.copy(alpha = 0.3f)
-
-/** Label and note chips on the sheet frame: a 24dp-high chip with 12dp corners, as in AspectCropper. */
-private val FrameChipShape = RoundedCornerShape(12.dp)
 
 /** Zoom steps the preview cut-out is recomputed at; the feather radius depends on zoom. */
 private const val CUTOUT_ZOOM_STEP = 0.1f

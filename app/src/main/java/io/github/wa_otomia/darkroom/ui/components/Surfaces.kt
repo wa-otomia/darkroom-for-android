@@ -29,10 +29,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Icon
@@ -92,11 +94,14 @@ import io.github.wa_otomia.darkroom.ui.theme.Surface1
 import io.github.wa_otomia.darkroom.ui.theme.Surface2
 import io.github.wa_otomia.darkroom.ui.theme.Surface3
 
-/** Smallest touch target we ship, per the Material accessibility guidance. */
-internal val MinTouchTarget = 48.dp
+/**
+ * Smallest touch target we ship, per the Material accessibility guidance. Hand-drawn controls use
+ * it as `heightIn(min = MinTouchTarget)` on the clickable box around a smaller visual.
+ */
+val MinTouchTarget: Dp = 48.dp
 
 /** Visual height of chips and pills; the touch box around them stays [MinTouchTarget]. */
-internal val ChipVisualHeight = 36.dp
+val ChipVisualHeight: Dp = 36.dp
 
 /**
  * Shape for controls whose height is a 48dp minimum but can grow when large
@@ -104,10 +109,10 @@ internal val ChipVisualHeight = 36.dp
  * 48dp and turns into a rounded rectangle when taller, so a wrapped label
  * never runs into the curve the way it would with a 50% stadium.
  */
-internal val ControlShape: Shape = RoundedCornerShape(24.dp)
+val ControlShape: Shape = RoundedCornerShape(24.dp)
 
-/** Same idea as [ControlShape] for the 36dp chips. */
-internal val ChipShape: Shape = RoundedCornerShape(18.dp)
+/** Same idea as [ControlShape] for the [ChipVisualHeight] chips and pills. */
+val ChipShape: Shape = RoundedCornerShape(18.dp)
 
 /** Gap between the segmented track and the selected segment block. */
 private val SegmentInset = 3.dp
@@ -398,10 +403,17 @@ fun ListRowChevron(expanded: Boolean? = null, modifier: Modifier = Modifier) {
 
 /**
  * Inline warning or hint: [Surface1] fill, 16dp corners, 1dp outline at 50% of
- * [color], with icon and text in [color]. Amber on Surface1 8.10:1; Danger on
+ * [color], with the icon in [color]. Amber on Surface1 8.10:1; Danger on
  * Surface1 10.67:1. The 50% outline (2.93:1) is decorative — icon and text
  * carry the meaning. [actions] (e.g. a [TonalButton]) flow below the text and
  * wrap at large font sizes.
+ *
+ * Without [title], [text] is the message: 14sp in [color]. With [title], the
+ * title is the message (14sp Medium in [color]) and [text] is the detail below
+ * it: 13sp in [textColor], PaperDim by default (5.16:1 on Surface1).
+ *
+ * A notice without [actions] is merged into one TalkBack item (title and text
+ * read together); with actions the buttons stay separately focusable.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -410,6 +422,8 @@ fun NoticeCard(
     modifier: Modifier = Modifier,
     icon: ImageVector? = Icons.Outlined.Info,
     color: Color = Amber,
+    title: String? = null,
+    textColor: Color = if (title != null) PaperDim else color,
     actions: (@Composable RowScope.() -> Unit)? = null,
 ) {
     Column(
@@ -418,6 +432,7 @@ fun NoticeCard(
             .clip(PanelShape)
             .background(Surface1)
             .border(1.dp, color.copy(alpha = 0.5f), PanelShape)
+            .then(if (actions == null) Modifier.semantics(mergeDescendants = true) {} else Modifier)
             .padding(14.dp),
     ) {
         Row(verticalAlignment = Alignment.Top) {
@@ -429,7 +444,20 @@ fun NoticeCard(
                     modifier = Modifier.padding(top = 1.dp, end = 10.dp).size(18.dp),
                 )
             }
-            Text(text, color = color, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.weight(1f))
+            Column(Modifier.weight(1f)) {
+                if (title != null) {
+                    Text(title, color = color, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        text,
+                        color = textColor,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                } else {
+                    Text(text, color = textColor, fontSize = 14.sp, lineHeight = 20.sp)
+                }
+            }
         }
         if (actions != null) {
             FlowRow(
@@ -520,6 +548,87 @@ fun SelectPill(
                 Spacer(Modifier.width(6.dp))
             }
             Text(label, color = content, fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+/**
+ * On/off switch drawn as a choice pill, e.g. the Studio "ID photo" toggle (EDID010-R01). On:
+ * [AmberSoft] fill, Amber label (6.10:1 over Surface1) with a check mark and SemiBold weight, so
+ * "on" does not rest on hue alone. Off: [Surface2] fill, Paper label (13.40:1). Pressed: [Surface3]
+ * when off, Amber 28% when on (Amber still 4.66:1 on it over Surface1), so the press shows with
+ * animations off too. Disabled labels are PaperDim.
+ *
+ * 36dp pill inside a 48dp touch box, like [SelectPill]. It is a `toggleable` with `Role.Switch`
+ * and an on/off stateDescription, not a radio: TalkBack hears the label, "switch" and the state,
+ * also while disabled (a disabled toggleable ignores taps but keeps its semantics).
+ */
+@Composable
+fun TogglePill(
+    checked: Boolean,
+    label: String,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val state = stringResource(if (checked) R.string.studio_toggle_on else R.string.studio_toggle_off)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val fill by animateColorAsState(
+        targetValue = when {
+            checked && pressed && enabled -> Amber.copy(alpha = 0.28f)
+            checked -> AmberSoft
+            pressed && enabled -> Surface3
+            else -> Surface2
+        },
+        animationSpec = DarkroomMotion.stateChange(),
+        label = "togglePillFill",
+    )
+    val content by animateColorAsState(
+        targetValue = when {
+            !enabled -> PaperDim
+            checked -> Amber
+            else -> Paper
+        },
+        animationSpec = DarkroomMotion.stateChange(),
+        label = "togglePillContent",
+    )
+    Box(
+        modifier
+            .heightIn(min = MinTouchTarget)
+            .widthIn(min = MinTouchTarget)
+            .toggleable(
+                value = checked,
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                role = Role.Switch,
+                onValueChange = onCheckedChange,
+            )
+            .semantics { stateDescription = state },
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            Modifier
+                .pressScale(interaction)
+                .heightIn(min = ChipVisualHeight)
+                .clip(ChipShape)
+                .background(fill)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Decorative: the state is announced.
+            if (checked) {
+                Icon(Icons.Outlined.Check, contentDescription = null, tint = content, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+            }
+            Text(
+                label,
+                color = content,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Medium,
+            )
         }
     }
 }

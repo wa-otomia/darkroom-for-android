@@ -93,9 +93,9 @@ private val GridShadow = Color.Black.copy(alpha = 0.28f)
 /**
  * The frame's label and note chips. One line of 12sp text plus 4dp padding is 24dp high, so 12dp
  * corners read as a pill; fixed rather than 50% so a chip wrapped at a large font scale keeps
- * modest corners instead of turning into an oval.
+ * modest corners instead of turning into an oval. Shared with the ID photo sheet preview.
  */
-private val FrameChipShape = RoundedCornerShape(12.dp)
+internal val FrameChipShape = RoundedCornerShape(12.dp)
 
 /**
  * [imageWidth] and [imageHeight] are the dimensions the image has *after* [quarterTurns]

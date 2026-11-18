@@ -173,6 +173,7 @@ import io.github.wa_otomia.darkroom.ui.components.PresetDropdown
 import io.github.wa_otomia.darkroom.ui.components.SectionLabel
 import io.github.wa_otomia.darkroom.ui.components.SegmentedPills
 import io.github.wa_otomia.darkroom.ui.components.SnapDragState
+import io.github.wa_otomia.darkroom.ui.components.TogglePill
 import io.github.wa_otomia.darkroom.ui.components.TonalButton
 import io.github.wa_otomia.darkroom.ui.components.darkroomSliderColors
 import io.github.wa_otomia.darkroom.ui.jobFieldKey
@@ -1022,7 +1023,7 @@ fun StudioScreen(
                         }
                     },
                 )
-                StudioToggleChip(
+                TogglePill(
                     label = stringResource(R.string.studio_id_photo),
                     checked = idActive,
                     enabled = !cropLocked && framingReady,

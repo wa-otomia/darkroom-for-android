@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -71,9 +70,12 @@ import io.github.wa_otomia.darkroom.core.EDIT_PRESETS
 import io.github.wa_otomia.darkroom.core.isSeedPresetId
 import io.github.wa_otomia.darkroom.data.settings.SettingsRepository
 import io.github.wa_otomia.darkroom.ui.UserErrorDialog
+import io.github.wa_otomia.darkroom.ui.components.ChipShape
+import io.github.wa_otomia.darkroom.ui.components.ChipVisualHeight
 import io.github.wa_otomia.darkroom.ui.components.DarkroomCard
 import io.github.wa_otomia.darkroom.ui.components.DarkroomSnackbarHost
 import io.github.wa_otomia.darkroom.ui.components.DarkroomTextField
+import io.github.wa_otomia.darkroom.ui.components.MinTouchTarget
 import io.github.wa_otomia.darkroom.ui.components.PageTitle
 import io.github.wa_otomia.darkroom.ui.components.PaperButton
 import io.github.wa_otomia.darkroom.ui.components.SectionLabel
@@ -629,10 +631,9 @@ private fun DefaultMarker(isDefault: Boolean, onSetDefault: () -> Unit, modifier
 private fun SetDefaultPill(onSetDefault: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val shape = RoundedCornerShape(18.dp)
     Box(
         Modifier
-            .heightIn(min = 48.dp)
+            .heightIn(min = MinTouchTarget)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -644,8 +645,8 @@ private fun SetDefaultPill(onSetDefault: () -> Unit) {
         Row(
             Modifier
                 .pressScale(interaction)
-                .heightIn(min = 36.dp)
-                .clip(shape)
+                .heightIn(min = ChipVisualHeight)
+                .clip(ChipShape)
                 .background(if (pressed) Surface3 else Surface2)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,

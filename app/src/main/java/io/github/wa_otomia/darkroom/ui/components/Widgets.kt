@@ -47,7 +47,6 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -92,6 +91,7 @@ import io.github.wa_otomia.darkroom.core.undoRemainingFraction
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
 import io.github.wa_otomia.darkroom.data.catalog.PendingDeletion
 import io.github.wa_otomia.darkroom.data.progress.ProgressUi
+import io.github.wa_otomia.darkroom.ui.navigation.LocalBottomBarClearance
 import io.github.wa_otomia.darkroom.ui.theme.Amber
 import io.github.wa_otomia.darkroom.ui.theme.Danger
 import io.github.wa_otomia.darkroom.ui.theme.FieldShape
@@ -679,6 +679,10 @@ fun AmberTrack(
  * bottom-anchored opaque [Surface1] sheet with 28dp top corners. Put cancel on the bar via [extra] or
  * [cancel]. [secondaryAction] follows [cancel] (hide, while the job keeps
  * running).
+ *
+ * The sheet runs to the screen's bottom edge; its content is lifted by [bottomInset], which
+ * defaults to [LocalBottomBarClearance], so the progress text and buttons stay clear of the
+ * floating navigation bar on a tab and of the system navigation bar on a detail screen.
  */
 @Composable
 fun JobScrim(
@@ -688,6 +692,7 @@ fun JobScrim(
     extra: @Composable () -> Unit = {},
     cancel: @Composable (() -> Unit)? = null,
     secondaryAction: @Composable (() -> Unit)? = null,
+    bottomInset: Dp = LocalBottomBarClearance.current,
 ) {
     val a11y = stringResource(R.string.job_scrim_a11y)
     Box(
@@ -709,7 +714,7 @@ fun JobScrim(
                 .fillMaxWidth()
                 .clip(SheetTopShape)
                 .background(Surface1)
-                .padding(20.dp),
+                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 20.dp + bottomInset),
         ) {
             AmberProgressBar(
                 title = title,
@@ -735,6 +740,7 @@ fun JobScrim(
     extra: @Composable () -> Unit = {},
     cancel: @Composable (() -> Unit)? = null,
     secondaryAction: @Composable (() -> Unit)? = null,
+    bottomInset: Dp = LocalBottomBarClearance.current,
 ) {
     JobScrim(
         title = title,
@@ -748,6 +754,7 @@ fun JobScrim(
         extra = extra,
         cancel = cancel,
         secondaryAction = secondaryAction,
+        bottomInset = bottomInset,
     )
 }
 
@@ -1044,27 +1051,6 @@ private fun rememberUndoFill(startedAtMs: Long, totalMs: Long): Float {
         }
     }
     return fill.value
-}
-
-/**
- * Legacy page header: amber `labelSmall` eyebrow, then the `headlineLarge`
- * title 4.dp below it. Superseded by [PageTitle] (design D2); kept until every
- * screen has migrated, then removed.
- */
-@Composable
-fun ScreenHeader(
-    eyebrow: String,
-    title: String,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier) {
-        Text(eyebrow, style = MaterialTheme.typography.labelSmall, color = Amber)
-        Text(
-            title,
-            style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-    }
 }
 
 /**

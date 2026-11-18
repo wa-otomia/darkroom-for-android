@@ -1,11 +1,7 @@
 package io.github.wa_otomia.darkroom.ui.about
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,10 +25,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,14 +36,13 @@ import io.github.wa_otomia.darkroom.ui.components.CardGroup
 import io.github.wa_otomia.darkroom.ui.components.GroupDivider
 import io.github.wa_otomia.darkroom.ui.components.ListRow
 import io.github.wa_otomia.darkroom.ui.components.ListRowPadding
+import io.github.wa_otomia.darkroom.ui.components.NoticeCard
 import io.github.wa_otomia.darkroom.ui.components.SectionLabel
 import io.github.wa_otomia.darkroom.ui.navigation.LocalBottomBarClearance
 import io.github.wa_otomia.darkroom.ui.theme.Amber
-import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
 import io.github.wa_otomia.darkroom.ui.theme.Room
-import io.github.wa_otomia.darkroom.ui.theme.Surface1
 
 private const val APACHE_2 = "Apache License 2.0"
 private const val MLKIT_TERMS = "ML Kit Terms of Service"
@@ -172,7 +165,15 @@ fun AboutScreen(onBack: () -> Unit) {
                 Paragraph(stringResource(R.string.about_privacy_local))
             }
 
-            PolicyNotice(Modifier.padding(top = 12.dp, bottom = 28.dp))
+            // Privacy-policy placeholder. The note stays Amber: it is the warning that the
+            // policy link is still missing. No actions, so TalkBack reads it as one item.
+            NoticeCard(
+                title = stringResource(R.string.about_policy_title),
+                text = stringResource(R.string.about_policy_placeholder),
+                icon = Icons.Outlined.Policy,
+                textColor = Amber,
+                modifier = Modifier.padding(top = 12.dp, bottom = 28.dp),
+            )
 
             SectionLabel(stringResource(R.string.about_licenses_title))
             Text(
@@ -205,46 +206,4 @@ private fun Paragraph(text: String) {
             .fillMaxWidth()
             .padding(horizontal = ListRowPadding, vertical = 14.dp),
     )
-}
-
-/**
- * Privacy-policy placeholder in the NoticeCard look (Surface1, 16dp corners, 1dp Amber 50%
- * outline, Amber icon). Built locally because [io.github.wa_otomia.darkroom.ui.components.NoticeCard]
- * has a single text slot and this box carries a Paper title plus an Amber note (8.10:1 on Surface1).
- * Merged so TalkBack reads the title and note as one item (the old box read them separately).
- */
-@Composable
-private fun PolicyNotice(modifier: Modifier = Modifier) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .clip(PanelShape)
-            .background(Surface1)
-            .border(1.dp, Amber.copy(alpha = 0.5f), PanelShape)
-            .semantics(mergeDescendants = true) {}
-            .padding(14.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(
-            Icons.Outlined.Policy,
-            contentDescription = null,
-            tint = Amber,
-            modifier = Modifier.padding(top = 1.dp).size(18.dp),
-        )
-        Column {
-            Text(
-                stringResource(R.string.about_policy_title),
-                color = Paper,
-                fontSize = 15.sp,
-                lineHeight = 20.sp,
-            )
-            Text(
-                stringResource(R.string.about_policy_placeholder),
-                color = Amber,
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-    }
 }
