@@ -412,8 +412,9 @@ fun ListRowChevron(expanded: Boolean? = null, modifier: Modifier = Modifier) {
  * title is the message (14sp Medium in [color]) and [text] is the detail below
  * it: 13sp in [textColor], PaperDim by default (5.16:1 on Surface1).
  *
- * A notice without [actions] is merged into one TalkBack item (title and text
- * read together); with actions the buttons stay separately focusable.
+ * Title and text are always read together as one TalkBack item. A notice
+ * without [actions] is merged whole (icon is decorative); with actions the
+ * buttons stay separately focusable after the message.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -444,7 +445,8 @@ fun NoticeCard(
                     modifier = Modifier.padding(top = 1.dp, end = 10.dp).size(18.dp),
                 )
             }
-            Column(Modifier.weight(1f)) {
+            // Title and text are always one TalkBack stop, with or without actions.
+            Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
                 if (title != null) {
                     Text(title, color = color, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
                     Text(

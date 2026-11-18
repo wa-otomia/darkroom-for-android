@@ -235,7 +235,7 @@
     <string name="settings_summary_ftp">%1$d · %2$s</string>
     <string name="settings_on">On</string>
     <string name="settings_off">Off</string>
-    <string name="badge_edited">Edit</string>
+    <string name="badge_edited">Edited</string>
     <string name="copied_field">Copied %1$s</string>
     <string name="expand_section">Expand</string>
     <string name="collapse_section">Collapse</string>

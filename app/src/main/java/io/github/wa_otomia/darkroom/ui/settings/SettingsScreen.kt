@@ -34,7 +34,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
@@ -1410,17 +1409,15 @@ fun SettingsScreen(
                             modifier = Modifier.padding(bottom = 4.dp),
                         )
                         if (cfg.autoEdit && (!autoAiReady || !autoHasPreset)) {
-                            BlockedNotice(stringResource(R.string.settings_automation_blocked_edit)) {
-                                if (!autoAiReady) {
-                                    BlockedDetail(needKeyText)
-                                    TextButton(onClick = { revealSection("grok") }) {
-                                        Text(stringResource(R.string.settings_goto_ai), color = Amber)
-                                    }
-                                }
-                                if (!autoHasPreset) {
-                                    BlockedDetail(needPresetText)
-                                }
-                            }
+                            BlockedNotice(
+                                title = stringResource(R.string.settings_automation_blocked_edit),
+                                details = listOfNotNull(
+                                    needKeyText.takeIf { !autoAiReady },
+                                    needPresetText.takeIf { !autoHasPreset },
+                                ),
+                                gotoLabel = if (!autoAiReady) stringResource(R.string.settings_goto_ai) else null,
+                                onGoto = { revealSection("grok") },
+                            )
                         }
                         StepConnector()
                         Row(
@@ -1452,12 +1449,12 @@ fun SettingsScreen(
                             )
                         }
                         if (!watermark.isConfigured()) {
-                            BlockedNotice(stringResource(R.string.settings_automation_blocked_watermark)) {
-                                BlockedDetail(needWatermarkText)
-                                TextButton(onClick = { revealSection("watermark") }) {
-                                    Text(stringResource(R.string.settings_goto_watermark), color = Amber)
-                                }
-                            }
+                            BlockedNotice(
+                                title = stringResource(R.string.settings_automation_blocked_watermark),
+                                details = listOf(needWatermarkText),
+                                gotoLabel = stringResource(R.string.settings_goto_watermark),
+                                onGoto = { revealSection("watermark") },
+                            )
                         }
                         StepConnector()
                         Row(
@@ -1487,12 +1484,12 @@ fun SettingsScreen(
                             )
                         }
                         if (!printerBound) {
-                            BlockedNotice(stringResource(R.string.settings_automation_blocked_print)) {
-                                BlockedDetail(needPrinterText)
-                                TextButton(onClick = { revealSection("printer") }) {
-                                    Text(stringResource(R.string.settings_goto_printer), color = Amber)
-                                }
-                            }
+                            BlockedNotice(
+                                title = stringResource(R.string.settings_automation_blocked_print),
+                                details = listOf(needPrinterText),
+                                gotoLabel = stringResource(R.string.settings_goto_printer),
+                                onGoto = { revealSection("printer") },
+                            )
                         }
                     }
                     GroupDivider()
@@ -2187,23 +2184,24 @@ private fun Notice(text: String, action: @Composable () -> Unit) {
 }
 
 /**
- * Notice for an automation step that cannot run yet: the shared [NoticeCard] with the Amber [title]
- * (8.10:1 on Surface1) and, in its actions flow, Paper detail lines ([BlockedDetail], one per line)
- * and Amber "go to …" links.
+ * Notice for an automation step that cannot run yet: the shared titled [NoticeCard] — the Amber
+ * [title] (14sp Medium, 8.10:1 on Surface1) is the message and [details] (what is missing, one per
+ * line) are the PaperDim detail below it. [gotoLabel], when given, is a [TonalButton] that calls
+ * [onGoto] to reveal the settings section that fixes it; without it the notice is one TalkBack item.
  */
 @Composable
-private fun BlockedNotice(title: String, content: @Composable RowScope.() -> Unit) {
+private fun BlockedNotice(
+    title: String,
+    details: List<String>,
+    gotoLabel: String? = null,
+    onGoto: () -> Unit = {},
+) {
     NoticeCard(
-        text = title,
+        title = title,
+        text = details.joinToString("\n"),
         modifier = Modifier.padding(vertical = 4.dp),
-        actions = content,
+        actions = gotoLabel?.let { label -> { TonalButton(label, fillMaxWidth = false, onClick = onGoto) } },
     )
-}
-
-/** A Paper detail line of a [BlockedNotice]; takes a whole line of the notice's actions flow. */
-@Composable
-private fun BlockedDetail(text: String) {
-    Text(text, color = Paper, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.fillMaxWidth())
 }
 
 /**

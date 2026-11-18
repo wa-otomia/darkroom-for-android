@@ -239,7 +239,7 @@
     <string name="settings_summary_ftp">%1$d · %2$s</string>
     <string name="settings_on">켜짐</string>
     <string name="settings_off">꺼짐</string>
-    <string name="badge_edited">편집</string>
+    <string name="badge_edited">편집됨</string>
     <string name="copied_field">복사 완료: %1$s</string>
     <string name="expand_section">펼치기</string>
     <string name="collapse_section">접기</string>

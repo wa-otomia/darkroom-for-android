@@ -647,44 +647,52 @@ internal fun IdCutoutResultViewer(failure: IdMaskFailure, onDismiss: () -> Unit)
                     color = Paper,
                     modifier = Modifier.semantics { heading() },
                 )
-                if (request != null && !decodeFailed) {
-                    AsyncImage(
-                        model = request,
-                        contentDescription = title,
-                        contentScale = ContentScale.Fit,
-                        onError = { decodeFailed = true },
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .clip(PhotoShape)
-                            .background(Color.Black),
-                    )
-                } else {
-                    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                        val noImage = if (idFailureIsLocal(failure.local, failure.message)) {
-                            R.string.studio_id_cutout_result_no_image_local
-                        } else {
-                            R.string.studio_id_cutout_result_no_image
-                        }
-                        Text(stringResource(noImage), color = Paper)
-                    }
-                }
-                // Bounded and scrollable, so a long reason at a large font scale keeps Close on screen.
+                // The image and the reason take what is left after the title and Close.
                 Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 240.dp)
-                        .verticalScroll(rememberScrollState()),
+                    Modifier.weight(1f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    if (failure.message.isNotBlank()) {
-                        UserErrorMessage(failure.message)
+                    if (request != null && !decodeFailed) {
+                        AsyncImage(
+                            model = request,
+                            contentDescription = title,
+                            contentScale = ContentScale.Fit,
+                            onError = { decodeFailed = true },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .clip(PhotoShape)
+                                .background(Color.Black),
+                        )
+                    } else {
+                        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                            val noImage = if (idFailureIsLocal(failure.local, failure.message)) {
+                                R.string.studio_id_cutout_result_no_image_local
+                            } else {
+                                R.string.studio_id_cutout_result_no_image
+                            }
+                            Text(stringResource(noImage), color = Paper)
+                        }
                     }
-                    Text(
-                        stringResource(R.string.studio_id_cutout_result_at, whenText),
-                        color = PaperDim,
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp,
-                    )
+                    // Bounded and scrollable. It shares only the space the image area gets, which is
+                    // measured after the title and Close, so a long reason at a large font scale
+                    // cannot push Close off screen.
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        if (failure.message.isNotBlank()) {
+                            UserErrorMessage(failure.message)
+                        }
+                        Text(
+                            stringResource(R.string.studio_id_cutout_result_at, whenText),
+                            color = PaperDim,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                        )
+                    }
                 }
                 TonalButton(stringResource(R.string.studio_id_failed_mask_close), onClick = onDismiss)
             }
