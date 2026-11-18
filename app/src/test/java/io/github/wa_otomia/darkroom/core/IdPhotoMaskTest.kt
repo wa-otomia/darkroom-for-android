@@ -180,6 +180,135 @@ class IdPhotoMaskTest {
         assertArrayEquals(solid, featherAlpha(solid, 40, 30, 10))
     }
 
+    /** Deterministic irregular masks: blobs, noise and grey edges. */
+    private fun randomMask(w: Int, h: Int, seed: Long, noiseEvery: Int = 25): ByteArray {
+        val rnd = java.util.Random(seed)
+        val a = ByteArray(w * h)
+        repeat(6) {
+            val cx = rnd.nextInt(w)
+            val cy = rnd.nextInt(h)
+            val rad = 4 + rnd.nextInt(maxOf(5, minOf(w, h) / 2))
+            for (y in 0 until h) for (x in 0 until w) {
+                val dx = x - cx
+                val dy = y - cy
+                if (dx * dx + dy * dy <= rad * rad) a[y * w + x] = 255.toByte()
+            }
+        }
+        repeat(w * h / noiseEvery) { a[rnd.nextInt(w * h)] = rnd.nextInt(256).toByte() }
+        return a
+    }
+
+    /** Brute-force (2r+1)² minimum with edge replication. */
+    private fun bruteErode(a: ByteArray, w: Int, h: Int, r: Int): ByteArray = ByteArray(w * h) { i ->
+        val x = i % w
+        val y = i / w
+        var m = 255
+        for (dy in -r..r) for (dx in -r..r) {
+            val v = a[(y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)].toInt() and 0xFF
+            if (v < m) m = v
+        }
+        m.toByte()
+    }
+
+    @Test
+    fun erodeIsTheWindowMinimumWithReplicatedEdges() {
+        for ((w, h) in listOf(1 to 1, 1 to 9, 9 to 1, 17 to 11, 40 to 33)) {
+            val a = randomMask(w, h, (w * 31 + h).toLong())
+            for (r in listOf(1, 2, 3, 5, 10, 25)) {
+                assertArrayEquals("${w}x$h r=$r", bruteErode(a, w, h, r), erodeAlpha(a, w, h, r))
+            }
+        }
+        val a = byteArrayOf(0, 255.toByte(), 7, 9)
+        for (r in listOf(0, -2)) {
+            val out = erodeAlpha(a, 2, 2, r)
+            assertArrayEquals(a, out)
+            assertNotSame(a, out)
+        }
+    }
+
+    @Test
+    fun inwardFeatherWithZeroRadiusIsIdentity() {
+        val a = randomMask(23, 19, 7)
+        for (inward in listOf(true, false)) {
+            val out = featherAlphaFor(a, 23, 19, 0, inward)
+            assertArrayEquals(a, out)
+            assertNotSame(a, out)
+        }
+        assertArrayEquals(a, featherAlphaInward(a, 23, 19, 0))
+    }
+
+    @Test
+    fun outwardChoiceIsExactlyTheSymmetricFeather() {
+        val a = randomMask(50, 37, 11)
+        for (r in listOf(0, 1, 2, 5, 10)) {
+            assertArrayEquals("r=$r", featherAlpha(a, 50, 37, r), featherAlphaFor(a, 50, 37, r, inward = false))
+            assertArrayEquals("r=$r", featherAlphaInward(a, 50, 37, r), featherAlphaFor(a, 50, 37, r, inward = true))
+        }
+    }
+
+    @Test
+    fun inwardFeatherNeverSpillsOutsideTheMask() {
+        for (seed in 1L..4L) {
+            val w = 60
+            val h = 45
+            val a = randomMask(w, h, seed)
+            for (r in listOf(1, 2, 5, 10)) {
+                val out = featherAlphaInward(a, w, h, r)
+                for (i in a.indices) {
+                    if ((a[i].toInt() and 0xFF) == 0) assertEquals("seed=$seed r=$r i=$i", 0, out[i].toInt() and 0xFF)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun inwardFeatherKeepsPixelsWhoseWideWindowIsOpaque() {
+        // Any pixel whose (4r+1)² window (edges replicated) is all 255 keeps 255.
+        for (seed in 5L..8L) {
+            val w = 70
+            val h = 52
+            val a = randomMask(w, h, seed, noiseEvery = 400)
+            for (r in listOf(1, 2, 5, 10)) {
+                val out = featherAlphaInward(a, w, h, r)
+                val wide = bruteErode(a, w, h, 2 * r)
+                var checked = 0
+                for (i in a.indices) {
+                    if ((wide[i].toInt() and 0xFF) == 255) {
+                        assertEquals("seed=$seed r=$r i=$i", 255, out[i].toInt() and 0xFF)
+                        checked++
+                    }
+                }
+                if (r <= 2) assertTrue("seed=$seed r=$r", checked > 0)
+            }
+        }
+    }
+
+    @Test
+    fun inwardFeatherBlendsInsideTheEdgeOnly() {
+        val w = 80
+        val h = 30
+        val edge = 40 // x < 40 is black, x ≥ 40 white
+        val a = ByteArray(w * h) { i -> if (i % w >= edge) 255.toByte() else 0 }
+        for (r in listOf(2, 5, 10)) {
+            val out = featherAlphaInward(a, w, h, r)
+            for (y in 0 until h) {
+                for (x in 0 until w) {
+                    val v = alphaAt(out, w, x, y)
+                    when {
+                        x < edge -> assertEquals("r=$r x=$x", 0, v)
+                        x >= edge + 2 * r -> assertEquals("r=$r x=$x", 255, v)
+                    }
+                }
+            }
+            // The blend sits just inside the edge and rises monotonically.
+            assertTrue(alphaAt(out, w, edge + r, 5) in 1..254)
+            for (x in 1 until w) assertTrue(alphaAt(out, w, x, 5) >= alphaAt(out, w, x - 1, 5))
+        }
+        // A uniform mask stays uniform: image borders are not edges.
+        val solid = ByteArray(40 * 30) { 255.toByte() }
+        assertArrayEquals(solid, featherAlphaInward(solid, 40, 30, 10))
+    }
+
     @Test
     fun compositeKeepsOriginalPixelsUnderOpaqueMask() {
         val src = 0xFFC99678.toInt() // RGB(201,150,120)

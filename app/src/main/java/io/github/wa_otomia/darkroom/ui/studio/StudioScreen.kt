@@ -121,6 +121,7 @@ import io.github.wa_otomia.darkroom.core.sourceAfterVersionRemoved
 import io.github.wa_otomia.darkroom.core.studioVersionIngestName
 import io.github.wa_otomia.darkroom.core.versionLabel
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
+import io.github.wa_otomia.darkroom.data.catalog.IdMaskFailure
 import io.github.wa_otomia.darkroom.data.imaging.ImagePipeline
 import io.github.wa_otomia.darkroom.data.jobs.AiJobs
 import io.github.wa_otomia.darkroom.data.jobs.AiKind
@@ -157,6 +158,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -232,6 +234,15 @@ fun StudioScreen(
     // an older row value happens to equal the latest tap.
     var idBgPending by remember(photoId, source) { mutableStateOf(PendingIdChoice()) }
     var idFeatherPending by remember(photoId, source) { mutableStateOf(PendingIdChoice()) }
+    var idInwardPending by remember(photoId, source) { mutableStateOf(PendingIdChoice()) }
+    // EDID040-R08: the preview is building a new composite; the ID controls wait for it.
+    // Reported by the preview while it is composed, false for every new version.
+    var idCompositing by remember(photoId, source) { mutableStateOf(false) }
+    // EDID040-R09: this version's last failed cut-out, read from the cache record; re-read on
+    // screen open, version switch, every record write/clear and every mask Ready/Failed event.
+    var idMaskFailure by remember(photoId, source) { mutableStateOf<IdMaskFailure?>(null) }
+    var idMaskFailureCheck by remember(photoId) { mutableStateOf(0) }
+    var idCutoutResultOpen by remember(photoId, source) { mutableStateOf(false) }
     // Mask job failure for the ID section; already sanitized by AiJobs. Recorded with the version
     // (framing version key) it belongs to and shown only on that version.
     var maskError by rememberSaveable(photoId) { mutableStateOf<String?>(null) }
@@ -365,6 +376,7 @@ fun StudioScreen(
                     launch { snackbar.showSnackbar(editDoneText) }
                 }
                 is StudioJobEvent.MaskReady -> {
+                    idMaskFailureCheck++
                     if (maskErrorVersion == framingVersionKey(e.source)) {
                         maskError = null
                         maskErrorVersion = null
@@ -373,6 +385,7 @@ fun StudioScreen(
                 }
                 is StudioJobEvent.Failed -> {
                     if (e.action == "mask") {
+                        idMaskFailureCheck++
                         // Shown in the ID section, not the generic dialog; a cancel is blank.
                         if (e.message.isNullOrBlank()) {
                             launch { snackbar.showSnackbar(aiCancelledText) }
@@ -607,6 +620,7 @@ fun StudioScreen(
     val idHasMask = idStored?.hasMask == true
     val idBg = idBackground(idBgPending.value ?: idStored?.background)
     val idFeatherChoice = idFeather(idFeatherPending.value ?: idStored?.feather)
+    val idFeatherInward = idInwardPending.value?.toBooleanStrictOrNull() ?: idStored?.featherInward ?: true
     // Backstop for the load above: a first entry written by a composition that is already gone
     // (left and reopened at once) can land after the load found nothing. Adopt it when it shows,
     // so the screen never shows ordinary framing while the row (and so a print) has ID mode on.
@@ -626,6 +640,9 @@ fun StudioScreen(
     }
     LaunchedEffect(idStored?.feather, idFeatherPending) {
         idFeatherPending = idFeatherPending.settle(idStored?.feather)
+    }
+    LaunchedEffect(idStored?.featherInward, idInwardPending) {
+        idInwardPending = idInwardPending.settle(idStored?.featherInward?.toString())
     }
     val setIdPose: (IdPhotoPose) -> Unit = { p ->
         idZoom = p.zoom
@@ -716,6 +733,15 @@ fun StudioScreen(
             idFeatherPending = idFeatherPending.finish(token, ok)
         }
     }
+    val onIdFeatherInward: (Boolean) -> Unit = { inward ->
+        val id = photo.id
+        val src = source
+        idInwardPending = idInwardPending.begin(inward.toString())
+        val token = idInwardPending.seq
+        writeIdChoice({ catalog.setIdPhotoFeatherInward(id, src, inward) }) { ok ->
+            idInwardPending = idInwardPending.finish(token, ok)
+        }
+    }
 
     val appliedAiFraming: AppliedFraming? =
         if (useCurrentFraming) {
@@ -780,10 +806,17 @@ fun StudioScreen(
 
     val startExport: () -> Unit = {
         if (!exporting) {
-            // EDEX010-R04: the live ID state with the row's background, feather and mask.
+            // EDEX010-R04: the live ID state with the on-screen background, feather and inward
+            // choice (pending taps included) and the row's mask.
             val idExport: IdPhotoState? = if (idActive) {
                 (idStored ?: IdPhotoState())
-                    .copy(active = true, presetId = idPresetId, background = idBg.id, feather = idFeatherChoice.id)
+                    .copy(
+                        active = true,
+                        presetId = idPresetId,
+                        background = idBg.id,
+                        feather = idFeatherChoice.id,
+                        featherInward = idFeatherInward,
+                    )
                     .withPose(idPose)
             } else {
                 null
@@ -898,6 +931,17 @@ fun StudioScreen(
         }
     }
     val maskErrorHere = maskErrorFor(maskError, maskErrorVersion, currentVersionKey)
+    // The mask job writes the record before it reports the failure and clears it when a new
+    // attempt starts or succeeds; each write or clear signals, so the entry follows the record.
+    LaunchedEffect(photo.id, source, idMaskFailureCheck) {
+        catalog.idMaskFailureChanges().collectLatest {
+            val read = withContext(Dispatchers.IO) {
+                runCatching { catalog.readIdMaskFailure(photo.id, source) }.getOrNull()
+            }
+            idMaskFailure = read
+            if (read == null) idCutoutResultOpen = false
+        }
+    }
 
     val composePanel: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -934,10 +978,11 @@ fun StudioScreen(
                         }
                     },
                 )
-                StudioSwitchRow(
+                StudioToggleChip(
                     label = stringResource(R.string.studio_id_photo),
                     checked = idActive,
                     enabled = !cropLocked && framingReady,
+                    modifier = Modifier.padding(top = 6.dp),
                     onCheckedChange = onIdToggle,
                 )
                 if (idActive) {
@@ -1037,6 +1082,8 @@ fun StudioScreen(
                     hasMask = idHasMask,
                     background = idBg,
                     feather = idFeatherChoice,
+                    featherInward = idFeatherInward,
+                    compositing = idCompositing,
                     canCutOut = grokPub.keySet && !aiBusy,
                     maskJob = maskJobUi,
                     maskJobElsewhere = maskJobElsewhereLabel,
@@ -1045,6 +1092,12 @@ fun StudioScreen(
                     onOpenSettings = { onSettings("grok") },
                     onBackground = onIdBackground,
                     onFeather = onIdFeather,
+                    onFeatherInward = onIdFeatherInward,
+                    onViewCutoutResult = if (idMaskFailure != null) {
+                        { idCutoutResultOpen = true }
+                    } else {
+                        null
+                    },
                 )
             } else {
                 if (maskJobUi != null) {
@@ -1238,6 +1291,7 @@ fun StudioScreen(
                 maskRev = idStored?.maskRev,
                 background = idBg,
                 feather = idFeatherChoice,
+                featherInward = idFeatherInward,
                 zoom = idZoom,
                 layout = idLayout,
                 imageWidth = orientedW,
@@ -1245,6 +1299,12 @@ fun StudioScreen(
             )
             val perSheet = pluralStringResource(R.plurals.studio_id_per_sheet, idLayout.count, idLayout.count)
             val swapped = idBg.argb?.takeIf { idHasMask }
+            // Reported up for the process tab; reset when the preview leaves (ID mode off).
+            val compositing = cutout.compositing
+            DisposableEffect(compositing) {
+                idCompositing = compositing
+                onDispose { idCompositing = false }
+            }
             IdPhotoSheetPreview(
                 model = imageFile,
                 imageWidth = orientedW,
@@ -1252,7 +1312,9 @@ fun StudioScreen(
                 layout = idLayout,
                 pose = idPose,
                 onPoseChange = setIdPose,
-                cellBackground = swapped?.let { Color(it) } ?: Color.White,
+                // The blank cell area follows the composite on screen, so it keeps the old colour
+                // until the new composite lands.
+                cellBackground = (cutout.argb ?: swapped)?.let { Color(it) } ?: Color.White,
                 cutout = cutout.bitmap,
                 overlay = idSheetLabel(idPreset, idLayout),
                 description = stringResource(
@@ -1261,8 +1323,9 @@ fun StudioScreen(
                 ),
                 snapState = snapState,
                 modifier = cropModifier,
-                enabled = !cropLocked,
+                enabled = !cropLocked && !compositing,
                 note = if (cutout.failed) stringResource(R.string.studio_id_mask_missing) else null,
+                compositing = compositing,
             )
         } else {
             WatermarkOverlay(
@@ -1388,6 +1451,14 @@ fun StudioScreen(
                 prompt = it
                 extraPromptOpen = false
             },
+        )
+    }
+
+    val cutoutResult = idMaskFailure
+    if (idCutoutResultOpen && cutoutResult != null) {
+        IdCutoutResultViewer(
+            failure = cutoutResult,
+            onDismiss = { idCutoutResultOpen = false },
         )
     }
 

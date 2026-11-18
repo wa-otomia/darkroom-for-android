@@ -13,7 +13,7 @@ class IdPhotoLabelsTest {
     fun millimetreLabels() {
         assertEquals(
             listOf(
-                "35×45", "33×48", "25×35", "22×32", "35×49", "50.8×50.8",
+                "35×45", "35×45", "45×45", "33×48", "25×35", "22×32", "35×49", "50.8×50.8",
                 "50×70", "30×40", "24×30", "40×60", "35×50",
             ),
             ID_PHOTO_PRESETS.map { idPresetMm(it) },

@@ -25,6 +25,8 @@ class IdPhotoLayoutTest {
     // Verified table (map/geometry.md §9): margins in px at print scale.
     private val table = listOf(
         Expected("35x45", 717, 921, false, 2, 1, 58, 59, 58, 60),
+        Expected("kr-visa", 717, 921, false, 2, 1, 58, 59, 58, 60),
+        Expected("jp-visa", 921, 921, false, 1, 1, 319, 59, 320, 60),
         Expected("33x48", 676, 983, false, 2, 1, 99, 28, 99, 29),
         Expected("25x35", 512, 717, true, 2, 2, 58, 3, 58, 3),
         Expected("22x32", 450, 655, true, 2, 2, 120, 65, 120, 65),
@@ -43,9 +45,13 @@ class IdPhotoLayoutTest {
         a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
 
     @Test
-    fun presetTableHasElevenFixedIdsInOrder() {
+    fun presetTableHasThirteenFixedIdsInOrder() {
         assertEquals(table.map { it.id }, ID_PHOTO_PRESETS.map { it.id })
-        assertEquals(11, ID_PHOTO_PRESETS.size)
+        assertEquals(13, ID_PHOTO_PRESETS.size)
+        assertEquals(IdPhotoPreset("kr-visa", 35.0, 45.0), idPhotoPreset("kr-visa"))
+        assertEquals(IdPhotoPreset("jp-visa", 45.0, 45.0), idPhotoPreset("jp-visa"))
+        // Ids are not sizes: the Korean visa entry is its own choice, kept as stored.
+        assertEquals("kr-visa", normalizeIdPhotoPresetId("kr-visa"))
         assertEquals(IdPhotoPreset("2x2in", 50.8, 50.8), idPhotoPreset("2x2in"))
         assertEquals("35x45", DEFAULT_ID_PHOTO_PRESET_ID)
     }
@@ -90,7 +96,7 @@ class IdPhotoLayoutTest {
     @Test
     fun countsMatchTheSpecList() {
         assertEquals(
-            listOf(2, 2, 4, 4, 2, 1, 1, 2, 4, 1, 2),
+            listOf(2, 2, 1, 2, 4, 4, 2, 1, 1, 2, 4, 1, 2),
             ID_PHOTO_PRESETS.map { idPhotoLayout(it).count },
         )
     }
@@ -110,6 +116,15 @@ class IdPhotoLayoutTest {
         val upright = layout("35x45")
         assertEquals(listOf(IdRect(58, 59, 717, 921), IdRect(785, 59, 717, 921)), upright.slots)
         assertEquals(ID_GAP_PX, upright.slots[1].left - upright.slots[0].right)
+    }
+
+    @Test
+    fun japaneseVisaSquareSitsUprightWithoutEdgeWarning() {
+        val l = layout("jp-visa")
+        assertEquals(listOf(IdRect(319, 59, 921, 921)), l.slots)
+        assertEquals(59, l.minMarginPx)
+        assertFalse(l.showsEdgeWarning())
+        assertEquals(layout("35x45").slots, layout("kr-visa").slots)
     }
 
     @Test

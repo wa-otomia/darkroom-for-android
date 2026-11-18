@@ -29,6 +29,8 @@ data class IdPhotoPreset(val id: String, val widthMm: Double, val heightMm: Doub
 /** Built-in sizes. Order and ids are stable: they are stored and shown in this order. */
 val ID_PHOTO_PRESETS: List<IdPhotoPreset> = listOf(
     IdPhotoPreset("35x45", 35.0, 45.0),
+    IdPhotoPreset("kr-visa", 35.0, 45.0),
+    IdPhotoPreset("jp-visa", 45.0, 45.0),
     IdPhotoPreset("33x48", 33.0, 48.0),
     IdPhotoPreset("25x35", 25.0, 35.0),
     IdPhotoPreset("22x32", 22.0, 32.0),
@@ -394,6 +396,8 @@ data class IdPhotoState(
     val background: String = IdBackground.ORIGINAL.id,
     val feather: String = IdFeather.WEAK.id,
     val maskRev: String? = null,
+    /** Shrink the mask by the feather radius before smoothing, so the blend stays inside (EDID040-R07). */
+    val featherInward: Boolean = true,
 ) {
     val pose: IdPhotoPose get() = IdPhotoPose(zoom, panX, panY, rotation)
 
@@ -413,10 +417,24 @@ data class IdPhotoState(
         background = idBackground(background).id,
         feather = idFeather(feather).id,
         maskRev = maskRev?.trim()?.takeIf { it.isNotEmpty() },
+        featherInward = featherInward,
     )
 }
 
 fun PhotoMeta.idPhotoFor(source: String?): IdPhotoState? = idPhotos[framingVersionKey(source)]
+
+/** Whether the version [source] (the original or one of [PhotoMeta.edits]) still exists. */
+fun PhotoMeta.hasVersion(source: String?): Boolean {
+    val key = framingVersionKey(source)
+    return key == ORIGINAL_VERSION_ID || edits.any { it.id == key }
+}
+
+/**
+ * Names of `idmask-failed/<photoId>` folders whose photo has no catalog row: a reply kept for a
+ * photo that has since been deleted (EDID040-R09).
+ */
+fun orphanIdMaskFailureDirs(dirNames: Collection<String>, knownIds: Set<String>): List<String> =
+    dirNames.filter { it !in knownIds }
 
 /**
  * A version's ID state after a Studio save of its toggle, size and pose (EDID010-R03), or null to
@@ -520,6 +538,67 @@ const val ID_MASK_MSG_UNDECODABLE = "抠图失败：无法解码返回图"
 const val ID_MASK_MSG_NEED_KEY = "抠图失败：未配置 AI 密钥"
 const val ID_MASK_MSG_VERSION_GONE = "抠图失败：该版本已删除"
 const val ID_MASK_MSG_MISSING = "证件照蒙版缺失或损坏"
+
+// ---------------------------------------------------------------------------------------------
+// Failed cut-out record (EDID040-R09)
+// ---------------------------------------------------------------------------------------------
+
+/** Longest failure reason kept with a failed cut-out. */
+const val ID_MASK_FAILURE_MESSAGE_MAX = 500
+
+/**
+ * What a version keeps after a mask job fails for any reason but a user cancel: the sanitized
+ * reason, when it failed (epoch ms) and whether the reply bytes were kept next to it. Stored as
+ * `idmask-failed/<photoId>/<versionKey>.json` in the app cache; its presence is the record.
+ */
+@Serializable
+data class IdMaskFailureRecord(val message: String, val at: Long, val hasImage: Boolean)
+
+/** [message] with secrets redacted (AIPV040-R03), trimmed and cut to [ID_MASK_FAILURE_MESSAGE_MAX] chars. */
+fun idMaskFailureMessage(message: String?): String {
+    val clean = sanitizeAiSecrets(message.orEmpty()).trim()
+    if (clean.length <= ID_MASK_FAILURE_MESSAGE_MAX) return clean
+    // Never leave half of a surrogate pair at the cut.
+    val end = if (Character.isHighSurrogate(clean[ID_MASK_FAILURE_MESSAGE_MAX - 1])) {
+        ID_MASK_FAILURE_MESSAGE_MAX - 1
+    } else {
+        ID_MASK_FAILURE_MESSAGE_MAX
+    }
+    return clean.substring(0, end)
+}
+
+/**
+ * The reply bytes a failed cut-out keeps: any reply that arrived, as is, whatever went wrong
+ * after it (undecodable, wrong aspect, not a matte, version gone). Null when none arrived.
+ */
+fun idMaskFailureReply(reply: ByteArray?): ByteArray? = reply?.takeIf { it.isNotEmpty() }
+
+/**
+ * True when a cut-out job that threw [error] ends as a user cancel (no failure record): the
+ * error is a cancellation, or the job was already cancelled ([jobActive] false). A cancel that
+ * lands while a reply is decoded can surface as the decode's own error instead of a
+ * cancellation, so the job's state decides (EDID040-R09).
+ */
+fun idMaskEndsAsCancel(error: Throwable, jobActive: Boolean): Boolean =
+    error is kotlin.coroutines.cancellation.CancellationException || !jobActive
+
+/** The record of a failed cut-out with [message], at [at], given the [reply] bytes received. */
+fun idMaskFailureRecord(message: String?, reply: ByteArray?, at: Long): IdMaskFailureRecord =
+    IdMaskFailureRecord(idMaskFailureMessage(message), at, idMaskFailureReply(reply) != null)
+
+private val idMaskFailureJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
+fun encodeIdMaskFailureRecord(record: IdMaskFailureRecord): String =
+    idMaskFailureJson.encodeToString(IdMaskFailureRecord.serializer(), record)
+
+/** The stored record, or null when [raw] is missing, not JSON or lacks a field. */
+fun parseIdMaskFailureRecord(raw: String?): IdMaskFailureRecord? {
+    if (raw.isNullOrBlank()) return null
+    val record = runCatching { idMaskFailureJson.decodeFromString(IdMaskFailureRecord.serializer(), raw) }
+        .getOrNull() ?: return null
+    // Re-cleaned on read: the file is outside the app's control once written.
+    return record.copy(message = idMaskFailureMessage(record.message))
+}
 
 // ---------------------------------------------------------------------------------------------
 // AI mask request (AIPV030-R04)
