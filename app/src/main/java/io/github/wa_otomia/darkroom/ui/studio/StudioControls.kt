@@ -1,16 +1,11 @@
 package io.github.wa_otomia.darkroom.ui.studio
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -21,14 +16,11 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
@@ -42,8 +34,6 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Rotate90DegreesCcw
 import androidx.compose.material.icons.outlined.Rotate90DegreesCw
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -51,19 +41,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.SubcomposeLayout
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -83,7 +69,6 @@ import coil.compose.AsyncImage
 import io.github.wa_otomia.darkroom.R
 import io.github.wa_otomia.darkroom.ui.components.DarkroomTextField
 import io.github.wa_otomia.darkroom.ui.components.IconCircleButton
-import io.github.wa_otomia.darkroom.ui.components.SegmentedPills
 import io.github.wa_otomia.darkroom.ui.components.SelectPill
 import io.github.wa_otomia.darkroom.ui.components.TonalButton
 import io.github.wa_otomia.darkroom.ui.components.darkroomSwitchColors
@@ -94,11 +79,8 @@ import io.github.wa_otomia.darkroom.ui.theme.DarkroomMotion
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
 import io.github.wa_otomia.darkroom.ui.theme.PaperFaint
-import io.github.wa_otomia.darkroom.ui.theme.SheetTopShape
-import io.github.wa_otomia.darkroom.ui.theme.Surface1
 import io.github.wa_otomia.darkroom.ui.theme.Surface2
 import io.github.wa_otomia.darkroom.ui.theme.Surface3
-import kotlinx.coroutines.launch
 
 internal enum class StudioTab(val key: String, val labelRes: Int) {
     Compose("compose", R.string.studio_tab_compose),
@@ -118,37 +100,6 @@ internal fun studioEqualPanelHeight(measuredHeights: IntArray, capPx: Int): Int 
     var tallest = 0
     for (h in measuredHeights) if (h > tallest) tallest = h
     return tallest.coerceAtMost(capPx)
-}
-
-/**
- * The three Studio tabs as one segmented control (Role.Tab, selected state). Tapping the current
- * tab still calls [onSelect], which the drawer uses to collapse. Transparent, so it takes the
- * colour of whatever holds it (drawer Surface1, wide-screen panel Room). Labels wrap at large
- * font sizes instead of being cut.
- */
-@Composable
-internal fun StudioTabBar(
-    selected: StudioTab,
-    onSelect: (StudioTab) -> Unit,
-    modifier: Modifier = Modifier,
-    includeNavigationBars: Boolean = false,
-) {
-    val tabs = StudioTab.entries
-    val labels = tabs.map { stringResource(it.labelRes) }
-    Box(
-        modifier
-            .fillMaxWidth()
-            .then(if (includeNavigationBars) Modifier.navigationBarsPadding() else Modifier)
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-    ) {
-        SegmentedPills(
-            options = labels,
-            selectedIndex = tabs.indexOf(selected),
-            onSelect = { index -> onSelect(tabs[index]) },
-            modifier = Modifier.fillMaxWidth(),
-            role = Role.Tab,
-        )
-    }
 }
 
 @Composable
@@ -210,118 +161,6 @@ internal fun StudioEqualHeightTabs(
         }
         layout(width, height) {
             shown.forEach { it.place(0, 0) }
-        }
-    }
-}
-
-/**
- * Drag handle and tab bar stay on screen as the peek; the selected panel opens below the tabs
- * and pushes them up. A Surface1 sheet with 28dp top corners. The navigation bar inset is taken
- * at the bottom of the drawer itself; that also consumes it for a tab bar that asks for it
- * (includeNavigationBars), so the inset is never applied twice. BottomSheetScaffold peeks from
- * the top of a sheet whose height it owns, so this measured, equal-height drawer stays its own
- * component.
- *
- * The handle is the stock [BottomSheetDefaults.DragHandle] drawn with SheetGrabber's 32x4dp
- * PaperFaint look, not SheetGrabber itself: the stock one keeps the localized "drag handle"
- * TalkBack label and a 48dp-high drag strip (22dp above and below the bar), which a bare
- * SheetGrabber (no semantics, no padding) lacks. Integration note: StudioScreen.kt on
- * mvd/studio_shell has its own private drawer copy; only one of the two should survive.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun StudioControlsDrawer(
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    panel: @Composable () -> Unit,
-    tabBar: @Composable () -> Unit,
-) {
-    val density = LocalDensity.current
-    val scope = rememberCoroutineScope()
-    var contentPx by remember { mutableIntStateOf(0) }
-    val revealed = remember { Animatable(0f) }
-    var settled by remember { mutableStateOf(false) }
-
-    LaunchedEffect(expanded, contentPx) {
-        if (contentPx <= 0) return@LaunchedEffect
-        val target = if (expanded) contentPx.toFloat() else 0f
-        if (!settled) {
-            revealed.snapTo(target)
-            settled = true
-        } else {
-            revealed.animateTo(target, tween(durationMillis = 280))
-        }
-    }
-
-    fun settleFromDrag() {
-        if (contentPx <= 0) return
-        val open = revealed.value > contentPx * 0.5f
-        if (open != expanded) {
-            onExpandedChange(open)
-        } else {
-            scope.launch {
-                revealed.animateTo(if (open) contentPx.toFloat() else 0f, tween(durationMillis = 280))
-            }
-        }
-    }
-    val handleDrag = rememberDraggableState { delta ->
-        if (contentPx <= 0) return@rememberDraggableState
-        val next = (revealed.value - delta).coerceIn(0f, contentPx.toFloat())
-        scope.launch { revealed.snapTo(next) }
-    }
-    val barDrag = rememberDraggableState { delta ->
-        if (contentPx <= 0) return@rememberDraggableState
-        val next = (revealed.value - delta).coerceIn(0f, contentPx.toFloat())
-        scope.launch { revealed.snapTo(next) }
-    }
-
-    Column(
-        modifier
-            .fillMaxWidth()
-            .clip(SheetTopShape)
-            .background(Surface1)
-            .navigationBarsPadding(),
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .draggable(
-                    state = handleDrag,
-                    orientation = Orientation.Vertical,
-                    enabled = contentPx > 0,
-                    onDragStopped = { settleFromDrag() },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            // The stock handle keeps its TalkBack label and 48dp-high drag strip; drawn as the
-            // 32x4dp PaperFaint grabber (3.32:1 on Surface1, decorative).
-            BottomSheetDefaults.DragHandle(width = 32.dp, height = 4.dp, color = PaperFaint)
-        }
-        Box(
-            Modifier.draggable(
-                state = barDrag,
-                orientation = Orientation.Vertical,
-                enabled = contentPx > 0,
-                onDragStopped = { settleFromDrag() },
-            ),
-        ) {
-            tabBar()
-        }
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(with(density) { revealed.value.coerceAtLeast(0f).toDp() })
-                .clipToBounds(),
-        ) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight(unbounded = true, align = Alignment.Top)
-                    .onSizeChanged { contentPx = it.height },
-            ) {
-                panel()
-            }
         }
     }
 }

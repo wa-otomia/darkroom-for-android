@@ -49,6 +49,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ImageNotSupported
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
@@ -174,7 +175,6 @@ import io.github.wa_otomia.darkroom.ui.components.PaperButton
 import io.github.wa_otomia.darkroom.ui.components.PresetDropdown
 import io.github.wa_otomia.darkroom.ui.components.SectionLabel
 import io.github.wa_otomia.darkroom.ui.components.SegmentedPills
-import io.github.wa_otomia.darkroom.ui.components.SheetGrabber
 import io.github.wa_otomia.darkroom.ui.components.SnapDragState
 import io.github.wa_otomia.darkroom.ui.components.TonalButton
 import io.github.wa_otomia.darkroom.ui.components.darkroomSliderColors
@@ -187,6 +187,7 @@ import io.github.wa_otomia.darkroom.ui.theme.MonoFont
 import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
+import io.github.wa_otomia.darkroom.ui.theme.PaperFaint
 import io.github.wa_otomia.darkroom.ui.theme.RadiusSheet
 import io.github.wa_otomia.darkroom.ui.theme.Room
 import io.github.wa_otomia.darkroom.ui.theme.SheetTopShape
@@ -1801,12 +1802,14 @@ private val StripModifier = Modifier
 
 /**
  * The phone drawer: Surface1 with 28dp top corners, a drag handle and the tab pills at the top,
- * the selected panel revealed below them. The open/close logic is the same as
- * [StudioControlsDrawer] (EDVS040-R01/R02): handle and tabs both drag the reveal over
- * `0..measured panel height`, release opens only past strictly half, the first measure snaps and
- * later changes animate over 280ms. Only the order changed (tabs above the panel), so the panel
- * now grows downward from under the tabs and the navigation-bar inset sits at the bottom.
+ * the selected panel revealed below them. The only drawer implementation (it replaced
+ * StudioControlsDrawer). The open/close logic is unchanged from main@35d70bf (EDVS040-R01/R02):
+ * handle and tabs both drag the reveal over `0..measured panel height`, release opens only past
+ * strictly half, the first measure snaps and later changes animate over 280ms. Only the order
+ * changed (tabs above the panel), so the panel grows downward from under the tabs and the
+ * navigation-bar inset sits at the bottom.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun StudioDrawerShell(
     expanded: Boolean,
@@ -1873,7 +1876,10 @@ private fun StudioDrawerShell(
                 .heightIn(min = 48.dp),
             contentAlignment = Alignment.Center,
         ) {
-            SheetGrabber()
+            // The stock handle, as before the redesign: it keeps Material's localized "drag
+            // handle" TalkBack label and its 48dp-high strip (22dp above and below the bar).
+            // Drawn with SheetGrabber's 32x4dp PaperFaint look (3.32:1 on Surface1).
+            BottomSheetDefaults.DragHandle(width = 32.dp, height = 4.dp, color = PaperFaint)
         }
         Box(
             Modifier
