@@ -1043,7 +1043,14 @@ fun StudioScreen(
             }
             Column {
                 val zoomLabel = stringResource(R.string.zoom)
-                Text(zoomLabel, color = PaperDim)
+                // Styled like the other slider and switch labels in the drawer (15sp Medium).
+                Text(
+                    zoomLabel,
+                    color = if (!cropLocked) Paper else PaperDim,
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                )
                 Slider(
                     value = if (idActive) idZoom else zoom,
                     onValueChange = { if (idActive) idZoom = it else zoom = it },
@@ -1157,13 +1164,16 @@ fun StudioScreen(
                 Column {
                     SectionLabel(stringResource(R.string.grok_title))
                     if (!grokPub.keySet) {
+                        // Same notice as the ID-mode process section (IdPhotoProcessSection).
                         NoticeCard(
                             text = stringResource(R.string.grok_need_key),
                             modifier = Modifier.padding(bottom = 8.dp),
                             actions = {
-                                TextButton(onClick = { onSettings("grok") }) {
-                                    Text(stringResource(R.string.nav_settings), color = Amber)
-                                }
+                                TonalButton(
+                                    stringResource(R.string.nav_settings),
+                                    fillMaxWidth = false,
+                                    onClick = { onSettings("grok") },
+                                )
                             },
                         )
                     }
@@ -1221,9 +1231,11 @@ fun StudioScreen(
                 NoticeCard(
                     text = stringResource(R.string.print_need_printer),
                     actions = {
-                        TextButton(onClick = { onSettings("printer") }) {
-                            Text(stringResource(R.string.nav_settings), color = Amber)
-                        }
+                        TonalButton(
+                            stringResource(R.string.nav_settings),
+                            fillMaxWidth = false,
+                            onClick = { onSettings("printer") },
+                        )
                     },
                 )
             }
@@ -1968,7 +1980,14 @@ private fun CopiesStepper(copies: Int, enabled: Boolean, onChange: (Int) -> Unit
         Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(stringResource(R.string.copies), color = PaperDim, modifier = Modifier.weight(1f))
+        Text(
+            stringResource(R.string.copies),
+            color = if (enabled) Paper else PaperDim,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f),
+        )
         val fewer = stringResource(R.string.copies_decrease)
         val more = stringResource(R.string.copies_increase)
         IconCircleButton(

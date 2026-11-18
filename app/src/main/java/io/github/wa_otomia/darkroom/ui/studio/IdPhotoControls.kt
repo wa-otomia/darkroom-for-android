@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.DropdownMenuItem
@@ -31,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -52,6 +54,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -97,7 +100,9 @@ import io.github.wa_otomia.darkroom.ui.theme.PaperDim
 import io.github.wa_otomia.darkroom.ui.theme.PaperFaint
 import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.PhotoShape
+import io.github.wa_otomia.darkroom.ui.theme.RadiusSheet
 import io.github.wa_otomia.darkroom.ui.theme.Room
+import io.github.wa_otomia.darkroom.ui.theme.Surface1
 
 // ---------------------------------------------------------------------------------------------
 // Pure helpers (no Compose), kept here so the labels and the resource mapping stay in one place.
@@ -619,55 +624,70 @@ internal fun IdCutoutResultViewer(failure: IdMaskFailure, onDismiss: () -> Unit)
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Column(
+        // A Surface1 panel with 28dp corners on the Room backdrop, like the other sheets and
+        // dialogs. Still fills the window, so nothing outside it can be tapped (as before).
+        Box(
             Modifier
                 .fillMaxSize()
                 .background(Room)
                 .systemBarsPadding()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(12.dp),
         ) {
-            SectionLabel(title)
-            if (request != null && !decodeFailed) {
-                AsyncImage(
-                    model = request,
-                    contentDescription = title,
-                    contentScale = ContentScale.Fit,
-                    onError = { decodeFailed = true },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .clip(PhotoShape)
-                        .background(Color.Black),
-                )
-            } else {
-                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                    val noImage = if (idFailureIsLocal(failure.local, failure.message)) {
-                        R.string.studio_id_cutout_result_no_image_local
-                    } else {
-                        R.string.studio_id_cutout_result_no_image
-                    }
-                    Text(stringResource(noImage), color = Paper)
-                }
-            }
-            // Bounded and scrollable, so a long reason at a large font scale keeps Close on screen.
             Column(
                 Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 240.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(RadiusSheet))
+                    .background(Surface1)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (failure.message.isNotBlank()) {
-                    UserErrorMessage(failure.message)
-                }
                 Text(
-                    stringResource(R.string.studio_id_cutout_result_at, whenText),
-                    color = PaperDim,
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp,
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Paper,
+                    modifier = Modifier.semantics { heading() },
                 )
+                if (request != null && !decodeFailed) {
+                    AsyncImage(
+                        model = request,
+                        contentDescription = title,
+                        contentScale = ContentScale.Fit,
+                        onError = { decodeFailed = true },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .clip(PhotoShape)
+                            .background(Color.Black),
+                    )
+                } else {
+                    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                        val noImage = if (idFailureIsLocal(failure.local, failure.message)) {
+                            R.string.studio_id_cutout_result_no_image_local
+                        } else {
+                            R.string.studio_id_cutout_result_no_image
+                        }
+                        Text(stringResource(noImage), color = Paper)
+                    }
+                }
+                // Bounded and scrollable, so a long reason at a large font scale keeps Close on screen.
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 240.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    if (failure.message.isNotBlank()) {
+                        UserErrorMessage(failure.message)
+                    }
+                    Text(
+                        stringResource(R.string.studio_id_cutout_result_at, whenText),
+                        color = PaperDim,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                    )
+                }
+                TonalButton(stringResource(R.string.studio_id_failed_mask_close), onClick = onDismiss)
             }
-            TonalButton(stringResource(R.string.studio_id_failed_mask_close), onClick = onDismiss)
         }
     }
 }
