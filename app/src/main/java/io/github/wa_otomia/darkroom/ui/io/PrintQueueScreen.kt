@@ -1,10 +1,12 @@
 package io.github.wa_otomia.darkroom.ui.io
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,13 +20,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,21 +46,23 @@ import io.github.wa_otomia.darkroom.data.progress.indeterminateUi
 import io.github.wa_otomia.darkroom.data.progress.toUi
 import io.github.wa_otomia.darkroom.ui.components.AmberProgressBar
 import io.github.wa_otomia.darkroom.ui.components.ProPrinterPanel
-import io.github.wa_otomia.darkroom.ui.components.GhostButton
+import io.github.wa_otomia.darkroom.ui.components.DarkroomCard
+import io.github.wa_otomia.darkroom.ui.components.IconCircleButton
+import io.github.wa_otomia.darkroom.ui.components.PageTitle
+import io.github.wa_otomia.darkroom.ui.components.TonalButton
 import io.github.wa_otomia.darkroom.ui.jobFieldKey
 import io.github.wa_otomia.darkroom.ui.localizedPrintPhase
 import io.github.wa_otomia.darkroom.ui.localizedUserError
+import io.github.wa_otomia.darkroom.ui.navigation.LocalBottomBarClearance
 import io.github.wa_otomia.darkroom.ui.theme.Amber
 import io.github.wa_otomia.darkroom.ui.theme.MonoFont
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
-import io.github.wa_otomia.darkroom.ui.theme.PaperHairline
 import io.github.wa_otomia.darkroom.ui.theme.Room
-import io.github.wa_otomia.darkroom.ui.theme.SurfaceLow
+import io.github.wa_otomia.darkroom.ui.theme.Surface2
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PrintQueueScreen(
     catalog: CatalogRepository,
@@ -83,43 +82,46 @@ fun PrintQueueScreen(
     val canClear = visible.any { jobFieldKey(it.state) in FINISHED_STATES && it.phase != "outcome_unknown" }
     val byPhoto = remember(photos) { photos.associateBy { it.id } }
 
+    // Detail route: the bottom clearance is the navigation-bar inset (NavHost bottom padding is 0).
+    val clearance = LocalBottomBarClearance.current
     Scaffold(
         containerColor = Room,
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.print_queue_title), color = Paper) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back),
-                            tint = Paper,
-                        )
-                    }
-                },
-                windowInsets = WindowInsets(0),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Room,
-                    titleContentColor = Paper,
-                    navigationIconContentColor = Paper,
-                    actionIconContentColor = Paper,
-                ),
-            )
+            // Back floats as a round button over the Room background; the title scrolls with the list.
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(Room)
+                    .padding(start = 12.dp, end = 12.dp, top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconCircleButton(
+                    icon = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = stringResource(R.string.common_back),
+                    onClick = onBack,
+                )
+            }
         },
     ) { padding ->
         LazyColumn(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 20.dp),
+                .padding(padding),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = clearance + 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item {
+                PageTitle(
+                    title = stringResource(R.string.print_queue_title),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
             item {
                 ProPrinterPanel(printQueue, visible.firstOrNull { jobFieldKey(it.state) == "running" }?.id)
             }
             item {
-                GhostButton(
+                TonalButton(
                     stringResource(R.string.print_queue_clear_failed),
                     enabled = canClear,
                 ) { printQueue.clearFinished() }
@@ -129,7 +131,7 @@ fun PrintQueueScreen(
                     Text(
                         stringResource(R.string.print_queue_empty),
                         color = PaperDim,
-                        modifier = Modifier.padding(vertical = 24.dp),
+                        modifier = Modifier.padding(start = 4.dp, top = 24.dp, bottom = 24.dp),
                     )
                 }
             }
@@ -149,11 +151,11 @@ fun PrintQueueScreen(
                     onRemove = { printQueue.remove(job.id) },
                 )
             }
-            item { Spacer(Modifier.height(16.dp)) }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PrintJobRow(
     job: PrintJob,
@@ -185,19 +187,17 @@ private fun PrintJobRow(
         "failed" -> stringResource(R.string.job_state_failed)
         else -> state
     }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .border(1.dp, PaperHairline, RoundedCornerShape(2.dp))
-            .padding(12.dp),
+    DarkroomCard(
+        contentPadding = 14.dp,
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
                     .width(40.dp)
                     .height(60.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(SurfaceLow),
+                    .clip(ThumbShape)
+                    .background(Surface2),
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(context).data(thumb).crossfade(true).build(),
@@ -213,6 +213,7 @@ private fun PrintJobRow(
                     color = Paper,
                     fontFamily = MonoFont,
                     fontSize = 13.sp,
+                    lineHeight = 18.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -220,12 +221,14 @@ private fun PrintJobRow(
                     origin,
                     color = PaperDim,
                     fontSize = 12.sp,
+                    lineHeight = 16.sp,
                     modifier = Modifier.padding(top = 4.dp),
                 )
                 Text(
                     status,
                     color = if (state == "failed") Amber else PaperDim,
                     fontSize = 12.sp,
+                    lineHeight = 16.sp,
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
@@ -239,34 +242,38 @@ private fun PrintJobRow(
                         phaseLabel = status,
                         indeterminate = true,
                     )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(14.dp))
                 AmberProgressBar(
                     title = stringResource(R.string.progress_print),
                     ui = ui,
+                    framed = false,
                 )
-                Spacer(Modifier.height(10.dp))
-                GhostButton(stringResource(R.string.common_cancel), fillMaxWidth = false, onClick = onCancel)
+                Spacer(Modifier.height(12.dp))
+                TonalButton(stringResource(R.string.common_cancel), fillMaxWidth = false, onClick = onCancel)
             }
             "queued" -> {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(14.dp))
                 AmberProgressBar(
                     title = stringResource(R.string.progress_print),
                     ui = indeterminateUi(status),
+                    framed = false,
                 )
-                Spacer(Modifier.height(10.dp))
-                GhostButton(stringResource(R.string.common_cancel), fillMaxWidth = false, onClick = onCancel)
+                Spacer(Modifier.height(12.dp))
+                TonalButton(stringResource(R.string.common_cancel), fillMaxWidth = false, onClick = onCancel)
             }
             "failed", "cancelled" -> {
                 val error = job.error?.let { localizedUserError(it) }
                 if (!error.isNullOrBlank()) {
-                    Text(error, color = Amber, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                    Text(error, color = Amber, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 10.dp))
                 }
-                Row(
-                    Modifier.padding(top = 10.dp),
+                // FlowRow so the two buttons wrap instead of squeezing at large font sizes.
+                FlowRow(
+                    Modifier.padding(top = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    GhostButton(stringResource(R.string.print_queue_retry), fillMaxWidth = false, enabled = job.phase != "outcome_unknown", onClick = onRetry)
-                    GhostButton(stringResource(R.string.print_queue_remove), fillMaxWidth = false, enabled = job.phase != "outcome_unknown", onClick = onRemove)
+                    TonalButton(stringResource(R.string.print_queue_retry), fillMaxWidth = false, enabled = job.phase != "outcome_unknown", onClick = onRetry)
+                    TonalButton(stringResource(R.string.print_queue_remove), fillMaxWidth = false, enabled = job.phase != "outcome_unknown", onClick = onRemove)
                 }
             }
         }
@@ -274,6 +281,9 @@ private fun PrintJobRow(
 }
 
 private val FINISHED_STATES = setOf("failed", "cancelled")
+
+/** Job thumbnails are small, so they take a 10dp radius rather than the 16dp photo radius. */
+private val ThumbShape = RoundedCornerShape(10.dp)
 
 private fun printSortKey(job: PrintJob): Int = when (jobFieldKey(job.state)) {
     "running" -> 0
