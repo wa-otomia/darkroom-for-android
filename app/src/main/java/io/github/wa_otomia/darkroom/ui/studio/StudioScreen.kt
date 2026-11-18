@@ -7,7 +7,12 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,41 +21,52 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.ImageNotSupported
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,15 +74,23 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -140,21 +164,31 @@ import io.github.wa_otomia.darkroom.ui.UserErrorDialog
 import io.github.wa_otomia.darkroom.ui.components.AspectCropper
 import io.github.wa_otomia.darkroom.ui.components.DarkroomSnackbarHost
 import io.github.wa_otomia.darkroom.ui.components.DeleteUndoBar
-import io.github.wa_otomia.darkroom.ui.components.GhostButton
+import io.github.wa_otomia.darkroom.ui.components.IconCircleButton
 import io.github.wa_otomia.darkroom.ui.components.JobProgressStrip
+import io.github.wa_otomia.darkroom.ui.components.NoticeCard
 import io.github.wa_otomia.darkroom.ui.components.PaperButton
 import io.github.wa_otomia.darkroom.ui.components.PresetDropdown
 import io.github.wa_otomia.darkroom.ui.components.SectionLabel
+import io.github.wa_otomia.darkroom.ui.components.SegmentedPills
+import io.github.wa_otomia.darkroom.ui.components.SheetGrabber
 import io.github.wa_otomia.darkroom.ui.components.SnapDragState
+import io.github.wa_otomia.darkroom.ui.components.TonalButton
+import io.github.wa_otomia.darkroom.ui.components.darkroomSliderColors
 import io.github.wa_otomia.darkroom.ui.jobFieldKey
 import io.github.wa_otomia.darkroom.ui.localizedByteProgress
 import io.github.wa_otomia.darkroom.ui.localizedGeneratePhase
 import io.github.wa_otomia.darkroom.ui.localizedPrintPhase
 import io.github.wa_otomia.darkroom.ui.theme.Amber
 import io.github.wa_otomia.darkroom.ui.theme.MonoFont
+import io.github.wa_otomia.darkroom.ui.theme.OnPhotoScrim
+import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
+import io.github.wa_otomia.darkroom.ui.theme.RadiusSheet
 import io.github.wa_otomia.darkroom.ui.theme.Room
+import io.github.wa_otomia.darkroom.ui.theme.SheetTopShape
+import io.github.wa_otomia.darkroom.ui.theme.Surface1
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -415,19 +449,7 @@ fun StudioScreen(
     }
 
     if (photo == null) {
-        Column(Modifier.padding(24.dp)) {
-            TextButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = null,
-                    tint = Amber,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.back_gallery), color = Amber)
-            }
-            Text(stringResource(R.string.not_found), style = MaterialTheme.typography.headlineMedium, color = Paper)
-        }
+        StudioMissingPhoto(onBack = onBack)
         return
     }
 
@@ -1025,7 +1047,7 @@ fun StudioScreen(
                     onValueChange = { if (idActive) idZoom = it else zoom = it },
                     valueRange = MIN_PRINT_ZOOM..MAX_PRINT_ZOOM,
                     enabled = !cropLocked,
-                    colors = SliderDefaults.colors(thumbColor = Amber, activeTrackColor = Amber),
+                    colors = darkroomSliderColors(),
                 )
                 if (cropLocked) {
                     StudioNote(stringResource(R.string.studio_crop_locked), tone = Amber)
@@ -1132,8 +1154,15 @@ fun StudioScreen(
                 Column {
                     SectionLabel(stringResource(R.string.grok_title))
                     if (!grokPub.keySet) {
-                        Text(stringResource(R.string.grok_need_key), color = Amber, modifier = Modifier.padding(bottom = 8.dp))
-                        TextButton(onClick = { onSettings("grok") }) { Text(stringResource(R.string.nav_settings), color = Amber) }
+                        NoticeCard(
+                            text = stringResource(R.string.grok_need_key),
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            actions = {
+                                TextButton(onClick = { onSettings("grok") }) {
+                                    Text(stringResource(R.string.nav_settings), color = Amber)
+                                }
+                            },
+                        )
                     }
                     Row(
                         Modifier.fillMaxWidth(),
@@ -1161,7 +1190,7 @@ fun StudioScreen(
                     genError = null
                     aiJobs.enqueueEdit(photo.id, source, presetId, prompt, appliedAiFraming)
                 }
-                GhostButton(stringResource(R.string.studio_ai_generate_to_gallery), enabled = canGenerate) {
+                TonalButton(stringResource(R.string.studio_ai_generate_to_gallery), enabled = canGenerate) {
                     genError = null
                     aiJobs.enqueueGenerate(photo.id, source, presetId, prompt, appliedAiFraming)
                 }
@@ -1176,7 +1205,7 @@ fun StudioScreen(
             PaperButton(stringResource(R.string.studio_add_to_print_queue), enabled = canPrintDirect) {
                 startPrint(false)
             }
-            GhostButton(stringResource(R.string.print_with_preset), enabled = canPrintWithPreset && !idActive) {
+            TonalButton(stringResource(R.string.print_with_preset), enabled = canPrintWithPreset && !idActive) {
                 startPrint(true)
             }
             if (idActive) {
@@ -1186,12 +1215,16 @@ fun StudioScreen(
                 StudioNote(stringResource(R.string.print_queue_already_queued), tone = Amber, topPadding = 0)
             }
             if (!printerReady) {
-                Column {
-                    Text(stringResource(R.string.print_need_printer), color = Amber)
-                    TextButton(onClick = { onSettings("printer") }) { Text(stringResource(R.string.nav_settings), color = Amber) }
-                }
+                NoticeCard(
+                    text = stringResource(R.string.print_need_printer),
+                    actions = {
+                        TextButton(onClick = { onSettings("printer") }) {
+                            Text(stringResource(R.string.nav_settings), color = Amber)
+                        }
+                    },
+                )
             }
-            GhostButton(stringResource(R.string.studio_export), enabled = !exporting && !cropLocked) {
+            TonalButton(stringResource(R.string.studio_export), enabled = !exporting && !cropLocked) {
                 startExport()
             }
         }
@@ -1209,19 +1242,13 @@ fun StudioScreen(
         }
     }
 
+    // The size line that used to head the drawer now sits in the floating pill.
     val drawerPanel: @Composable (maxHeight: Dp) -> Unit = { panelCap ->
         Column(Modifier.fillMaxWidth()) {
-            Text(
-                sizeLabel,
-                fontFamily = MonoFont,
-                color = PaperDim,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-            )
             StudioEqualHeightTabs(
                 selected = tab,
                 maxHeight = panelCap,
-                modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 12.dp),
+                modifier = Modifier.padding(horizontal = 20.dp).padding(top = 8.dp, bottom = 16.dp),
                 compose = composePanel,
                 process = processPanel,
                 output = outputPanel,
@@ -1258,11 +1285,16 @@ fun StudioScreen(
     }
     val exportUi = exportProgress?.toUi(exportLabel) ?: indeterminateUi(exportLabel)
 
+    // The floating buttons and centre pill replace the app bar; the job strips and the undo bar
+    // keep their order and sit right under them, above the photo.
     val topBar: @Composable () -> Unit = {
         Column {
-            StudioTopBar(
+            StudioFloatingChrome(
                 filename = photo.filename,
                 generated = photo.isGenerated(),
+                // In ID mode the sheet's own corner label already names the size (D4: one of the
+                // two, never neither), so the pill keeps only the name.
+                sizeLabel = if (idActive) null else sizeLabel,
                 busy = aiBusy || alreadyQueued,
                 onBack = onBack,
                 onDelete = { pendingDelete = true },
@@ -1271,12 +1303,14 @@ fun StudioScreen(
                 pending = pendingDeletion,
                 onUndo = { catalog.undoDelete(it) },
                 onDeleteNow = { catalog.commitDeleteNow(it) },
+                modifier = StripModifier,
             )
             if (myPrint != null && printUi != null) {
                 JobProgressStrip(
                     title = stringResource(R.string.progress_print),
                     ui = printUi,
                     collapsed = printStripCollapsed,
+                    modifier = StripModifier,
                     extra = printerJobId?.let { stringResource(R.string.print_job_id, it) },
                     onCancel = { printQueue.cancel(myPrint.id) },
                     onHide = { printStripCollapsed = true },
@@ -1287,6 +1321,7 @@ fun StudioScreen(
                     title = stringResource(R.string.progress_generate),
                     ui = aiUi,
                     collapsed = aiStripCollapsed,
+                    modifier = StripModifier,
                     extra = aiBytes,
                     onCancel = { aiJobs.cancel(job.id) },
                     onHide = {
@@ -1300,6 +1335,7 @@ fun StudioScreen(
                     title = stringResource(R.string.progress_export),
                     ui = exportUi,
                     collapsed = exportStripCollapsed,
+                    modifier = StripModifier,
                     onHide = { exportStripCollapsed = true },
                 )
             }
@@ -1387,42 +1423,73 @@ fun StudioScreen(
         }
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(Room)) {
-        if (maxWidth >= 600.dp) {
-            val panelWidth = (maxWidth * 0.36f).coerceIn(320.dp, 440.dp)
-            Scaffold(
-                containerColor = Room,
-                contentWindowInsets = WindowInsets(0),
-                topBar = topBar,
-                snackbarHost = { DarkroomSnackbarHost(snackbar) },
-            ) { padding ->
+    // The crop area and its snackbar. The snackbar sits at the bottom of the photo, so it never
+    // hides behind the drawer, the side panel or the navigation bar.
+    val photoArea: @Composable (Modifier) -> Unit = { areaModifier ->
+        Box(areaModifier) {
+            cropper(Modifier.fillMaxSize())
+            DarkroomSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
+        }
+    }
+
+    // The navigation host stops at the status bar; paint the strip above this screen black too,
+    // so the crop area runs up under the status bar instead of meeting a band of Room.
+    val statusBarTopPx = WindowInsets.systemBars.getTop(density).toFloat()
+    CompositionLocalProvider(LocalContentColor provides Paper) {
+        BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    if (statusBarTopPx > 0f) {
+                        drawRect(
+                            Color.Black,
+                            topLeft = Offset(0f, -statusBarTopPx),
+                            size = Size(size.width, statusBarTopPx),
+                        )
+                    }
+                }
+                .background(Color.Black),
+        ) {
+            if (maxWidth >= 600.dp) {
+                val panelWidth = (maxWidth * 0.36f).coerceIn(320.dp, 440.dp)
                 Row(
                     Modifier
                         .fillMaxSize()
-                        .padding(padding)
-                        .navigationBarsPadding()
                         .imePadding(),
                 ) {
-                    cropper(Modifier.weight(1f).fillMaxHeight())
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .windowInsetsPadding(
+                                WindowInsets.navigationBars.only(WindowInsetsSides.Start + WindowInsetsSides.Bottom),
+                            ),
+                    ) {
+                        topBar()
+                        photoArea(Modifier.weight(1f).fillMaxWidth())
+                    }
                     Column(
                         Modifier
                             .width(panelWidth)
                             .fillMaxHeight()
-                            .background(Room)
+                            .clip(RoundedCornerShape(topStart = RadiusSheet))
+                            .background(Surface1)
+                            .windowInsetsPadding(
+                                WindowInsets.navigationBars.only(WindowInsetsSides.End + WindowInsetsSides.Bottom),
+                            )
                             .verticalScroll(rememberScrollState()),
                     ) {
-                        Text(
-                            sizeLabel,
-                            fontFamily = MonoFont,
-                            color = PaperDim,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                        // Tabs only switch the content here; there is nothing to collapse.
+                        StudioTabPills(
+                            selected = tab,
+                            onSelect = { tabKey = it.key },
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
                         )
                         Column(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 20.dp)
-                                .padding(bottom = 12.dp),
+                                .padding(top = 8.dp, bottom = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             when (tab) {
@@ -1431,39 +1498,22 @@ fun StudioScreen(
                                 StudioTab.Output -> outputPanel()
                             }
                         }
-                        StudioTabBar(
-                            selected = tab,
-                            onSelect = { tabKey = it.key },
-                        )
                     }
                 }
-            }
-        } else {
-            val panelCap = maxHeight * PANEL_MAX_FRACTION
-            Scaffold(
-                containerColor = Room,
-                contentWindowInsets = WindowInsets(0),
-                topBar = topBar,
-                snackbarHost = { DarkroomSnackbarHost(snackbar) },
-            ) { padding ->
+            } else {
+                val panelCap = maxHeight * PANEL_MAX_FRACTION
                 Column(
                     Modifier
                         .fillMaxSize()
-                        .padding(padding)
                         .imePadding(),
                 ) {
-                    cropper(Modifier.weight(1f).fillMaxWidth())
-                    StudioControlsDrawer(
+                    topBar()
+                    photoArea(Modifier.weight(1f).fillMaxWidth())
+                    StudioDrawerShell(
                         expanded = drawerExpanded,
                         onExpandedChange = { drawerExpanded = it },
+                        tabs = { StudioTabPills(selected = tab, onSelect = onTabSelect) },
                         panel = { drawerPanel(panelCap) },
-                        tabBar = {
-                            StudioTabBar(
-                                selected = tab,
-                                onSelect = onTabSelect,
-                                includeNavigationBars = true,
-                            )
-                        },
                     )
                 }
             }
@@ -1495,8 +1545,9 @@ fun StudioScreen(
     if (pendingDelete) {
         AlertDialog(
             onDismissRequest = { pendingDelete = false },
+            containerColor = Surface1,
             title = { Text(stringResource(R.string.delete_photo_title)) },
-            text = { Text(photo.filename) },
+            text = { Text(photo.filename, fontFamily = MonoFont, color = PaperDim) },
             confirmButton = {
                 TextButton(
                     enabled = !aiBusy && !alreadyQueued,
@@ -1535,6 +1586,7 @@ fun StudioScreen(
         }
         AlertDialog(
             onDismissRequest = { versionMenuId = null },
+            containerColor = Surface1,
             title = { Text(menuLabel) },
             text = {
                 Column {
@@ -1545,7 +1597,7 @@ fun StudioScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(stringResource(R.string.studio_delete_version), modifier = Modifier.fillMaxWidth())
+                        Text(stringResource(R.string.studio_delete_version), color = Paper, modifier = Modifier.fillMaxWidth())
                     }
                     TextButton(
                         onClick = {
@@ -1574,7 +1626,7 @@ fun StudioScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(stringResource(R.string.studio_add_version_to_gallery), modifier = Modifier.fillMaxWidth())
+                        Text(stringResource(R.string.studio_add_version_to_gallery), color = Paper, modifier = Modifier.fillMaxWidth())
                     }
                 }
             },
@@ -1589,6 +1641,7 @@ fun StudioScreen(
     versionDeleteId?.let { editId ->
         AlertDialog(
             onDismissRequest = { versionDeleteId = null },
+            containerColor = Surface1,
             title = { Text(stringResource(R.string.studio_delete_version_title)) },
             confirmButton = {
                 TextButton(
@@ -1618,63 +1671,282 @@ fun StudioScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The Studio's own chrome now that there is no top app bar: round back and delete buttons on
+ * [OnPhotoScrim] over the black crop area, and a centre pill naming the photo. The pill carries
+ * the "Generated" eyebrow and the file name (both used to sit in the app bar title) and, when it
+ * does not repeat the frame's own label, the working size that used to head the drawer.
+ */
 @Composable
-private fun StudioTopBar(
+private fun StudioFloatingChrome(
     filename: String,
     generated: Boolean,
+    sizeLabel: String?,
     busy: Boolean,
     onBack: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
     onCancelHiddenJob: (() -> Unit)? = null,
 ) {
-    TopAppBar(
-        title = {
-            Column {
-                if (generated) {
-                    Text(
-                        stringResource(R.string.photo_tag_generated),
-                        color = Amber,
-                        fontSize = 11.sp,
-                        lineHeight = 14.sp,
-                        fontFamily = MonoFont,
-                        letterSpacing = 1.2.sp,
-                    )
-                }
-                Text(filename, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Paper)
-            }
-        },
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = Paper)
-            }
-        },
-        actions = {
-            if (onCancelHiddenJob != null) {
-                IconButton(onClick = onCancelHiddenJob) {
-                    Icon(
-                        Icons.Outlined.Close,
-                        contentDescription = stringResource(R.string.common_cancel),
-                        tint = Paper,
-                    )
-                }
-            }
-            IconButton(onClick = onDelete, enabled = !busy) {
-                Icon(
-                    Icons.Outlined.Delete,
-                    contentDescription = stringResource(R.string.common_delete),
-                    tint = if (busy) PaperDim else Paper,
+    Row(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconCircleButton(
+            icon = Icons.AutoMirrored.Outlined.ArrowBack,
+            contentDescription = stringResource(R.string.common_back),
+            onClick = onBack,
+            container = OnPhotoScrim,
+        )
+        Box(
+            Modifier
+                .weight(1f)
+                .padding(horizontal = 4.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            StudioTitlePill(filename = filename, generated = generated, sizeLabel = sizeLabel)
+        }
+        if (onCancelHiddenJob != null) {
+            IconCircleButton(
+                icon = Icons.Outlined.Close,
+                contentDescription = stringResource(R.string.common_cancel),
+                onClick = onCancelHiddenJob,
+                container = OnPhotoScrim,
+            )
+        }
+        IconCircleButton(
+            icon = Icons.Outlined.Delete,
+            contentDescription = stringResource(R.string.common_delete),
+            onClick = onDelete,
+            enabled = !busy,
+            container = OnPhotoScrim,
+        )
+    }
+}
+
+/**
+ * Not interactive; read as one node. The name keeps one line (it was ellipsized in the app bar
+ * too); the size wraps at large font scales. Fixed 20dp corners rather than a stadium so a
+ * wrapped size line never runs into the curve. Paper 15+:1 and PaperDim ≥ 5:1 on the scrim over
+ * the black crop area; Amber ≥ 8:1.
+ */
+@Composable
+private fun StudioTitlePill(filename: String, generated: Boolean, sizeLabel: String?) {
+    Column(
+        Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(OnPhotoScrim)
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+            .semantics(mergeDescendants = true) {},
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (generated) {
+                Text(
+                    stringResource(R.string.photo_tag_generated),
+                    color = Amber,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
                 )
+                Spacer(Modifier.width(6.dp))
             }
-        },
-        windowInsets = WindowInsets(0),
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Room,
-            titleContentColor = Paper,
-            navigationIconContentColor = Paper,
-            actionIconContentColor = Paper,
-        ),
+            Text(
+                filename,
+                color = Paper,
+                fontFamily = MonoFont,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+        }
+        if (!sizeLabel.isNullOrEmpty()) {
+            Text(
+                sizeLabel,
+                color = PaperDim,
+                fontFamily = MonoFont,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/** Job strips and the delete-undo bar as inset Surface1 panels under the floating buttons. */
+private val StripModifier = Modifier
+    .padding(start = 12.dp, end = 12.dp, bottom = 6.dp)
+    .clip(PanelShape)
+
+/**
+ * The phone drawer: Surface1 with 28dp top corners, a drag handle and the tab pills at the top,
+ * the selected panel revealed below them. The open/close logic is the same as
+ * [StudioControlsDrawer] (EDVS040-R01/R02): handle and tabs both drag the reveal over
+ * `0..measured panel height`, release opens only past strictly half, the first measure snaps and
+ * later changes animate over 280ms. Only the order changed (tabs above the panel), so the panel
+ * now grows downward from under the tabs and the navigation-bar inset sits at the bottom.
+ */
+@Composable
+private fun StudioDrawerShell(
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    tabs: @Composable () -> Unit,
+    panel: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    var contentPx by remember { mutableIntStateOf(0) }
+    val revealed = remember { Animatable(0f) }
+    var settled by remember { mutableStateOf(false) }
+
+    LaunchedEffect(expanded, contentPx) {
+        if (contentPx <= 0) return@LaunchedEffect
+        val target = if (expanded) contentPx.toFloat() else 0f
+        if (!settled) {
+            revealed.snapTo(target)
+            settled = true
+        } else {
+            revealed.animateTo(target, tween(durationMillis = 280))
+        }
+    }
+
+    fun settleFromDrag() {
+        if (contentPx <= 0) return
+        val open = revealed.value > contentPx * 0.5f
+        if (open != expanded) {
+            onExpandedChange(open)
+        } else {
+            scope.launch {
+                revealed.animateTo(if (open) contentPx.toFloat() else 0f, tween(durationMillis = 280))
+            }
+        }
+    }
+    val handleDrag = rememberDraggableState { delta ->
+        if (contentPx <= 0) return@rememberDraggableState
+        val next = (revealed.value - delta).coerceIn(0f, contentPx.toFloat())
+        scope.launch { revealed.snapTo(next) }
+    }
+    val barDrag = rememberDraggableState { delta ->
+        if (contentPx <= 0) return@rememberDraggableState
+        val next = (revealed.value - delta).coerceIn(0f, contentPx.toFloat())
+        scope.launch { revealed.snapTo(next) }
+    }
+
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(SheetTopShape)
+            .background(Surface1)
+            .navigationBarsPadding(),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .draggable(
+                    state = handleDrag,
+                    orientation = Orientation.Vertical,
+                    enabled = contentPx > 0,
+                    onDragStopped = { settleFromDrag() },
+                )
+                .padding(top = 10.dp, bottom = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            SheetGrabber()
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .draggable(
+                    state = barDrag,
+                    orientation = Orientation.Vertical,
+                    enabled = contentPx > 0,
+                    onDragStopped = { settleFromDrag() },
+                )
+                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+        ) {
+            tabs()
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(with(density) { revealed.value.coerceAtLeast(0f).toDp() })
+                .clipToBounds(),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(unbounded = true, align = Alignment.Top)
+                    .onSizeChanged { contentPx = it.height },
+            ) {
+                panel()
+            }
+        }
+    }
+}
+
+/** 构图 / 处理 / 输出 as tab pills. Tapping a segment always reports, even the selected one. */
+@Composable
+private fun StudioTabPills(
+    selected: StudioTab,
+    onSelect: (StudioTab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SegmentedPills(
+        options = StudioTab.entries.map { stringResource(it.labelRes) },
+        selectedIndex = StudioTab.entries.indexOf(selected),
+        onSelect = { onSelect(StudioTab.entries[it]) },
+        modifier = modifier.fillMaxWidth(),
+        role = Role.Tab,
     )
+}
+
+/** No such photo (deleted elsewhere, stale link): say so and offer the way back. */
+@Composable
+private fun StudioMissingPhoto(onBack: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Room)
+            .navigationBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+    ) {
+        Spacer(Modifier.height(48.dp))
+        Box(
+            Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(Surface1),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.ImageNotSupported,
+                contentDescription = null,
+                tint = PaperDim,
+                modifier = Modifier.size(32.dp),
+            )
+        }
+        Text(
+            stringResource(R.string.not_found),
+            style = MaterialTheme.typography.headlineSmall,
+            color = Paper,
+            textAlign = TextAlign.Center,
+        )
+        TonalButton(
+            text = stringResource(R.string.back_gallery),
+            fillMaxWidth = false,
+            icon = Icons.AutoMirrored.Outlined.ArrowBack,
+            onClick = onBack,
+        )
+    }
 }
 
 @Composable
@@ -1686,21 +1958,27 @@ private fun CopiesStepper(copies: Int, enabled: Boolean, onChange: (Int) -> Unit
         Text(stringResource(R.string.copies), color = PaperDim, modifier = Modifier.weight(1f))
         val fewer = stringResource(R.string.copies_decrease)
         val more = stringResource(R.string.copies_increase)
-        IconButton(
+        IconCircleButton(
+            icon = Icons.Outlined.Remove,
+            contentDescription = fewer,
             enabled = enabled && copies > 1,
             onClick = { onChange(copies - 1) },
-            modifier = Modifier.semantics { contentDescription = fewer },
-        ) {
-            Text("−", color = if (enabled && copies > 1) Paper else PaperDim, fontSize = 20.sp)
-        }
-        Text("$copies", color = Paper, fontFamily = MonoFont, modifier = Modifier.padding(horizontal = 4.dp))
-        IconButton(
+        )
+        Text(
+            "$copies",
+            color = Paper,
+            fontFamily = MonoFont,
+            fontSize = 16.sp,
+            lineHeight = 22.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.widthIn(min = 32.dp).padding(horizontal = 4.dp),
+        )
+        IconCircleButton(
+            icon = Icons.Outlined.Add,
+            contentDescription = more,
             enabled = enabled && copies < 9,
             onClick = { onChange(copies + 1) },
-            modifier = Modifier.semantics { contentDescription = more },
-        ) {
-            Text("+", color = if (enabled && copies < 9) Paper else PaperDim, fontSize = 20.sp)
-        }
+        )
     }
 }
 

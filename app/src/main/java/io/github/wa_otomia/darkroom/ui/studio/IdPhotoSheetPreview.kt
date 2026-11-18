@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
@@ -101,6 +102,9 @@ import kotlin.math.abs
 private val SheetWhite = Color.White
 private val CutLine = Color(ID_CUT_LINE_COLOR)
 private val SheetHairline = Paper.copy(alpha = 0.3f)
+
+/** Label and note chips on the sheet frame: a 24dp-high chip with 12dp corners, as in AspectCropper. */
+private val FrameChipShape = RoundedCornerShape(12.dp)
 
 /** Zoom steps the preview cut-out is recomputed at; the feather radius depends on zoom. */
 private const val CUTOUT_ZOOM_STEP = 0.1f
@@ -320,12 +324,12 @@ internal fun IdPhotoSheetPreview(
                     color = Paper.copy(alpha = 0.9f),
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
-                    letterSpacing = 1.4.sp,
+                    fontWeight = FontWeight.Medium,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(10.dp)
-                        .background(Ink.copy(alpha = 0.72f), RoundedCornerShape(2.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .background(Ink.copy(alpha = 0.72f), FrameChipShape)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
                 )
                 if (decoding && cutout == null) {
                     AmberTrack(
@@ -354,11 +358,12 @@ internal fun IdPhotoSheetPreview(
                         color = Amber,
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
+                        fontWeight = FontWeight.Medium,
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .padding(10.dp)
-                            .background(Ink.copy(alpha = 0.82f), RoundedCornerShape(2.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .background(Ink.copy(alpha = 0.82f), FrameChipShape)
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
             }

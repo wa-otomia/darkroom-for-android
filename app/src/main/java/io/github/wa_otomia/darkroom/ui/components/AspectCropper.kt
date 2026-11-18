@@ -36,6 +36,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -88,6 +89,13 @@ private val FrameHairline = Paper.copy(alpha = 0.3f)
  */
 private val GridLine = Paper.copy(alpha = 0.55f)
 private val GridShadow = Color.Black.copy(alpha = 0.28f)
+
+/**
+ * The frame's label and note chips. One line of 12sp text plus 4dp padding is 24dp high, so 12dp
+ * corners read as a pill; fixed rather than 50% so a chip wrapped at a large font scale keeps
+ * modest corners instead of turning into an oval.
+ */
+private val FrameChipShape = RoundedCornerShape(12.dp)
 
 /**
  * [imageWidth] and [imageHeight] are the dimensions the image has *after* [quarterTurns]
@@ -277,12 +285,12 @@ fun AspectCropper(
                     color = Paper.copy(alpha = 0.9f),
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
-                    letterSpacing = 1.4.sp,
+                    fontWeight = FontWeight.Medium,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(10.dp)
-                        .background(Ink.copy(alpha = 0.72f), RoundedCornerShape(2.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .background(Ink.copy(alpha = 0.72f), FrameChipShape)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
                 )
                 if (decoding) {
                     AmberTrack(
@@ -299,12 +307,12 @@ fun AspectCropper(
                         color = Amber,
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
-                        letterSpacing = 1.4.sp,
+                        fontWeight = FontWeight.Medium,
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .padding(10.dp)
-                            .background(Ink.copy(alpha = 0.82f), RoundedCornerShape(2.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .background(Ink.copy(alpha = 0.82f), FrameChipShape)
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
             }
