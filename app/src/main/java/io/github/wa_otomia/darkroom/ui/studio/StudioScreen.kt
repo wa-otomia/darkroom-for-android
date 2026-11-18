@@ -26,9 +26,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -87,7 +87,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -181,7 +184,6 @@ import io.github.wa_otomia.darkroom.ui.localizedGeneratePhase
 import io.github.wa_otomia.darkroom.ui.localizedPrintPhase
 import io.github.wa_otomia.darkroom.ui.theme.Amber
 import io.github.wa_otomia.darkroom.ui.theme.MonoFont
-import io.github.wa_otomia.darkroom.ui.theme.OnPhotoScrim
 import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
@@ -189,6 +191,7 @@ import io.github.wa_otomia.darkroom.ui.theme.RadiusSheet
 import io.github.wa_otomia.darkroom.ui.theme.Room
 import io.github.wa_otomia.darkroom.ui.theme.SheetTopShape
 import io.github.wa_otomia.darkroom.ui.theme.Surface1
+import io.github.wa_otomia.darkroom.ui.theme.Surface2
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -1041,13 +1044,15 @@ fun StudioScreen(
                 }
             }
             Column {
-                Text(stringResource(R.string.zoom), color = PaperDim)
+                val zoomLabel = stringResource(R.string.zoom)
+                Text(zoomLabel, color = PaperDim)
                 Slider(
                     value = if (idActive) idZoom else zoom,
                     onValueChange = { if (idActive) idZoom = it else zoom = it },
                     valueRange = MIN_PRINT_ZOOM..MAX_PRINT_ZOOM,
                     enabled = !cropLocked,
                     colors = darkroomSliderColors(),
+                    modifier = Modifier.semantics { contentDescription = zoomLabel },
                 )
                 if (cropLocked) {
                     StudioNote(stringResource(R.string.studio_crop_locked), tone = Amber)
@@ -1428,7 +1433,14 @@ fun StudioScreen(
     val photoArea: @Composable (Modifier) -> Unit = { areaModifier ->
         Box(areaModifier) {
             cropper(Modifier.fillMaxSize())
-            DarkroomSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
+            // Unbounded upward: a short photo area (big font, several strips) must not squeeze
+            // the snackbar's message or action; it overlaps the strips above instead.
+            DarkroomSnackbarHost(
+                snackbar,
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .wrapContentHeight(align = Alignment.Bottom, unbounded = true),
+            )
         }
     }
 
@@ -1457,12 +1469,14 @@ fun StudioScreen(
                         .fillMaxSize()
                         .imePadding(),
                 ) {
+                    // The navigation host already pads start and end for the system bars, so
+                    // only the bottom navigation-bar inset is added here and on the panel.
                     Column(
                         Modifier
                             .weight(1f)
                             .fillMaxHeight()
                             .windowInsetsPadding(
-                                WindowInsets.navigationBars.only(WindowInsetsSides.Start + WindowInsetsSides.Bottom),
+                                WindowInsets.navigationBars.only(WindowInsetsSides.Bottom),
                             ),
                     ) {
                         topBar()
@@ -1475,7 +1489,7 @@ fun StudioScreen(
                             .clip(RoundedCornerShape(topStart = RadiusSheet))
                             .background(Surface1)
                             .windowInsetsPadding(
-                                WindowInsets.navigationBars.only(WindowInsetsSides.End + WindowInsetsSides.Bottom),
+                                WindowInsets.navigationBars.only(WindowInsetsSides.Bottom),
                             )
                             .verticalScroll(rememberScrollState()),
                     ) {
@@ -1672,8 +1686,10 @@ fun StudioScreen(
 }
 
 /**
- * The Studio's own chrome now that there is no top app bar: round back and delete buttons on
- * [OnPhotoScrim] over the black crop area, and a centre pill naming the photo. The pill carries
+ * The Studio's own chrome now that there is no top app bar: round back and delete buttons and a
+ * centre pill naming the photo, on [Surface2] because the row sits on the black Studio background
+ * above the crop area (a photo scrim would vanish on black; overlaying the photo would cover the
+ * frame's label chip and the top of the crop gestures). The pill carries
  * the "Generated" eyebrow and the file name (both used to sit in the app bar title) and, when it
  * does not repeat the frame's own label, the working size that used to head the drawer.
  */
@@ -1698,7 +1714,7 @@ private fun StudioFloatingChrome(
             icon = Icons.AutoMirrored.Outlined.ArrowBack,
             contentDescription = stringResource(R.string.common_back),
             onClick = onBack,
-            container = OnPhotoScrim,
+            container = Surface2,
         )
         Box(
             Modifier
@@ -1713,7 +1729,7 @@ private fun StudioFloatingChrome(
                 icon = Icons.Outlined.Close,
                 contentDescription = stringResource(R.string.common_cancel),
                 onClick = onCancelHiddenJob,
-                container = OnPhotoScrim,
+                container = Surface2,
             )
         }
         IconCircleButton(
@@ -1721,7 +1737,7 @@ private fun StudioFloatingChrome(
             contentDescription = stringResource(R.string.common_delete),
             onClick = onDelete,
             enabled = !busy,
-            container = OnPhotoScrim,
+            container = Surface2,
         )
     }
 }
@@ -1729,15 +1745,15 @@ private fun StudioFloatingChrome(
 /**
  * Not interactive; read as one node. The name keeps one line (it was ellipsized in the app bar
  * too); the size wraps at large font scales. Fixed 20dp corners rather than a stadium so a
- * wrapped size line never runs into the curve. Paper 15+:1 and PaperDim ≥ 5:1 on the scrim over
- * the black crop area; Amber ≥ 8:1.
+ * wrapped size line never runs into the curve. On [Surface2]: Paper 13.40:1, PaperDim 4.96:1,
+ * Amber 7.38:1.
  */
 @Composable
 private fun StudioTitlePill(filename: String, generated: Boolean, sizeLabel: String?) {
     Column(
         Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(OnPhotoScrim)
+            .background(Surface2)
             .padding(horizontal = 14.dp, vertical = 6.dp)
             .semantics(mergeDescendants = true) {},
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1843,7 +1859,7 @@ private fun StudioDrawerShell(
             .fillMaxWidth()
             .clip(SheetTopShape)
             .background(Surface1)
-            .navigationBarsPadding(),
+            .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)),
     ) {
         Box(
             Modifier
@@ -1854,7 +1870,7 @@ private fun StudioDrawerShell(
                     enabled = contentPx > 0,
                     onDragStopped = { settleFromDrag() },
                 )
-                .padding(top = 10.dp, bottom = 8.dp),
+                .heightIn(min = 48.dp),
             contentAlignment = Alignment.Center,
         ) {
             SheetGrabber()
@@ -1913,7 +1929,7 @@ private fun StudioMissingPhoto(onBack: () -> Unit) {
         Modifier
             .fillMaxSize()
             .background(Room)
-            .navigationBarsPadding()
+            .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1971,7 +1987,10 @@ private fun CopiesStepper(copies: Int, enabled: Boolean, onChange: (Int) -> Unit
             fontSize = 16.sp,
             lineHeight = 22.sp,
             textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(min = 32.dp).padding(horizontal = 4.dp),
+            modifier = Modifier
+                .widthIn(min = 32.dp)
+                .padding(horizontal = 4.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite },
         )
         IconCircleButton(
             icon = Icons.Outlined.Add,
