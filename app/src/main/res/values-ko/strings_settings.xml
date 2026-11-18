@@ -120,6 +120,7 @@
     <string name="about_version">버전 %1$s(빌드 %2$d)</string>
     <string name="about_privacy_title">개인정보 처리 안내</string>
     <string name="about_privacy_ai">AI 이미지 처리 기능을 사용하면 선택한 사진이 설정에서 구성한 API 엔드포인트로 업로드되어 해당 서비스에서 처리됩니다. AI를 사용하지 않으면 사진은 업로드되지 않습니다.</string>
+    <string name="about_privacy_local_cutout">증명사진 모드의 \'기기에서 오려내기\'는 Google ML Kit로 이 기기에서 처리되며 사진과 결과는 업로드되지 않습니다. ML Kit 약관에 따라 ML Kit는 성능 및 사용 지표(기기 모델, OS 버전, 앱 패키지 이름과 버전, 설치별 식별자)를 Google에 보내며 사진은 포함되지 않습니다.</string>
     <string name="about_privacy_ftp">카메라 FTP 서비스가 실행되는 동안 로컬 네트워크에 수신 포트가 열립니다. 같은 네트워크에서 계정을 아는 사람은 이 기기로 사진을 업로드할 수 있습니다. 사용하지 않을 때는 서비스를 중지하세요.</string>
     <string name="about_privacy_storage">API 키와 FTP 비밀번호는 이 기기의 암호화 저장소에 보관되며, 사용자가 구성한 API 엔드포인트 외에는 전송되지 않습니다.</string>
     <string name="about_privacy_local">사진, 편집 결과, 활동 로그는 이 기기에만 저장됩니다.</string>

@@ -1,5 +1,6 @@
 package io.github.wa_otomia.darkroom.ui.studio
 
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_LOCAL_FAILED
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -221,5 +222,69 @@ class IdPhotoUiStateTest {
         assertFalse(gaveUpCovers(white, white.copy(file = "other.jpg")))
         assertFalse(gaveUpCovers(null, white))
         assertFalse(gaveUpCovers(white, null))
+    }
+
+    @Test
+    fun cutOutLabelFollowsMaskAndMode() {
+        assertEquals(IdCutOutLabel.AI, idCutOutLabel(hasMask = false, local = false))
+        assertEquals(IdCutOutLabel.LOCAL, idCutOutLabel(hasMask = false, local = true))
+        assertEquals(IdCutOutLabel.RECUT, idCutOutLabel(hasMask = true, local = false))
+        assertEquals(IdCutOutLabel.RECUT, idCutOutLabel(hasMask = true, local = true))
+    }
+
+    @Test
+    fun canCutOutLocalNeedsNoKeyAndAnyJobBlocks() {
+        // AI: needs a key.
+        assertTrue(idCanCutOut(local = false, keySet = true, busy = false))
+        assertFalse(idCanCutOut(local = false, keySet = false, busy = false))
+        // On device: no key needed.
+        assertTrue(idCanCutOut(local = true, keySet = false, busy = false))
+        assertTrue(idCanCutOut(local = true, keySet = true, busy = false))
+        // Any job on the photo (hidden ones included) blocks both modes.
+        for (local in listOf(false, true)) {
+            for (keySet in listOf(false, true)) {
+                assertFalse(idCanCutOut(local = local, keySet = keySet, busy = true))
+            }
+        }
+    }
+
+    @Test
+    fun needKeyHintOnlyForAiWithoutKey() {
+        assertTrue(idShowNeedKey(local = false, keySet = false))
+        assertFalse(idShowNeedKey(local = false, keySet = true))
+        assertFalse(idShowNeedKey(local = true, keySet = false))
+        assertFalse(idShowNeedKey(local = true, keySet = true))
+    }
+
+    @Test
+    fun maskOffsetChangeFreezesAndReadsSigned() {
+        assertEquals(CutoutTransition.FREEZE, cutoutTransition(navy10, navy10.copy(maskOffset = -3)))
+        assertEquals(CutoutTransition.ZOOM_ONLY, cutoutTransition(navy10.copy(maskOffset = 2), navy10.copy(maskOffset = 2, zoomStep = 12)))
+        assertEquals("+3", idMaskOffsetSigned(3))
+        assertEquals("-10", idMaskOffsetSigned(-10))
+        assertEquals("0", idMaskOffsetSigned(0))
+    }
+
+    @Test
+    fun localSwitchDisabledWhileBusyOrCompositing() {
+        assertTrue(idLocalSwitchEnabled(busy = false, compositing = false))
+        assertFalse(idLocalSwitchEnabled(busy = true, compositing = false))
+        assertFalse(idLocalSwitchEnabled(busy = false, compositing = true))
+        assertFalse(idLocalSwitchEnabled(busy = true, compositing = true))
+    }
+
+    @Test
+    fun localFailureRecognisedByItsModeOrLegacyMessage() {
+        // The stored mode decides, whatever the message: a corrupt or deleted version fails a
+        // local job without the local prefix and must not blame the AI.
+        assertTrue(idFailureIsLocal(local = true, message = "无法解码 JPEG"))
+        assertTrue(idFailureIsLocal(local = true, message = "抠图失败：该版本已删除"))
+        assertTrue(idFailureIsLocal(local = true, message = ""))
+        // Records written before the mode was kept fall back to the local prefix.
+        assertTrue(idFailureIsLocal(local = false, message = "本地抠图失败：UnsatisfiedLinkError"))
+        assertTrue(idFailureIsLocal(local = false, message = ID_MASK_MSG_LOCAL_FAILED))
+        assertFalse(idFailureIsLocal(local = false, message = "抠图失败：返回图不是黑白蒙版"))
+        assertFalse(idFailureIsLocal(local = false, message = "无法解码 JPEG"))
+        assertFalse(idFailureIsLocal(local = false, message = ""))
     }
 }

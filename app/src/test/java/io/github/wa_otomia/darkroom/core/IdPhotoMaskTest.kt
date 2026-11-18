@@ -63,34 +63,17 @@ class IdPhotoMaskTest {
     }
 
     @Test
-    fun lumaVerdicts() {
-        assertEquals(IdMaskVerdict.OK, validateIdMaskLuma(luma(0 to 50, 255 to 50)))
-        // Thresholds: 32 is black, 223 is white.
-        assertEquals(IdMaskVerdict.OK, validateIdMaskLuma(luma(32 to 50, 223 to 50)))
-        // Exactly 10 % mid-grey passes; above it is not a matte.
-        assertEquals(IdMaskVerdict.OK, validateIdMaskLuma(luma(0 to 45, 128 to 10, 255 to 45)))
-        assertEquals(IdMaskVerdict.NOT_BINARY, validateIdMaskLuma(luma(0 to 44, 33 to 11, 255 to 45)))
-        assertEquals(IdMaskVerdict.NOT_BINARY, validateIdMaskLuma(luma(0 to 44, 222 to 11, 255 to 45)))
-        // A colour photo is mostly mid-grey.
-        assertEquals(IdMaskVerdict.NOT_BINARY, validateIdMaskLuma(luma(90 to 40, 150 to 40, 255 to 20)))
-        // All black: no person. Under 1 % white: no person. Exactly 1 %: fine.
-        assertEquals(IdMaskVerdict.NO_PERSON, validateIdMaskLuma(luma(0 to 100)))
-        assertEquals(IdMaskVerdict.NO_PERSON, validateIdMaskLuma(luma(0 to 1000, 255 to 9)))
-        assertEquals(IdMaskVerdict.OK, validateIdMaskLuma(luma(0 to 99, 255 to 1)))
-        // All white or over 99 % white: no background.
-        assertEquals(IdMaskVerdict.NO_BACKGROUND, validateIdMaskLuma(luma(255 to 100)))
-        assertEquals(IdMaskVerdict.NO_BACKGROUND, validateIdMaskLuma(luma(0 to 9, 255 to 1000)))
-        assertEquals(IdMaskVerdict.OK, validateIdMaskLuma(luma(0 to 1, 255 to 99)))
-        assertEquals(IdMaskVerdict.NO_PERSON, validateIdMaskLuma(ByteArray(0)))
-    }
-
-    @Test
     fun verdictMessages() {
         assertEquals("", idMaskVerdictMessage(IdMaskVerdict.OK))
         assertEquals(ID_MASK_MSG_ASPECT, idMaskVerdictMessage(IdMaskVerdict.ASPECT_MISMATCH))
         assertEquals(ID_MASK_MSG_NOT_BINARY, idMaskVerdictMessage(IdMaskVerdict.NOT_BINARY))
         assertEquals(ID_MASK_MSG_NO_PERSON, idMaskVerdictMessage(IdMaskVerdict.NO_PERSON))
         assertEquals(ID_MASK_MSG_NO_BACKGROUND, idMaskVerdictMessage(IdMaskVerdict.NO_BACKGROUND))
+        assertEquals(ID_MASK_MSG_BACKGROUND_KEPT, idMaskVerdictMessage(IdMaskVerdict.BACKGROUND_KEPT))
+        assertEquals(ID_MASK_MSG_SHADED, idMaskVerdictMessage(IdMaskVerdict.SHADED))
+        assertEquals("抠图失败：返回图保留了原背景，不是蒙版", ID_MASK_MSG_BACKGROUND_KEPT)
+        assertEquals("抠图失败：返回图是带明暗的灰度图，不是蒙版", ID_MASK_MSG_SHADED)
+        assertEquals("本地抠图失败", ID_MASK_MSG_LOCAL_FAILED)
     }
 
     @Test
@@ -242,7 +225,11 @@ class IdPhotoMaskTest {
         val a = randomMask(50, 37, 11)
         for (r in listOf(0, 1, 2, 5, 10)) {
             assertArrayEquals("r=$r", featherAlpha(a, 50, 37, r), featherAlphaFor(a, 50, 37, r, inward = false))
-            assertArrayEquals("r=$r", featherAlphaInward(a, 50, 37, r), featherAlphaFor(a, 50, 37, r, inward = true))
+            assertArrayEquals(
+                "r=$r",
+                featherAlphaInwardFine(a, 50, 37, r),
+                featherAlphaFor(a, 50, 37, r, inward = true),
+            )
         }
     }
 
@@ -365,5 +352,36 @@ class IdPhotoMaskTest {
         assertTrue(ID_PHOTO_MASK_PROMPT.contains("white"))
         assertTrue(ID_PHOTO_MASK_PROMPT.contains("black"))
         assertTrue(ID_PHOTO_MASK_PROMPT.all { it.code < 128 })
+    }
+
+    @Test
+    fun maskPromptKeepsOnlyThePerson() {
+        // AIPV030-R04 / design D1 fragments.
+        for (fragment in listOf(
+            "main person only",
+            "chair backs",
+            "even where it is white or light-coloured",
+            "flat, solid, pure white",
+            "fine hair strands",
+            "all-black",
+            "do not crop, pad, shift, rotate, resize or redraw",
+            "not a photo edit",
+            "headrests",
+            "between hair strands and locks",
+            "even inside those gaps",
+            "only dense hair with no background showing through",
+        )) {
+            assertTrue(fragment, ID_PHOTO_MASK_PROMPT.contains(fragment))
+        }
+        // Verbatim text of design D1: sentences joined by exactly one space.
+        assertEquals(EXPECTED_MASK_PROMPT, ID_PHOTO_MASK_PROMPT)
+        assertFalse(ID_PHOTO_MASK_PROMPT.contains("  "))
+        assertEquals(ID_PHOTO_MASK_PROMPT.trim(), ID_PHOTO_MASK_PROMPT)
+    }
+
+    private companion object {
+        const val EXPECTED_MASK_PROMPT =
+            "Task: produce an alpha matte for replacing the background of a portrait or ID photo. This is a segmentation task, not a photo edit: do not relight, recolour, restyle or re-render the photo. Output only the matte, at exactly the same width, height, framing and composition as the input; do not crop, pad, shift, rotate, resize or redraw anything, so that every matte pixel lines up with the same pixel of the input. Foreground is the main person only: hair, face, ears, neck, shoulders, arms and hands if visible, worn clothing and worn accessories such as glasses, earrings, hats and headscarves. Background is everything else, even where it touches or overlaps the person: walls, floors, ceilings, sky, doors, windows, furniture including chairs, chair backs, headrests, sofas and cushions, shelves, hanging clothes and coats, bags, objects, other people, shadows cast on the background, and any border or padding. Background seen through gaps in the person is background too: between hair strands and locks, inside curls and loose ends, between the hair and the face, neck or shoulders, and between the arms and the body. Paint the background pure black (#000000), even where it is white or light-coloured in the photo and even inside those gaps. Paint the person as one flat, solid, pure white (#FFFFFF) silhouette with no shading, lighting, gradients, texture, facial features or outlines inside it; eyes, mouth, glasses, hair texture and clothing details must not be visible. Keep the edge tight to the person, with no glow, halo or margin around it. Only where fine hair strands or flyaways overlap the background, use grey levels to show partial transparency (lighter means more hair, darker means more background); only dense hair with no background showing through stays solid white, and everywhere else make a clean, sharp edge. If no person is visible, return an all-black image. Use only black, white and that grey hair transition: no colours, text, watermarks or other content."
+
     }
 }

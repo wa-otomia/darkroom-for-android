@@ -62,6 +62,11 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs {
+            // ML Kit's MediaPipe runtime is ~77 MB of .so across four ABIs; store it compressed
+            // (~22 MB) and let the installer extract the device's ABI.
+            useLegacyPackaging = true
+        }
     }
 }
 
@@ -91,6 +96,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.hilt.android)
+    implementation(libs.mlkit.segmentation.selfie)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

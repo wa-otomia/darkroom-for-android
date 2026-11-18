@@ -22,6 +22,7 @@ import io.github.wa_otomia.darkroom.core.mergeBuiltinPresets
 import io.github.wa_otomia.darkroom.core.mergeFgsPause
 import io.github.wa_otomia.darkroom.core.mergeProviderSettings
 import io.github.wa_otomia.darkroom.core.newPresetId
+import io.github.wa_otomia.darkroom.core.DEFAULT_ID_PHOTO_LOCAL_CUTOUT
 import io.github.wa_otomia.darkroom.core.normalizeIdPhotoPresetId
 import io.github.wa_otomia.darkroom.core.normalizeAiBaseUrl
 import io.github.wa_otomia.darkroom.core.normalizeAiPresetStore
@@ -82,6 +83,9 @@ class SettingsRepository @Inject constructor(
     val ai: StateFlow<PublicAiSettings> = _ai
     private val _watermark = MutableStateFlow(WatermarkSettings())
     val watermark: StateFlow<WatermarkSettings> = _watermark
+    // EDID040-R10: app-wide, not per version; resetAll() leaves it alone.
+    private val _idPhotoLocalCutout = MutableStateFlow(DEFAULT_ID_PHOTO_LOCAL_CUTOUT)
+    val idPhotoLocalCutoutFlow: StateFlow<Boolean> = _idPhotoLocalCutout
 
     init {
         if (prefs.getString(KEY_FTP_PASSWORD, "").isNullOrBlank()) {
@@ -112,6 +116,7 @@ class SettingsRepository @Inject constructor(
         _presets.value = readPresets()
         _autoEditPreset.value = readAutoEditPreset()
         _watermark.value = readWatermark()
+        _idPhotoLocalCutout.value = idPhotoLocalCutout()
         publishAi()
     }
 
@@ -377,6 +382,14 @@ class SettingsRepository @Inject constructor(
         prefs.edit().putString(KEY_ID_PHOTO_PRESET, normalizeIdPhotoPresetId(id)).apply()
     }
 
+    /** "本地抠图" (EDID040-R10): off unless the user turned it on. Settings reset keeps it. */
+    fun idPhotoLocalCutout(): Boolean = prefs.getBoolean(KEY_ID_PHOTO_LOCAL_CUTOUT, DEFAULT_ID_PHOTO_LOCAL_CUTOUT)
+
+    fun setIdPhotoLocalCutout(on: Boolean) {
+        prefs.edit().putBoolean(KEY_ID_PHOTO_LOCAL_CUTOUT, on).apply()
+        _idPhotoLocalCutout.value = on
+    }
+
     fun createPreset(title: String, prompt: String, category: String): AiPresetStore {
         val fields = validateAiPresetFields(title, prompt, category)
         val store = readPresets()
@@ -452,6 +465,8 @@ class SettingsRepository @Inject constructor(
         private const val KEY_WATERMARK = "watermark"
         private const val KEY_PRESETS = "presets"
         private const val KEY_ID_PHOTO_PRESET = "id_photo_preset"
+        // Boolean, missing = DEFAULT_ID_PHOTO_LOCAL_CUTOUT; not written by resetAll() (EDID040-R10).
+        private const val KEY_ID_PHOTO_LOCAL_CUTOUT = "id_photo_local_cutout"
         // Missing = never saved (migrate once); "" = none; otherwise a preset ID (AUTG040).
         private const val KEY_AUTO_EDIT_PRESET = "auto_edit_preset"
 

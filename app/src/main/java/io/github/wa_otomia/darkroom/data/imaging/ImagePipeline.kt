@@ -42,6 +42,7 @@ import io.github.wa_otomia.darkroom.core.compositeIdPixels
 import io.github.wa_otomia.darkroom.core.exifOrientationTransform
 import io.github.wa_otomia.darkroom.core.exportSheetSize
 import io.github.wa_otomia.darkroom.core.featherAlphaFor
+import io.github.wa_otomia.darkroom.core.idMaskColoured
 import io.github.wa_otomia.darkroom.core.fitMaskContent
 import io.github.wa_otomia.darkroom.core.idBackground
 import io.github.wa_otomia.darkroom.core.idFeather
@@ -51,6 +52,7 @@ import io.github.wa_otomia.darkroom.core.idMaskVerdictMessage
 import io.github.wa_otomia.darkroom.core.idPhotoLayout
 import io.github.wa_otomia.darkroom.core.idPhotoPreset
 import io.github.wa_otomia.darkroom.core.longEdgeSampleSize
+import io.github.wa_otomia.darkroom.core.offsetAlpha
 import io.github.wa_otomia.darkroom.core.sheetQuarterTurns
 import io.github.wa_otomia.darkroom.core.ensureJpegBytes
 import io.github.wa_otomia.darkroom.core.exactQuarterTurns
@@ -63,7 +65,7 @@ import io.github.wa_otomia.darkroom.core.rotateCrop
 import io.github.wa_otomia.darkroom.core.rotatedSize
 import io.github.wa_otomia.darkroom.core.scaled
 import io.github.wa_otomia.darkroom.core.toCellPlacement
-import io.github.wa_otomia.darkroom.core.validateIdMaskLuma
+import io.github.wa_otomia.darkroom.core.validateIdMask
 import io.github.wa_otomia.darkroom.core.widthSampleSize
 import kotlinx.coroutines.CancellationException
 import java.io.ByteArrayInputStream
@@ -453,6 +455,7 @@ object ImagePipeline {
                 maskBitmap,
                 idFeather(id.feather).radiusPx(scale),
                 id.featherInward,
+                id.maskOffset * scale,
             )
             assembleIdSheet(cell, layout, sheetForPrinter)
         } finally {
@@ -489,6 +492,7 @@ object ImagePipeline {
         background: Int,
         featherSourcePx: Float,
         featherInward: Boolean,
+        offsetSourcePx: Float = 0f,
         maxEdge: Int = 2048,
     ): Bitmap = reportingDecodeFailure {
         val maskBitmap = decodeStoredIdMask(mask)
@@ -526,7 +530,15 @@ object ImagePipeline {
                     maskBitmap.height.toFloat(),
                     Rect(0, 0, out.width, out.height),
                 )
-                compositeThroughMask(image, maskBitmap, maskMatrix, background, radius, featherInward)
+                // EDID040-R14: a non-zero shift stays at least 1 preview px.
+                val offset = if (offsetSourcePx.isFinite() && offsetSourcePx != 0f) {
+                    val px = Math.round(Math.abs(offsetSourcePx) * out.width / source.oriented.width.coerceAtLeast(1))
+                        .coerceAtLeast(1)
+                    if (offsetSourcePx < 0f) -px else px
+                } else {
+                    0
+                }
+                compositeThroughMask(image, maskBitmap, maskMatrix, background, radius, featherInward, offset)
                 image
             } catch (t: Throwable) {
                 recycle(image)
@@ -621,8 +633,8 @@ object ImagePipeline {
     /**
      * Decodes a provider reply (any format ImageDecoder reads) and checks it against [upload]:
      * aspect within 1% of the expected size, then the content rect (scaled to the reply size)
-     * is cut out and only that area is checked for a black-and-white matte with a person and a
-     * background. Failures throw [IllegalStateException] with an `ID_MASK_MSG_*` message;
+     * is cut out and only that area is checked ([validateIdMask]: colour, mid-grey, white share,
+     * kept background, shading). Failures throw [IllegalStateException] with an `ID_MASK_MSG_*` message;
      * nothing is stretched or re-aligned.
      */
     fun decodeIdMask(response: ByteArray, upload: IdMaskUpload): IdMaskDecoded {
@@ -663,14 +675,19 @@ object ImagePipeline {
             val w = right - left
             val h = bottom - top
             // Callers only catch Exception, so every post-decode allocation maps OOM to a message.
+            var coloured = 0L
             val luma = try {
                 val pixels = IntArray(w * h).also { bitmap.getPixels(it, 0, w, left, top, w, h) }
-                ByteArray(w * h) { i -> idMaskLuma(pixels[i]).toByte() }
+                ByteArray(w * h) { i ->
+                    val px = pixels[i]
+                    if (idMaskColoured(px)) coloured++
+                    idMaskLuma(px).toByte()
+                }
             } catch (_: OutOfMemoryError) {
                 error(ID_MASK_MSG_UNDECODABLE)
             }
             val verdict = try {
-                validateIdMaskLuma(luma)
+                validateIdMask(luma, w, h, coloured)
             } catch (_: OutOfMemoryError) {
                 error(ID_MASK_MSG_UNDECODABLE)
             }
@@ -696,6 +713,39 @@ object ImagePipeline {
             stream.toByteArray()
         } finally {
             recycle(bitmap)
+        }
+    }
+
+    /**
+     * On-device segmentation input (EDID040-R11): the whole version as [grokUploadJpeg] sees it
+     * (EXIF applied, no crop, no watermark, long edge at most [AI_UPLOAD_MAX_EDGE], never
+     * upscaled), as a software ARGB_8888 bitmap the caller recycles. No JPEG round trip.
+     * [OutOfMemoryError] propagates so the local job can report it as a local failure.
+     */
+    fun localMaskInput(bytes: ByteArray): Bitmap {
+        val source = inspectJpeg(bytes)
+        val raw = decodeSampled(
+            bytes,
+            longEdgeSampleSize(source.oriented.width, source.oriented.height, AI_UPLOAD_MAX_EDGE),
+        )
+        try {
+            val (outW, outH) = uploadSize(source.oriented)
+            val out = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
+            try {
+                val exif = exifOrientationTransform(source.orientation, raw.width, raw.height)
+                val matrix = Matrix()
+                matrix.setValues(exif.matrixValues())
+                matrix.postConcat(
+                    mapRectMatrix(0f, 0f, exif.outputWidth.toFloat(), exif.outputHeight.toFloat(), Rect(0, 0, outW, outH)),
+                )
+                Canvas(out).drawBitmap(raw, matrix, bitmapPaint())
+                return out
+            } catch (t: Throwable) {
+                recycle(out)
+                throw t
+            }
+        } finally {
+            recycle(raw)
         }
     }
 
@@ -732,6 +782,7 @@ object ImagePipeline {
         maskBitmap: Bitmap?,
         featherPx: Int,
         featherInward: Boolean,
+        offsetPx: Int,
     ): Bitmap {
         val source = inspectJpeg(bytes)
         val placement = state.pose.toCellPlacement(
@@ -773,7 +824,7 @@ object ImagePipeline {
                 Rect(0, 0, orientedW, orientedH),
             )
             placementMatrix(orientedW, orientedH, placement, cellW, cellH, maskMatrix)
-            compositeThroughMask(cell, maskBitmap, maskMatrix, background, featherPx, featherInward)
+            compositeThroughMask(cell, maskBitmap, maskMatrix, background, featherPx, featherInward, offsetPx)
             return cell
         } catch (t: Throwable) {
             recycle(cell)
@@ -783,7 +834,8 @@ object ImagePipeline {
 
     /**
      * Draws [maskBitmap] through [maskMatrix] onto black at [target]'s size, turns its luma into
-     * α, feathers α by [featherPx] in [target] px (inward when [featherInward]) and composites
+     * α, shifts its edge by [offsetPx] (EDID040-R14), feathers it by [featherPx] in [target] px
+     * (inward when [featherInward], fine parts included, EDID040-R07) and composites
      * [target] over [background] in place. [maskBitmap] is recycled once drawn.
      */
     private fun compositeThroughMask(
@@ -793,6 +845,7 @@ object ImagePipeline {
         background: Int,
         featherPx: Int,
         featherInward: Boolean,
+        offsetPx: Int = 0,
     ) {
         val w = target.width
         val h = target.height
@@ -808,7 +861,8 @@ object ImagePipeline {
         }
         recycle(maskBitmap)
         val alpha = ByteArray(w * h) { i -> idMaskLumaToAlpha(idMaskLuma(pixels[i])).toByte() }
-        val feathered = featherAlphaFor(alpha, w, h, featherPx, featherInward)
+        val shifted = if (offsetPx != 0) offsetAlpha(alpha, w, h, offsetPx) else alpha
+        val feathered = featherAlphaFor(shifted, w, h, featherPx, featherInward)
         target.getPixels(pixels, 0, w, 0, 0, w, h)
         compositeIdPixels(pixels, feathered, background)
         target.setPixels(pixels, 0, w, 0, 0, w, h)

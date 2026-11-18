@@ -1,6 +1,7 @@
 package io.github.wa_otomia.darkroom.core
 
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 // Mask checks, feathering and compositing for ID photo backgrounds (AIPV030-R04, EDID040).
 
@@ -11,11 +12,27 @@ const val ID_MASK_WHITE_LUMA = 223
 
 /** Luma at or below this is black (background); 33..222 is mid-grey. */
 const val ID_MASK_BLACK_LUMA = 32
-const val ID_MASK_MAX_MID_FRACTION = 0.10
+
+/** A pixel is coloured when max(R,G,B) − min(R,G,B), flattened over black, exceeds this. */
+const val ID_MASK_COLOUR_SPREAD = 24
+const val ID_MASK_MAX_COLOURED_FRACTION = 0.02
+const val ID_MASK_MAX_MID_FRACTION = 0.35
 const val ID_MASK_MIN_WHITE_FRACTION = 0.01
 const val ID_MASK_MAX_WHITE_FRACTION = 0.99
 
-enum class IdMaskVerdict { OK, ASPECT_MISMATCH, NOT_BINARY, NO_PERSON, NO_BACKGROUND }
+/** Top/left/right band width = max(2, round(short edge × this)). */
+const val ID_MASK_BORDER_BAND_FRACTION = 0.02
+const val ID_MASK_MAX_BORDER_NONBLACK_FRACTION = 0.60
+
+/** "Far from black" radius = max(2, round(short edge × this)) px (Chebyshev). */
+const val ID_MASK_INTERIOR_RADIUS_FRACTION = 0.01
+const val ID_MASK_MAX_INTERIOR_GREY_FRACTION = 0.15
+
+/** On-device confidence c maps to luma 0 at or below this, 255 at or above [ID_MASK_LOCAL_CONFIDENCE_HIGH]. */
+const val ID_MASK_LOCAL_CONFIDENCE_LOW = 0.25
+const val ID_MASK_LOCAL_CONFIDENCE_HIGH = 0.75
+
+enum class IdMaskVerdict { OK, ASPECT_MISMATCH, NOT_BINARY, NO_PERSON, NO_BACKGROUND, BACKGROUND_KEPT, SHADED }
 
 /** True when the returned aspect is within [ID_MASK_ASPECT_TOLERANCE] (relative) of the expected one. */
 fun idMaskAspectMatches(expectedWidth: Int, expectedHeight: Int, actualWidth: Int, actualHeight: Int): Boolean {
@@ -26,24 +43,123 @@ fun idMaskAspectMatches(expectedWidth: Int, expectedHeight: Int, actualWidth: In
 }
 
 /**
- * Checks the content area's luma (unsigned bytes): too much mid-grey is not a matte, and the
- * white share must leave both a person and some background. An empty area has no person.
+ * True when an unpremultiplied ARGB reply pixel, flattened over black (each channel
+ * `(c·a+127)/255` when a≠255, as the luma is), has max(R,G,B) − min(R,G,B) > [ID_MASK_COLOUR_SPREAD].
  */
-fun validateIdMaskLuma(luma: ByteArray): IdMaskVerdict {
-    if (luma.isEmpty()) return IdMaskVerdict.NO_PERSON
+fun idMaskColoured(argb: Int): Boolean {
+    val a = (argb ushr 24) and 0xFF
+    var r = (argb shr 16) and 0xFF
+    var g = (argb shr 8) and 0xFF
+    var b = argb and 0xFF
+    if (a != 255) {
+        r = (r * a + 127) / 255
+        g = (g * a + 127) / 255
+        b = (b * a + 127) / 255
+    }
+    return maxOf(r, g, b) - minOf(r, g, b) > ID_MASK_COLOUR_SPREAD
+}
+
+/** Width of each top/left/right band: max(2, round(short edge × 2%)), never past the short edge. */
+fun idMaskBorderBand(width: Int, height: Int): Int {
+    val short = minOf(width, height)
+    if (short <= 0) return 0
+    return maxOf(2, (short * ID_MASK_BORDER_BAND_FRACTION).roundToInt()).coerceAtMost(short)
+}
+
+/** "Far from black" radius: max(2, round(short edge × 1%)). */
+fun idMaskInteriorRadius(width: Int, height: Int): Int =
+    maxOf(2, (minOf(width, height).coerceAtLeast(0) * ID_MASK_INTERIOR_RADIUS_FRACTION).roundToInt())
+
+/**
+ * Checks a provider reply's content area (AIPV030-R04). [luma] is the unsigned luma of the
+ * [width]×[height] area, row-major; [colouredCount] is how many of its pixels [idMaskColoured].
+ * The first failing check wins:
+ * 1. coloured > 2 % → NOT_BINARY;
+ * 2. mid-grey (33–222) > 35 % → NOT_BINARY;
+ * 3. white (≥223) < 1 % → NO_PERSON; 4. white > 99 % → NO_BACKGROUND;
+ * 5. non-black (>32) share of the top, left and right bands ([idMaskBorderBand], union, bottom
+ *    excluded) > 60 % → BACKGROUND_KEPT;
+ * 6. mid-grey with no black pixel within [idMaskInteriorRadius] (Chebyshev, edges replicated),
+ *    as a share of non-black pixels, > 15 % → SHADED.
+ * An empty area has no person.
+ */
+fun validateIdMask(luma: ByteArray, width: Int, height: Int, colouredCount: Long): IdMaskVerdict {
+    if (width <= 0 || height <= 0 || luma.size < width.toLong() * height) return IdMaskVerdict.NO_PERSON
+    val n = width * height
+    val total = n.toDouble()
+    if (colouredCount / total > ID_MASK_MAX_COLOURED_FRACTION) return IdMaskVerdict.NOT_BINARY
     var white = 0L
     var mid = 0L
-    for (b in luma) {
-        val v = b.toInt() and 0xFF
+    for (i in 0 until n) {
+        val v = luma[i].toInt() and 0xFF
         if (v >= ID_MASK_WHITE_LUMA) white++ else if (v > ID_MASK_BLACK_LUMA) mid++
     }
-    val total = luma.size.toDouble()
+    if (mid / total > ID_MASK_MAX_MID_FRACTION) return IdMaskVerdict.NOT_BINARY
+    if (white / total < ID_MASK_MIN_WHITE_FRACTION) return IdMaskVerdict.NO_PERSON
+    if (white / total > ID_MASK_MAX_WHITE_FRACTION) return IdMaskVerdict.NO_BACKGROUND
+
+    val band = idMaskBorderBand(width, height)
+    var bandTotal = 0L
+    var bandLit = 0L
+    fun countBand(i: Int) {
+        bandTotal++
+        if ((luma[i].toInt() and 0xFF) > ID_MASK_BLACK_LUMA) bandLit++
+    }
+    for (y in 0 until height) {
+        val base = y * width
+        if (y < band) {
+            for (x in 0 until width) countBand(base + x)
+        } else {
+            val leftEnd = minOf(band, width)
+            for (x in 0 until leftEnd) countBand(base + x)
+            for (x in maxOf(leftEnd, width - band) until width) countBand(base + x)
+        }
+    }
+    if (bandTotal > 0 && bandLit.toDouble() / bandTotal > ID_MASK_MAX_BORDER_NONBLACK_FRACTION) {
+        return IdMaskVerdict.BACKGROUND_KEPT
+    }
+
+    val nonBlack = ByteArray(n)
+    var nonBlackCount = 0L
+    for (i in 0 until n) {
+        if ((luma[i].toInt() and 0xFF) > ID_MASK_BLACK_LUMA) {
+            nonBlack[i] = 255.toByte()
+            nonBlackCount++
+        }
+    }
+    val farFromBlack = erodeAlpha(nonBlack, width, height, idMaskInteriorRadius(width, height))
+    var interiorGrey = 0L
+    for (i in 0 until n) {
+        val v = luma[i].toInt() and 0xFF
+        if (v > ID_MASK_BLACK_LUMA && v < ID_MASK_WHITE_LUMA && (farFromBlack[i].toInt() and 0xFF) == 255) interiorGrey++
+    }
+    if (nonBlackCount > 0 && interiorGrey.toDouble() / nonBlackCount > ID_MASK_MAX_INTERIOR_GREY_FRACTION) {
+        return IdMaskVerdict.SHADED
+    }
+    return IdMaskVerdict.OK
+}
+
+/**
+ * Checks an on-device mask (EDID040-R11): only the white share, since a confidence map is grey
+ * by nature. Under 1 % white has no person, over 99 % no background.
+ */
+fun validateLocalMaskLuma(luma: ByteArray): IdMaskVerdict {
+    if (luma.isEmpty()) return IdMaskVerdict.NO_PERSON
+    var white = 0L
+    for (b in luma) if ((b.toInt() and 0xFF) >= ID_MASK_WHITE_LUMA) white++
+    val share = white.toDouble() / luma.size
     return when {
-        mid / total > ID_MASK_MAX_MID_FRACTION -> IdMaskVerdict.NOT_BINARY
-        white / total < ID_MASK_MIN_WHITE_FRACTION -> IdMaskVerdict.NO_PERSON
-        white / total > ID_MASK_MAX_WHITE_FRACTION -> IdMaskVerdict.NO_BACKGROUND
+        share < ID_MASK_MIN_WHITE_FRACTION -> IdMaskVerdict.NO_PERSON
+        share > ID_MASK_MAX_WHITE_FRACTION -> IdMaskVerdict.NO_BACKGROUND
         else -> IdMaskVerdict.OK
     }
+}
+
+/** On-device person confidence → mask luma: c ≤ 0.25 is 0, c ≥ 0.75 is 255, linear and rounded between. */
+fun idMaskConfidenceLuma(confidence: Float): Int {
+    if (confidence.isNaN()) return 0
+    val span = ID_MASK_LOCAL_CONFIDENCE_HIGH - ID_MASK_LOCAL_CONFIDENCE_LOW
+    return ((confidence - ID_MASK_LOCAL_CONFIDENCE_LOW) / span * 255.0).roundToInt().coerceIn(0, 255)
 }
 
 /** The data-layer failure message for [verdict]; [IdMaskVerdict.OK] has none. */
@@ -53,6 +169,8 @@ fun idMaskVerdictMessage(verdict: IdMaskVerdict): String = when (verdict) {
     IdMaskVerdict.NOT_BINARY -> ID_MASK_MSG_NOT_BINARY
     IdMaskVerdict.NO_PERSON -> ID_MASK_MSG_NO_PERSON
     IdMaskVerdict.NO_BACKGROUND -> ID_MASK_MSG_NO_BACKGROUND
+    IdMaskVerdict.BACKGROUND_KEPT -> ID_MASK_MSG_BACKGROUND_KEPT
+    IdMaskVerdict.SHADED -> ID_MASK_MSG_SHADED
 }
 
 /** Black (≤32) is 0, white (≥223) is 255, linear and rounded in between. */
@@ -161,9 +279,75 @@ private inline fun minFilterLine(
 fun featherAlphaInward(alpha: ByteArray, width: Int, height: Int, radius: Int): ByteArray =
     featherAlpha(erodeAlpha(alpha, width, height, radius), width, height, radius)
 
-/** [featherAlphaInward] when [inward], otherwise the symmetric [featherAlpha]. */
+/**
+ * Separable (2r+1)² maximum filter of [alpha] with edge replication, the mirror of [erodeAlpha]:
+ * the mask grows by [radius] px (Chebyshev). A radius of 0 or less returns a copy.
+ */
+fun dilateAlpha(alpha: ByteArray, width: Int, height: Int, radius: Int): ByteArray {
+    if (radius <= 0 || width <= 0 || height <= 0 || alpha.size < width * height) return alpha.copyOf()
+    // max(a) = 255 − min(255 − a): the same van Herk pass on the inverted mask.
+    val inverted = ByteArray(width * height) { i -> (255 - (alpha[i].toInt() and 0xFF)).toByte() }
+    val eroded = erodeAlpha(inverted, width, height, radius)
+    val out = alpha.copyOf()
+    for (i in 0 until width * height) out[i] = (255 - (eroded[i].toInt() and 0xFF)).toByte()
+    return out
+}
+
+/**
+ * Inward feather that also feathers fine parts (EDID040-R07): with e = [erodeAlpha] by r,
+ * F = [featherAlpha] of e (the body, as [featherAlphaInward]) and T = α − [dilateAlpha] of e (the
+ * opening residue: strands and flyaways narrower than 2r+1 that the opening cannot restore),
+ * `out = max(F, min(T, featherAlpha(T, r)))`. Fine parts are smoothed by the same radius and
+ * clipped to their own footprint, so they fade with the feather instead of vanishing or staying
+ * crisp. α 0 stays 0, no pixel ends above its α, and a mask the opening restores (wide parts,
+ * monotone ramps) gives exactly F. A radius of 0 or less returns a copy.
+ */
+fun featherAlphaInwardFine(alpha: ByteArray, width: Int, height: Int, radius: Int): ByteArray {
+    if (radius <= 0 || width <= 0 || height <= 0 || alpha.size < width * height) return alpha.copyOf()
+    val n = width * height
+    val eroded = erodeAlpha(alpha, width, height, radius)
+    val out = featherAlpha(eroded, width, height, radius)
+    val opened = dilateAlpha(eroded, width, height, radius)
+    val fine = ByteArray(n)
+    var any = false
+    for (i in 0 until n) {
+        val t = (alpha[i].toInt() and 0xFF) - (opened[i].toInt() and 0xFF)
+        if (t > 0) {
+            fine[i] = t.toByte()
+            any = true
+        }
+    }
+    if (!any) return out
+    val smoothed = featherAlpha(fine, width, height, radius)
+    for (i in 0 until n) {
+        val keep = minOf(fine[i].toInt() and 0xFF, smoothed[i].toInt() and 0xFF)
+        if (keep > (out[i].toInt() and 0xFF)) out[i] = keep.toByte()
+    }
+    return out
+}
+
+/**
+ * [featherAlphaInwardFine] when [inward], otherwise the symmetric [featherAlpha] (which also
+ * spreads fine parts outward).
+ */
 fun featherAlphaFor(alpha: ByteArray, width: Int, height: Int, radius: Int, inward: Boolean): ByteArray =
-    if (inward) featherAlphaInward(alpha, width, height, radius) else featherAlpha(alpha, width, height, radius)
+    if (inward) featherAlphaInwardFine(alpha, width, height, radius) else featherAlpha(alpha, width, height, radius)
+
+/** The mask edge shift range in print px, either way (EDID040-R14). */
+const val ID_MASK_OFFSET_MAX_PX = 10
+
+/** [px] clamped to ±[ID_MASK_OFFSET_MAX_PX]. */
+fun idMaskOffset(px: Int): Int = px.coerceIn(-ID_MASK_OFFSET_MAX_PX, ID_MASK_OFFSET_MAX_PX)
+
+/**
+ * Shifts the mask edge (EDID040-R14): [px] < 0 shrinks α inward by |px| ([erodeAlpha]), [px] > 0
+ * grows it outward ([dilateAlpha]), 0 returns a copy. Applied before the feather.
+ */
+fun offsetAlpha(alpha: ByteArray, width: Int, height: Int, px: Int): ByteArray = when {
+    px < 0 -> erodeAlpha(alpha, width, height, -px)
+    px > 0 -> dilateAlpha(alpha, width, height, px)
+    else -> alpha.copyOf()
+}
 
 /**
  * `out = src·a + bg·(1−a)` with `a = srcA/255 · α/255`. The result is opaque; an opaque

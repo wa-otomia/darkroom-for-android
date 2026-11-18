@@ -47,8 +47,13 @@ property of their owners. The full plugin binary is not included.
 
 ## Bundled dependencies
 
-All Apache License 2.0. The in-app About screen lists the same set; keep it, this file and
-`gradle/libs.versions.toml` in sync when a dependency changes.
+Most components are under the Apache License 2.0. The on-device cut-out in ID photo mode adds
+Google ML Kit, which is distributed under the
+[ML Kit Terms of Service](https://developers.google.com/ml-kit/terms), and Google Play services
+client libraries and ODML Image, which are distributed under the
+[Android Software Development Kit License](https://developer.android.com/studio/terms). Each
+row below names its own license. The in-app About screen lists the same set; keep it, this file
+and `gradle/libs.versions.toml` in sync when a dependency changes.
 
 | Component | License |
 |---|---|
@@ -67,3 +72,22 @@ All Apache License 2.0. The in-app About screen lists the same set; keep it, thi
 | OkHttp — Square | Apache-2.0 |
 | Okio — Square | Apache-2.0 |
 | Coil — Coil Contributors | Apache-2.0 |
+| ML Kit Selfie Segmentation (MediaPipe runtime) — Google | ML Kit Terms of Service |
+| Google Play services client libraries (base, basement, tasks) — Google | Android Software Development Kit License |
+| ODML Image — Google | Android Software Development Kit License |
+| Firebase Components and Encoders — Google | Apache-2.0 |
+| Android Data Transport — Google | Apache-2.0 |
+| AndroidX AppCompat and Fragment (via ML Kit) — Google | Apache-2.0 |
+
+ML Kit (`com.google.mlkit:segmentation-selfie` and its `mediapipe-internal`, `common`,
+`vision-common` and `vision-interfaces` artifacts) bundles further open-source components
+(MediaPipe, TensorFlow Lite, Abseil, Protobuf, OpenCV and others, 135 entries). Their licenses
+are listed in the `third_party_licenses.txt` file shipped inside the ML Kit AARs.
+
+### Data handling of the on-device cut-out
+
+The on-device cut-out runs the bundled ML Kit model on the phone: the photo and the cut-out are
+not uploaded. As its terms describe, ML Kit itself sends Google performance and usage metrics
+(device model, OS version, app package name and version, a per-installation identifier), and may
+contact Google for fixes and hardware-compatibility information. These metrics never contain
+photos.

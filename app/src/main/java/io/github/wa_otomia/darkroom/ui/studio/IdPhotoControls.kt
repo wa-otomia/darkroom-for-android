@@ -30,6 +30,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -64,11 +66,13 @@ import coil.size.Scale
 import coil.size.Size
 import io.github.wa_otomia.darkroom.R
 import io.github.wa_otomia.darkroom.data.catalog.IdMaskFailure
+import io.github.wa_otomia.darkroom.core.ID_MASK_OFFSET_MAX_PX
 import io.github.wa_otomia.darkroom.core.ID_PHOTO_PRESETS
 import io.github.wa_otomia.darkroom.core.IdBackground
 import io.github.wa_otomia.darkroom.core.IdFeather
 import io.github.wa_otomia.darkroom.core.IdPhotoLayout
 import io.github.wa_otomia.darkroom.core.IdPhotoPreset
+import io.github.wa_otomia.darkroom.core.idMaskOffset
 import io.github.wa_otomia.darkroom.core.idPhotoLayout
 import io.github.wa_otomia.darkroom.core.idPhotoPreset
 import io.github.wa_otomia.darkroom.core.showsEdgeWarning
@@ -286,10 +290,12 @@ internal fun IdMaskJobRow(job: IdMaskJobUi, elsewhere: String?) {
 }
 
 /**
- * Replaces the AI generate block in ID mode: what the AI does, the cut-out button and its gate,
+ * Replaces the AI generate block in ID mode: what the cut-out does (AI or on this device), the
+ * "cut out on this device" switch row ([local], EDID040-R10), the cut-out button and its gate,
  * the running job, the last failure, "view this cut-out's result" whenever [onViewCutoutResult]
  * is set (a failure record exists for the version, EDID040-R09), the palette, the feather
- * selector and the inward feather switch row below it (EDID040-R07).
+ * selector, the inward feather switch row below it (EDID040-R07) and the mask edge shift slider
+ * (EDID040-R14).
  * [compositing] freezes the cut-out button, palette, feather and inward switch while the preview
  * builds a new composite (EDID040-R08). Side-effect free: every action is a callback.
  */
@@ -297,27 +303,43 @@ internal fun IdMaskJobRow(job: IdMaskJobUi, elsewhere: String?) {
 @Composable
 internal fun IdPhotoProcessSection(
     keySet: Boolean,
+    local: Boolean,
+    localSwitchEnabled: Boolean,
     hasMask: Boolean,
     background: IdBackground,
     feather: IdFeather,
     featherInward: Boolean,
+    maskOffset: Int,
     compositing: Boolean,
     canCutOut: Boolean,
     maskJob: IdMaskJobUi?,
     maskJobElsewhere: String?,
     maskError: String?,
     onCutOut: () -> Unit,
+    onLocalChange: (Boolean) -> Unit,
     onOpenSettings: () -> Unit,
     onBackground: (IdBackground) -> Unit,
     onFeather: (IdFeather) -> Unit,
     onFeatherInward: (Boolean) -> Unit,
+    onMaskOffset: (Int) -> Unit,
     onViewCutoutResult: (() -> Unit)?,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.fillMaxWidth()) {
             SectionLabel(stringResource(R.string.studio_id_section))
-            StudioNote(stringResource(R.string.studio_id_explain), topPadding = 0)
-            if (!keySet) {
+            // Cloud: the whole photo is uploaded; on device: nothing is uploaded, no key needed.
+            StudioNote(
+                stringResource(if (local) R.string.studio_id_local_explain else R.string.studio_id_explain),
+                topPadding = 0,
+            )
+            // Only the setting changes; an existing mask and a running job keep their mode.
+            StudioSwitchRow(
+                label = stringResource(R.string.studio_id_local_cutout),
+                checked = local,
+                enabled = localSwitchEnabled,
+                onCheckedChange = onLocalChange,
+            )
+            if (idShowNeedKey(local = local, keySet = keySet)) {
                 Text(
                     stringResource(R.string.grok_need_key),
                     color = Amber,
@@ -329,7 +351,13 @@ internal fun IdPhotoProcessSection(
             }
         }
         PaperButton(
-            stringResource(if (hasMask) R.string.studio_id_recut else R.string.studio_id_cutout),
+            stringResource(
+                when (idCutOutLabel(hasMask = hasMask, local = local)) {
+                    IdCutOutLabel.RECUT -> R.string.studio_id_recut
+                    IdCutOutLabel.LOCAL -> R.string.studio_id_cutout_local
+                    IdCutOutLabel.AI -> R.string.studio_id_cutout
+                },
+            ),
             enabled = canCutOut && !compositing,
             onClick = onCutOut,
         )
@@ -392,7 +420,44 @@ internal fun IdPhotoProcessSection(
                 enabled = featherEnabled && feather != IdFeather.NONE,
                 onCheckedChange = onFeatherInward,
             )
+            IdMaskOffsetSlider(value = maskOffset, enabled = featherEnabled, onCommit = onMaskOffset)
         }
+    }
+}
+
+/**
+ * The mask edge shift (EDID040-R14), −10..+10 print px in steps of 1. The thumb follows the drag
+ * locally and only the released value is committed, so a drag never starts a composite (and its
+ * freeze) per step. Disabled, it still shows the value; the value text is its state description.
+ */
+@Composable
+private fun IdMaskOffsetSlider(value: Int, enabled: Boolean, onCommit: (Int) -> Unit) {
+    var drag by remember { mutableStateOf<Float?>(null) }
+    val shown = drag?.let { Math.round(it) } ?: value
+    val valueText = stringResource(R.string.studio_id_mask_offset_value, idMaskOffsetSigned(shown))
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.studio_id_mask_offset),
+                color = if (enabled) Paper else PaperDim,
+                modifier = Modifier.weight(1f),
+            )
+            Text(valueText, color = if (enabled) Amber else PaperDim)
+        }
+        Slider(
+            value = drag ?: value.toFloat(),
+            onValueChange = { drag = it },
+            onValueChangeFinished = {
+                drag?.let { onCommit(idMaskOffset(Math.round(it))) }
+                drag = null
+            },
+            valueRange = -ID_MASK_OFFSET_MAX_PX.toFloat()..ID_MASK_OFFSET_MAX_PX.toFloat(),
+            steps = 2 * ID_MASK_OFFSET_MAX_PX - 1,
+            enabled = enabled,
+            colors = SliderDefaults.colors(thumbColor = Amber, activeTrackColor = Amber),
+            modifier = Modifier.fillMaxWidth().semantics { stateDescription = valueText },
+        )
+        StudioNote(stringResource(R.string.studio_id_mask_offset_note), topPadding = 0)
     }
 }
 
@@ -550,7 +615,12 @@ internal fun IdCutoutResultViewer(failure: IdMaskFailure, onDismiss: () -> Unit)
                 )
             } else {
                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                    Text(stringResource(R.string.studio_id_cutout_result_no_image), color = Paper)
+                    val noImage = if (idFailureIsLocal(failure.local, failure.message)) {
+                        R.string.studio_id_cutout_result_no_image_local
+                    } else {
+                        R.string.studio_id_cutout_result_no_image
+                    }
+                    Text(stringResource(noImage), color = Paper)
                 }
             }
             // Bounded and scrollable, so a long reason at a large font scale keeps Close on screen.

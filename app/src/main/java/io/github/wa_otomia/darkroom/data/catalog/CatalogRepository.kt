@@ -17,6 +17,7 @@ import io.github.wa_otomia.darkroom.core.framingFor
 import io.github.wa_otomia.darkroom.core.framingVersionKey
 import io.github.wa_otomia.darkroom.core.idBackground
 import io.github.wa_otomia.darkroom.core.idFeather
+import io.github.wa_otomia.darkroom.core.idMaskOffset
 import io.github.wa_otomia.darkroom.core.idMaskRequired
 import io.github.wa_otomia.darkroom.core.hasVersion
 import io.github.wa_otomia.darkroom.core.idPhotoFor
@@ -80,7 +81,14 @@ data class DeleteProgress(val done: Int, val total: Int)
  * A version's failed cut-out (EDID040-R09): the sanitized reason, when it failed (epoch ms) and
  * the kept reply file, which is null when no reply arrived or it is gone. Cache only.
  */
-data class IdMaskFailure(val message: String, val at: Long, val hasImage: Boolean, val bytesFile: File?)
+data class IdMaskFailure(
+    val message: String,
+    val at: Long,
+    val hasImage: Boolean,
+    val bytesFile: File?,
+    /** The failed job was an on-device cut-out (EDID040-R11); false for records written before the field. */
+    val local: Boolean = false,
+)
 
 @Singleton
 class CatalogRepository @Inject constructor(
@@ -201,10 +209,16 @@ class CatalogRepository @Inject constructor(
      * [bytes] when any arrived, then the JSON record with the sanitized [message]. Both go through
      * a temp file and a rename. Under [rowLock] and only while the photo and the version still
      * exist, so a failure that lands after a delete ([deleteNow], [deleteEdit]) never recreates
-     * the folder. A reply that cannot be written leaves a record without an image. Returns
-     * whether a record was written.
+     * the folder. A reply that cannot be written leaves a record without an image. [local] keeps
+     * the job's mode with the record. Returns whether a record was written.
      */
-    suspend fun saveIdMaskFailure(photoId: String, source: String, message: String, bytes: ByteArray?): Boolean =
+    suspend fun saveIdMaskFailure(
+        photoId: String,
+        source: String,
+        message: String,
+        bytes: ByteArray?,
+        local: Boolean = false,
+    ): Boolean =
         withContext(Dispatchers.IO) {
             rowLock.withLock {
                 val current = get(photoId) ?: return@withLock false
@@ -215,7 +229,7 @@ class CatalogRepository @Inject constructor(
                     val kept = reply != null && runCatching {
                         writeAtomically(idMaskFailureFile(photoId, source), reply)
                     }.isSuccess
-                    val record = idMaskFailureRecord(message, reply.takeIf { kept }, System.currentTimeMillis())
+                    val record = idMaskFailureRecord(message, reply.takeIf { kept }, System.currentTimeMillis(), local)
                     writeAtomically(
                         idMaskFailureRecordFile(photoId, source),
                         encodeIdMaskFailureRecord(record).toByteArray(Charsets.UTF_8),
@@ -236,7 +250,7 @@ class CatalogRepository @Inject constructor(
         if (!json.isFile || json.length() > ID_MASK_FAILURE_JSON_MAX_BYTES) return null
         val record = parseIdMaskFailureRecord(runCatching { json.readText(Charsets.UTF_8) }.getOrNull()) ?: return null
         val bytes = idMaskFailureFile(photoId, source).takeIf { record.hasImage && it.isFile && it.length() > 0 }
-        return IdMaskFailure(record.message, record.at, bytes != null, bytes)
+        return IdMaskFailure(record.message, record.at, bytes != null, bytes, record.local)
     }
 
     /** Drops the version's failure record and reply (next attempt, success, version delete). */
@@ -490,6 +504,12 @@ class CatalogRepository @Inject constructor(
         updateIdPhoto(photoId, source) { old -> (old ?: IdPhotoState()).copy(featherInward = inward) }
     }
 
+    /** EDID040-R14: the mask edge shift in print px, clamped to ±10. */
+    suspend fun setIdPhotoMaskOffset(photoId: String, source: String, px: Int) {
+        val value = idMaskOffset(px)
+        updateIdPhoto(photoId, source) { old -> (old ?: IdPhotoState()).copy(maskOffset = value) }
+    }
+
     /**
      * Stores a validated mask for [source] as a new revision and points the version's ID state
      * at it. The first mask of a version also selects navy and weak feathering (EDID040-R04/R07);
@@ -514,6 +534,8 @@ class CatalogRepository @Inject constructor(
                 maskRev = rev,
                 background = if (firstMask) IdBackground.NAVY.id else base.background,
                 feather = if (firstMask) IdFeather.WEAK.id else base.feather,
+                // A first mask starts inward (EDID040-R07/R11), whatever an older state held.
+                featherInward = if (firstMask) true else base.featherInward,
             ).normalized()
             val next = current.withIdPhoto(key, state)
             try {

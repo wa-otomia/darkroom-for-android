@@ -92,6 +92,22 @@ class IdMaskFailureRecordTest {
     }
 
     @Test
+    fun recordKeepsTheJobMode() {
+        val local = idMaskFailureRecord("无法解码 JPEG", null, 4L, local = true)
+        assertEquals(IdMaskFailureRecord("无法解码 JPEG", 4L, hasImage = false, local = true), local)
+        val raw = encodeIdMaskFailureRecord(local)
+        assertTrue(raw, raw.contains("\"local\":true"))
+        assertEquals(local, parseIdMaskFailureRecord(raw))
+        // The default is an AI job.
+        assertFalse(idMaskFailureRecord("x", null, 5L).local)
+        // A record written before the field existed reads as an AI job.
+        assertEquals(
+            IdMaskFailureRecord("x", 2L, hasImage = false, local = false),
+            parseIdMaskFailureRecord("""{"message":"x","at":2,"hasImage":false}"""),
+        )
+    }
+
+    @Test
     fun missingOrCorruptRecordIsNone() {
         assertNull(parseIdMaskFailureRecord(null))
         assertNull(parseIdMaskFailureRecord(""))

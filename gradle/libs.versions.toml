@@ -18,6 +18,8 @@ coreKtx = "1.16.0"
 exifinterface = "1.4.1"
 junit = "4.13.2"
 coroutines = "1.10.2"
+# No stable release exists; bundled-model artifact, no Play services needed (EDID040-R11).
+mlkitSelfie = "16.0.0-beta6"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -48,6 +50,7 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }
 junit = { module = "junit:junit", version.ref = "junit" }
+mlkit-segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "mlkitSelfie" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
