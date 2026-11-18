@@ -77,9 +77,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
@@ -1445,23 +1442,16 @@ fun StudioScreen(
         }
     }
 
-    // The navigation host stops at the status bar; paint the strip above this screen black too,
-    // so the crop area runs up under the status bar instead of meeting a band of Room.
-    val statusBarTopPx = WindowInsets.systemBars.getTop(density).toFloat()
+    // The navigation host gives this route no top padding (DarkroomNav): the black backdrop runs
+    // up under the status bar, and everything else (floating buttons, title pill, job strips,
+    // undo bar, crop area, drawer and side panel) is laid out below it. The constraints below the
+    // status bar are the ones the screen had before, so the 42% drawer cap is unchanged.
     CompositionLocalProvider(LocalContentColor provides Paper) {
         BoxWithConstraints(
             Modifier
                 .fillMaxSize()
-                .drawBehind {
-                    if (statusBarTopPx > 0f) {
-                        drawRect(
-                            Color.Black,
-                            topLeft = Offset(0f, -statusBarTopPx),
-                            size = Size(size.width, statusBarTopPx),
-                        )
-                    }
-                }
-                .background(Color.Black),
+                .background(Color.Black)
+                .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top)),
         ) {
             if (maxWidth >= 600.dp) {
                 val panelWidth = (maxWidth * 0.36f).coerceIn(320.dp, 440.dp)
@@ -1935,7 +1925,8 @@ private fun StudioMissingPhoto(onBack: () -> Unit) {
         Modifier
             .fillMaxSize()
             .background(Room)
-            .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
+            // The navigation host leaves the status bar to the Studio route (DarkroomNav).
+            .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top + WindowInsetsSides.Bottom))
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

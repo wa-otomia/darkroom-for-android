@@ -170,6 +170,10 @@ fun DarkroomNav(
     // the bottom edge on every route. Top-level screens keep their last item
     // clear of the bar through LocalBottomBarClearance.
     Scaffold(containerColor = Room) { padding ->
+        // Every route but the Studio starts below the status bar. The Studio takes the top inset
+        // itself, so its black crop backdrop runs up under the status bar (design D4) and moves
+        // with the screen during the slide and fade transitions.
+        val top = padding.calculateTopPadding()
         Box(Modifier.fillMaxSize()) {
             CompositionLocalProvider(LocalBottomBarClearance provides clearance) {
                 NavHost(
@@ -177,7 +181,6 @@ fun DarkroomNav(
                     startDestination = "gallery",
                     modifier = Modifier.padding(
                         start = padding.calculateStartPadding(layoutDirection),
-                        top = padding.calculateTopPadding(),
                         end = padding.calculateEndPadding(layoutDirection),
                     ),
                     // Tab switches cross-fade; drilling into a detail slides toward the layout end and
@@ -216,49 +219,55 @@ fun DarkroomNav(
                     },
                 ) {
                     composable("gallery") {
-                        GalleryScreen(
-                            photos = photos,
-                            transfers = transfers,
-                            aiJobs = aiJobList,
-                            grokReady = grokPub.keySet,
-                            printerReady = appSettings.printerMac.isNotBlank(),
-                            autoEdit = appSettings.autoEdit,
-                            autoWatermark = appSettings.autoWatermark,
-                            autoPrint = appSettings.autoPrint,
-                            catalog = catalog,
-                            automation = automation,
-                            printQueue = printQueue,
-                            reselect = galleryReselect,
-                            focusPhotoId = focusPhotoId,
-                            onFocusConsumed = { galleryFocus.value = null },
-                            onOpen = { nav.navigate("studio/$it") },
-                            onDismissTransfer = { transferRegistry.dismiss(it) },
-                            onCancelAi = { aiJobs.cancel(it) },
-                            onSettings = { section ->
-                                if (section.isBlank()) nav.navigateTab("settings")
-                                else nav.navigateSettingsSection(section)
-                            },
-                        )
+                        BelowStatusBar(top) {
+                            GalleryScreen(
+                                photos = photos,
+                                transfers = transfers,
+                                aiJobs = aiJobList,
+                                grokReady = grokPub.keySet,
+                                printerReady = appSettings.printerMac.isNotBlank(),
+                                autoEdit = appSettings.autoEdit,
+                                autoWatermark = appSettings.autoWatermark,
+                                autoPrint = appSettings.autoPrint,
+                                catalog = catalog,
+                                automation = automation,
+                                printQueue = printQueue,
+                                reselect = galleryReselect,
+                                focusPhotoId = focusPhotoId,
+                                onFocusConsumed = { galleryFocus.value = null },
+                                onOpen = { nav.navigate("studio/$it") },
+                                onDismissTransfer = { transferRegistry.dismiss(it) },
+                                onCancelAi = { aiJobs.cancel(it) },
+                                onSettings = { section ->
+                                    if (section.isBlank()) nav.navigateTab("settings")
+                                    else nav.navigateSettingsSection(section)
+                                },
+                            )
+                        }
                     }
                     composable("io") {
-                        IoScreen(
-                            settings = appSettings,
-                            sessions = sessions,
-                            transfers = transfers,
-                            printQueue = printQueue,
-                            onDismissTransfer = { transferRegistry.dismiss(it) },
-                            onOpenPrintQueue = { nav.navigate("io/print-queue") },
-                        )
+                        BelowStatusBar(top) {
+                            IoScreen(
+                                settings = appSettings,
+                                sessions = sessions,
+                                transfers = transfers,
+                                printQueue = printQueue,
+                                onDismissTransfer = { transferRegistry.dismiss(it) },
+                                onOpenPrintQueue = { nav.navigate("io/print-queue") },
+                            )
+                        }
                     }
                     composable("io/print-queue") {
-                        PrintQueueScreen(
-                            catalog = catalog,
-                            printQueue = printQueue,
-                            photos = photos,
-                            onBack = { nav.popBackStack() },
-                        )
+                        BelowStatusBar(top) {
+                            PrintQueueScreen(
+                                catalog = catalog,
+                                printQueue = printQueue,
+                                photos = photos,
+                                onBack = { nav.popBackStack() },
+                            )
+                        }
                     }
-                    composable("presets") { PresetsScreen(settings) }
+                    composable("presets") { BelowStatusBar(top) { PresetsScreen(settings) } }
                     composable(
                         route = "settings?section={section}",
                         arguments = listOf(
@@ -268,17 +277,20 @@ fun DarkroomNav(
                             },
                         ),
                     ) { entry ->
-                        SettingsScreen(
-                            settings = settings,
-                            bluetooth = bluetooth,
-                            activityLog = activityLog,
-                            grokClient = grok,
-                            catalog = catalog,
-                            section = entry.arguments?.getString("section").orEmpty(),
-                            onAbout = { nav.navigate("about") },
-                        )
+                        BelowStatusBar(top) {
+                            SettingsScreen(
+                                settings = settings,
+                                bluetooth = bluetooth,
+                                activityLog = activityLog,
+                                grokClient = grok,
+                                catalog = catalog,
+                                section = entry.arguments?.getString("section").orEmpty(),
+                                onAbout = { nav.navigate("about") },
+                            )
+                        }
                     }
-                    composable("about") { AboutScreen(onBack = { nav.popBackStack() }) }
+                    composable("about") { BelowStatusBar(top) { AboutScreen(onBack = { nav.popBackStack() }) } }
+                    // No BelowStatusBar: StudioScreen pads for the status bar itself.
                     composable("studio/{id}") { entry ->
                         val id = entry.arguments?.getString("id").orEmpty()
                         StudioScreen(
@@ -330,6 +342,16 @@ fun DarkroomNav(
 }
 
 private data class NavTab(val id: String, val label: Int, val icon: ImageVector)
+
+/**
+ * The top system-bar padding the navigation host used to apply to every route. Applied per
+ * destination so that the Studio route alone can draw under the status bar; it wraps the screen
+ * exactly as the old host padding did (same constraints, same size).
+ */
+@Composable
+private fun BelowStatusBar(top: Dp, content: @Composable () -> Unit) {
+    Box(Modifier.padding(top = top)) { content() }
+}
 
 /** Gap between the floating bar and the navigation-bar inset. */
 private val FloatingBarGap = 12.dp
