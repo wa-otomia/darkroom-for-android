@@ -5,9 +5,11 @@
     <string name="nav_io">Transfer</string>
     <string name="nav_presets">Presets</string>
     <string name="nav_settings">Settings</string>
-    <string name="gallery_inbox_live">GALLERY</string>
     <string name="gallery_waiting">Waiting for camera</string>
-    <string name="gallery_count">%1$d in catalog</string>
+    <plurals name="gallery_count">
+        <item quantity="one">%1$d photo</item>
+        <item quantity="other">%1$d photos</item>
+    </plurals>
     <string name="gallery_desc">Cameras send JPG only. New files appear here. Turn on print-on-receive in Settings to crop to 2:3 and print automatically. AI editing is optional.</string>
     <string name="chip_grok_ok">AI ready</string>
     <string name="chip_grok_off">AI not configured</string>
@@ -41,7 +43,7 @@
     <string name="common_save">Save</string>
     <string name="common_edit">Edit</string>
     <string name="photo_tag_generated">Generated</string>
-    <string name="io_eyebrow">CAMERA FTP</string>
+    <string name="io_eyebrow">Camera FTP</string>
     <string name="io_title">Transfer</string>
     <string name="io_desc">Start the server, then set the camera host to this phone\'s Wi-Fi or hotspot IP; FTP never listens on mobile data. Use passive mode and leave the remote directory empty. Sessions, transfers and the print queue appear below.</string>
     <string name="io_sessions">Sessions</string>
@@ -136,15 +138,13 @@
     <string name="cancel_print">Cancel print</string>
     <string name="crop_overlay">2×3 in · 1040×1560</string>
     <string name="preset_none">No processing</string>
-    <string name="presets_eyebrow">PRESETS</string>
     <string name="presets_title">AI presets</string>
     <string name="presets_desc">Portrait and creative looks. Gallery and print share the preset you selected last; auto-edit after import uses its own preset, chosen in Settings.</string>
     <string name="default_preset">Default preset</string>
-    <string name="default_badge">DEFAULT</string>
+    <string name="default_badge">Default</string>
     <string name="add_preset">Add preset</string>
     <string name="preset_title">Title</string>
     <string name="preset_prompt">Prompt</string>
-    <string name="settings_eyebrow">SETTINGS</string>
     <string name="settings_title">Settings</string>
     <string name="settings_desc">AI API key, Xiaomi printer over Bluetooth Classic SPP, FTP account, print-on-receive.</string>
     <string name="settings_grok">AI image processing</string>
@@ -235,7 +235,7 @@
     <string name="settings_summary_ftp">%1$d · %2$s</string>
     <string name="settings_on">On</string>
     <string name="settings_off">Off</string>
-    <string name="badge_edited">EDIT</string>
+    <string name="badge_edited">Edited</string>
     <string name="copied_field">Copied %1$s</string>
     <string name="expand_section">Expand</string>
     <string name="collapse_section">Collapse</string>
@@ -289,7 +289,6 @@
     <string name="ds_error_storage">Could not read or write the file. Check the free space on this phone.</string>
     <string name="ds_error_ftp_bind">Could not open the FTP port. It may already be in use; try another port.</string>
     <string name="copied_to_clipboard">Copied</string>
-    <string name="io_ftp_connection">Connection</string>
     <string name="settings_ftp_auto_start">Start FTP when the app launches</string>
     <string name="settings_keep_alive">Keep app alive</string>
     <string name="settings_keep_alive_hint">Keeps the app running in the background so FTP and auto-print keep working.</string>

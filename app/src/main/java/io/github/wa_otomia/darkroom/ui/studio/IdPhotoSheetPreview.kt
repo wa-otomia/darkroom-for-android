@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +43,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
@@ -81,6 +81,7 @@ import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
 import io.github.wa_otomia.darkroom.data.imaging.ImagePipeline
 import io.github.wa_otomia.darkroom.data.progress.indeterminateUi
 import io.github.wa_otomia.darkroom.ui.components.AmberTrack
+import io.github.wa_otomia.darkroom.ui.components.FrameChipShape
 import io.github.wa_otomia.darkroom.ui.components.SnapDragState
 import io.github.wa_otomia.darkroom.ui.components.detectSnappingTransformGestures
 import io.github.wa_otomia.darkroom.ui.components.drawSnapGuides
@@ -320,12 +321,12 @@ internal fun IdPhotoSheetPreview(
                     color = Paper.copy(alpha = 0.9f),
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
-                    letterSpacing = 1.4.sp,
+                    fontWeight = FontWeight.Medium,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(10.dp)
-                        .background(Ink.copy(alpha = 0.72f), RoundedCornerShape(2.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .background(Ink.copy(alpha = 0.72f), FrameChipShape)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
                 )
                 if (decoding && cutout == null) {
                     AmberTrack(
@@ -354,11 +355,12 @@ internal fun IdPhotoSheetPreview(
                         color = Amber,
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
+                        fontWeight = FontWeight.Medium,
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .padding(10.dp)
-                            .background(Ink.copy(alpha = 0.82f), RoundedCornerShape(2.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .background(Ink.copy(alpha = 0.82f), FrameChipShape)
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
             }

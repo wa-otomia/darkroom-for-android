@@ -30,6 +30,17 @@ object DarkroomMotion {
     /** How long the Studio thirds grid stays fully visible after a drag ends, before it fades. */
     const val GuideHoldMillis = 1000L
 
+    /**
+     * Scale of a hand-drawn button, chip or pill while pressed (SYUI030-R04).
+     * Animated over [StateChangeMillis]; skipped entirely when
+     * [LocalSystemAnimationsEnabled] is false. See
+     * `io.github.wa_otomia.darkroom.ui.components.pressScale`.
+     */
+    const val PressedScale = 0.97f
+
+    /** Width change of the floating navigation bar when the selected tab changes. */
+    const val NavBarResizeMillis = StateChangeMillis
+
     /** Material 3 `emphasized`/standard easing. */
     val Standard: Easing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 

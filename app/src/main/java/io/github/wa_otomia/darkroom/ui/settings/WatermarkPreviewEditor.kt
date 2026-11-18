@@ -2,7 +2,6 @@ package io.github.wa_otomia.darkroom.ui.settings
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -20,7 +18,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -56,8 +54,8 @@ import io.github.wa_otomia.darkroom.ui.components.drawSnapGuides
 import io.github.wa_otomia.darkroom.ui.components.drawWatermarkMark
 import io.github.wa_otomia.darkroom.ui.components.rememberLogoGlow
 import io.github.wa_otomia.darkroom.ui.theme.Amber
-import io.github.wa_otomia.darkroom.ui.theme.PaperFaint
-import io.github.wa_otomia.darkroom.ui.theme.SurfacePanel
+import io.github.wa_otomia.darkroom.ui.theme.PhotoShape
+import io.github.wa_otomia.darkroom.ui.theme.Surface2
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import java.io.File
@@ -129,13 +127,15 @@ fun WatermarkPreviewEditor(
             }
         }
 
+        // A filled frame with the photo corner radius instead of an outline. The editor sits inside
+        // the Surface1 settings card, so the empty sheet is Surface2 to stay visible against it.
+        // Marks, glow and snap guides are still clipped to the frame, now along its 16dp corners.
         Box(
             Modifier
                 .size(with(density) { frameW.toDp() }, with(density) { frameH.toDp() })
                 .align(Alignment.Center)
-                .clipToBounds()
-                .background(SurfacePanel)
-                .border(1.dp, PaperFaint, RoundedCornerShape(2.dp))
+                .clip(PhotoShape)
+                .background(Surface2)
                 .semantics { contentDescription = previewLabel },
         ) {
             if (request != null) {

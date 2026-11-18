@@ -43,7 +43,7 @@
     <string name="lib_presets_default_none">None</string>
     <string name="lib_presets_default_clear">Clear default</string>
     <string name="lib_presets_default_hint">Set the default on a preset card below.</string>
-    <string name="lib_presets_auto_edit_badge">AUTO-EDIT</string>
+    <string name="lib_presets_auto_edit_badge">Auto-edit</string>
     <string name="lib_presets_delete_auto_edit_warning">Auto-edit after import uses this preset. After you delete it, auto-edit is skipped until you choose another preset in Settings.</string>
     <string name="lib_presets_char_count">%1$d / %2$d</string>
     <string name="lib_presets_category">Category</string>
