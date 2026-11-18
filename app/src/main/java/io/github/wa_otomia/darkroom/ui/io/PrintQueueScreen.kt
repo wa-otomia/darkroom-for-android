@@ -230,13 +230,17 @@ private fun PrintJobRow(
                     lineHeight = 16.sp,
                     modifier = Modifier.padding(top = 4.dp),
                 )
-                Text(
-                    status,
-                    color = if (state == "failed") Amber else PaperDim,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
+                // Running and queued jobs show the same status as the progress
+                // bar's phase label just below, so it is not repeated here.
+                if (state != "running" && state != "queued") {
+                    Text(
+                        status,
+                        color = if (state == "failed") Amber else PaperDim,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
             }
         }
         when (state) {

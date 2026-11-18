@@ -472,12 +472,12 @@ private fun CountedField(
             Modifier.fillMaxWidth().padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(label, color = PaperDim, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            Text(label, color = PaperDim, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.weight(1f))
             Text(
                 stringResource(R.string.lib_presets_char_count, count, max),
                 color = if (count > max) Danger else PaperDim,
                 fontFamily = MonoFont,
-                fontSize = 12.sp,
+                fontSize = 12.sp, lineHeight = 18.sp,
             )
         }
         DarkroomTextField(
@@ -490,7 +490,7 @@ private fun CountedField(
             Text(
                 stringResource(errorRes),
                 color = Danger,
-                fontSize = 12.sp,
+                fontSize = 12.sp, lineHeight = 18.sp,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }

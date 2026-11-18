@@ -102,7 +102,6 @@ import io.github.wa_otomia.darkroom.ui.theme.Ok
 import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
-import io.github.wa_otomia.darkroom.ui.theme.PaperDisabled
 import io.github.wa_otomia.darkroom.ui.theme.PaperFaint
 import io.github.wa_otomia.darkroom.ui.theme.PaperHairline
 import io.github.wa_otomia.darkroom.ui.theme.PaperPressed
@@ -345,7 +344,9 @@ fun VersionChip(
 /**
  * Primary action: Paper pill, Ink 15sp Medium label (14.85:1), at least 48dp
  * high. Pressed: [PaperPressed] fill (Ink 11.92:1) and a 0.97 press scale.
- * Disabled: [PaperDisabled] fill (Ink 4.96:1 over Room, 5.21:1 over Surface1).
+ * Disabled: [Surface2] fill with a PaperDim label (4.96:1), the same quiet
+ * look as a disabled [TonalButton]. A half-transparent Paper slab read as a
+ * heavy grey block on the dark surfaces, so `PaperDisabled` is no longer used.
  * Use one per screen or panel; everything else is a [TonalButton].
  * [icon] (18dp, optional) sits before the label. The label wraps at large
  * font sizes; the pill grows taller instead of clipping.
@@ -365,7 +366,7 @@ fun PaperButton(
     // shown by darkening the fill instead.
     val fill by animateColorAsState(
         targetValue = when {
-            !enabled -> PaperDisabled
+            !enabled -> Surface2
             pressed -> PaperPressed
             else -> Paper
         },
@@ -376,7 +377,7 @@ fun PaperButton(
         text = text,
         icon = icon,
         fill = fill,
-        content = Ink,
+        content = if (enabled) Ink else PaperDim,
         enabled = enabled,
         fillMaxWidth = fillMaxWidth,
         interaction = interaction,
@@ -549,7 +550,7 @@ fun AmberProgressBar(
                     percentLabel(ui),
                     color = Amber,
                     fontFamily = MonoFont,
-                    fontSize = 12.sp,
+                    fontSize = 12.sp, lineHeight = 18.sp,
                 )
             }
         }
@@ -562,7 +563,7 @@ fun AmberProgressBar(
                 ui.detail,
                 color = PaperDim,
                 fontFamily = MonoFont,
-                fontSize = 12.sp,
+                fontSize = 12.sp, lineHeight = 18.sp,
                 modifier = Modifier.padding(top = 8.dp),
             )
         }

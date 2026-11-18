@@ -82,9 +82,9 @@ val PaperHairline = Color(0x33EFE6D4)
 val PaperPressed = Color(0xFFD9CFBC)
 
 /**
- * Fill behind a disabled [io.github.wa_otomia.darkroom.ui.components.PaperButton].
- * 55% alpha keeps the Ink label at 4.96:1 over [Room] and 5.21:1 over
- * [Surface1]; the previous 40% measured 3.12:1.
+ * Former fill behind a disabled PaperButton (55% Paper). Since 0.2.0 a
+ * disabled PaperButton uses [Surface2] with a PaperDim label instead, so this
+ * is unused by the app; it is kept so older call sites and branches compile.
  */
 val PaperDisabled = Color(0x8CEFE6D4)
 

@@ -735,7 +735,7 @@ fun SettingsScreen(
                         Text(
                             stringResource(R.string.settings_grok_save_hint),
                             color = PaperDim,
-                            fontSize = 12.sp,
+                            fontSize = 12.sp, lineHeight = 18.sp,
                             modifier = Modifier.padding(bottom = 12.dp),
                         )
                         SettingsField(
@@ -863,7 +863,7 @@ fun SettingsScreen(
                             Text(
                                 stringResource(R.string.settings_ai_model_manual),
                                 color = PaperDim,
-                                fontSize = 12.sp,
+                                fontSize = 12.sp, lineHeight = 18.sp,
                                 modifier = Modifier.padding(bottom = 8.dp),
                             )
                         }
@@ -1171,7 +1171,7 @@ fun SettingsScreen(
                         val paired = devices.filter { it.bonded }
                         val discovered = devices.filter { !it.bonded }
                         if (devices.isEmpty()) {
-                            Text(stringResource(R.string.settings_devices_empty), color = PaperDim, fontSize = 13.sp)
+                            Text(stringResource(R.string.settings_devices_empty), color = PaperDim, fontSize = 13.sp, lineHeight = 18.sp)
                         }
                         if (paired.isNotEmpty()) {
                             Text(
@@ -1264,7 +1264,7 @@ fun SettingsScreen(
                         Text(
                             stringResource(R.string.settings_ftp_pasv_desc),
                             color = PaperDim,
-                            fontSize = 12.sp,
+                            fontSize = 12.sp, lineHeight = 18.sp,
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
                         SettingsField(
@@ -1318,7 +1318,7 @@ fun SettingsScreen(
                         Text(
                             stringResource(R.string.settings_default_copies_desc),
                             color = PaperDim,
-                            fontSize = 12.sp,
+                            fontSize = 12.sp, lineHeight = 18.sp,
                             modifier = Modifier.padding(top = 2.dp),
                         )
                         CopiesStepper(cfg.defaultCopies) { next ->
@@ -1373,7 +1373,7 @@ fun SettingsScreen(
                         Text(
                             stringResource(R.string.settings_automation_preset_hint),
                             color = PaperDim,
-                            fontSize = 12.sp,
+                            fontSize = 12.sp, lineHeight = 18.sp,
                             modifier = Modifier.padding(bottom = 4.dp),
                         )
                         if (cfg.autoEdit && (!autoAiReady || !autoHasPreset)) {
@@ -1398,7 +1398,7 @@ fun SettingsScreen(
                             Text(
                                 stringResource(R.string.settings_automation_watermark_print_only),
                                 color = PaperDim,
-                                fontSize = 13.sp,
+                                fontSize = 13.sp, lineHeight = 18.sp,
                                 modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
                             )
                         }
@@ -2248,7 +2248,7 @@ private fun DeviceRow(
         when {
             pairing -> {
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(stringResource(R.string.settings_device_pairing), color = Amber, fontSize = 12.sp)
+                    Text(stringResource(R.string.settings_device_pairing), color = Amber, fontSize = 12.sp, lineHeight = 18.sp)
                     TimedWaitBar(
                         label = "",
                         modifier = Modifier.padding(top = 6.dp).fillMaxWidth(0.35f),
@@ -2257,10 +2257,10 @@ private fun DeviceRow(
             }
             bound -> {
                 Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = Amber, modifier = Modifier.size(18.dp))
-                Text(stringResource(R.string.settings_device_bound), color = Amber, fontSize = 12.sp)
+                Text(stringResource(R.string.settings_device_bound), color = Amber, fontSize = 12.sp, lineHeight = 18.sp)
             }
             else -> {
-                Text(bindLabel, color = if (enabled) Paper else PaperDim, fontSize = 12.sp)
+                Text(bindLabel, color = if (enabled) Paper else PaperDim, fontSize = 12.sp, lineHeight = 18.sp)
                 ListRowChevron(modifier = Modifier.size(18.dp))
             }
         }
@@ -2453,7 +2453,7 @@ private fun TimedWaitBar(label: String, modifier: Modifier = Modifier) {
             stringResource(R.string.progress_elapsed_fmt, elapsed),
             color = PaperDim,
             fontFamily = MonoFont,
-            fontSize = 12.sp,
+            fontSize = 12.sp, lineHeight = 18.sp,
             modifier = Modifier.padding(top = 4.dp),
         )
     }
