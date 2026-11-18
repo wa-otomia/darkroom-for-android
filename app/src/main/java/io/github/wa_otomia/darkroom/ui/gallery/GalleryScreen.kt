@@ -80,21 +80,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.wa_otomia.darkroom.R
@@ -184,6 +192,11 @@ private val FabShape = RoundedCornerShape(18.dp)
 
 /** Scaffold FAB spacing (16dp) + FAB height (56dp) + a 16dp gap over the last row. */
 private val FabRowClearance = 88.dp
+
+/** The undo bar and delete progress as inset [PanelShape] panels, matching [SelectionBar]. */
+private val TopStripModifier = Modifier
+    .padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 4.dp)
+    .clip(PanelShape)
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -471,10 +484,12 @@ fun GalleryScreen(
                             onDelete = { deleteSelected() },
                         )
                     }
+                    // Inset panels like the selection bar above, so the stack reads as one family.
                     DeleteUndoBar(
                         pending = pendingDeletion,
                         onUndo = { catalog.undoDelete(it) },
                         onDeleteNow = { catalog.commitDeleteNow(it) },
+                        modifier = TopStripModifier,
                     )
                     deleteProgress?.let { deleting ->
                         val fraction = if (deleting.total > 0) deleting.done.toFloat() / deleting.total else 0f
@@ -487,6 +502,7 @@ fun GalleryScreen(
                                 indeterminate = false,
                             ),
                             collapsed = false,
+                            modifier = TopStripModifier,
                         )
                     }
                 }
@@ -691,7 +707,7 @@ private fun GalleryHeader(
 ) {
     Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
         PageTitle(
-            title = stringResource(R.string.gallery_inbox_live),
+            title = stringResource(R.string.nav_gallery),
             supporting = if (empty) stringResource(R.string.gallery_waiting) else stringResource(R.string.gallery_count, count),
             modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
         )
@@ -783,6 +799,28 @@ private fun PhotoCard(
     val selectable = photo != null && pending == null
     val selectedText = stringResource(R.string.a11y_state_selected)
     val notSelectedText = stringResource(R.string.a11y_state_not_selected)
+    val selectActionLabel = stringResource(R.string.gallery_a11y_select_photo)
+    // Caption text. A failed placeholder without a file name shows no caption: its face and
+    // footer already say it failed, and "Generating…" over a failure would contradict them.
+    val captionName: String? = when {
+        pending != null -> pending.filename
+            ?: if (failedPending) {
+                null
+            } else {
+                stringResource(if (pending.kind == PendingKind.Generate) R.string.generating else R.string.importing)
+            }
+        else -> photo?.filename.orEmpty()
+    }
+    // Mono only for a real file name; the "Generating…"/"Importing…" fallbacks are prose.
+    val captionIsFileName = pending?.filename != null || pending == null
+    val captionPrefix = if (photo?.parentId != null && pending == null) {
+        stringResource(R.string.generated_prefix)
+    } else {
+        ""
+    }
+    // Height of the caption + footer stack, so a pending face keeps its centred text above it.
+    val density = LocalDensity.current
+    var bottomStackHeight by remember { mutableStateOf(0.dp) }
 
     // The tile is the 2:3 image frame itself (LBBR010-R01): no outline and no caption bar. Only a
     // selected or located photo gets a frame, 2dp Amber, drawn over the photo's edge.
@@ -794,6 +832,7 @@ private fun PhotoCard(
             .background(Surface1)
             .then(if (selected || highlighted) Modifier.border(2.dp, Amber, PhotoShape) else Modifier)
             .combinedClickable(
+                onLongClickLabel = if (selectable && !selectionMode) selectActionLabel else null,
                 onClick = {
                     when {
                         failedPending -> onDismissPending()
@@ -821,11 +860,17 @@ private fun PhotoCard(
             label = "galleryPending",
         ) { isPending ->
             if (isPending && pending != null) {
-                PendingFace(pending = pending, sourceThumb = sourceThumb)
+                PendingFace(
+                    pending = pending,
+                    sourceThumb = sourceThumb,
+                    bottomReserve = bottomStackHeight,
+                    captionName = captionName,
+                )
             } else if (photo != null) {
                 AsyncImage(
                     model = request,
-                    contentDescription = photo.filename,
+                    // Decorative within the tile: the caption below already carries the file name.
+                    contentDescription = null,
                     contentScale = ContentScale.Crop,
                     onState = { state ->
                         thumbState = when (state) {
@@ -931,17 +976,17 @@ private fun PhotoCard(
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .onSizeChanged { bottomStackHeight = with(density) { it.height.toDp() } },
         ) {
-            val name = pending?.filename
-                ?: pending?.let { stringResource(if (it.kind == PendingKind.Generate) R.string.generating else R.string.importing) }
-                ?: photo?.filename.orEmpty()
-            val prefix = if (photo?.parentId != null && pending == null) {
-                stringResource(R.string.generated_prefix)
-            } else {
-                ""
+            if (captionName != null) {
+                PhotoCaption(
+                    prefix = captionPrefix,
+                    name = captionName,
+                    nameIsFileName = captionIsFileName,
+                    time = timeLabel,
+                )
             }
-            PhotoCaption(name = prefix + name, time = timeLabel)
             if (pending != null) {
                 PendingFooter(
                     pending = pending,
@@ -958,30 +1003,46 @@ private fun PhotoCard(
     }
 }
 
+/** Height of the transparent-to-Room-72% ramp at the top of [PhotoCaption]; text starts at 20dp. */
+private val CaptionScrimRamp = 16.dp
+
 /**
- * File name (mono, a technical value) and time laid over the bottom of the photo. The gradient
- * reaches Room 72% where the text starts, so Paper stays at ≥ 6:1 even over a white photo.
+ * File name and time laid over the bottom of the photo. Only a real file name is mono
+ * (a technical value); the prefix and status fallbacks stay sans. The scrim reaches Room 72% at
+ * a fixed [CaptionScrimRamp], above where the text starts, so however tall the text grows at a
+ * large font scale, Paper sits on at least Room 72% (≥ 6:1 even over a white photo).
  */
 @Composable
-private fun PhotoCaption(name: String, time: String) {
+private fun PhotoCaption(prefix: String, name: String, nameIsFileName: Boolean, time: String) {
+    val text = remember(prefix, name, nameIsFileName) {
+        buildAnnotatedString {
+            append(prefix)
+            if (nameIsFileName) {
+                withStyle(SpanStyle(fontFamily = MonoFont)) { append(name) }
+            } else {
+                append(name)
+            }
+        }
+    }
     Column(
         Modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
+            .drawWithCache {
+                val stop = (CaptionScrimRamp.toPx() / size.height).coerceIn(0f, 1f)
+                val scrim = Brush.verticalGradient(
                     0f to Color.Transparent,
-                    0.3f to Room.copy(alpha = 0.72f),
+                    stop to Room.copy(alpha = 0.72f),
                     1f to Room.copy(alpha = 0.88f),
-                ),
-            )
+                )
+                onDrawBehind { drawRect(scrim) }
+            }
             .padding(start = 10.dp, end = 10.dp, top = 20.dp, bottom = 8.dp),
     ) {
         Text(
-            name,
+            text,
             color = Paper,
             fontSize = 12.sp,
             lineHeight = 16.sp,
-            fontFamily = MonoFont,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -999,13 +1060,24 @@ private fun PhotoCaption(name: String, time: String) {
     }
 }
 
+/**
+ * Face of a placeholder tile. [bottomReserve] is the height of the caption and footer drawn over
+ * its bottom; the centred text keeps clear of it so a failure reason is never covered.
+ * [captionName] is what the caption shows, so the centred name is not announced twice.
+ */
 @Composable
-private fun PendingFace(pending: GalleryItem.Pending, sourceThumb: File?) {
+private fun PendingFace(
+    pending: GalleryItem.Pending,
+    sourceThumb: File?,
+    bottomReserve: Dp,
+    captionName: String?,
+) {
     Box(Modifier.fillMaxSize().background(Surface1)) {
         if (pending.kind == PendingKind.Generate && sourceThumb != null) {
             AsyncImage(
                 model = sourceThumb,
-                contentDescription = pending.filename,
+                // Decorative: the caption carries the name.
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
@@ -1015,17 +1087,26 @@ private fun PendingFace(pending: GalleryItem.Pending, sourceThumb: File?) {
                 Box(Modifier.matchParentSize().background(Room.copy(alpha = 0.32f)))
             }
         } else {
-            Box(Modifier.fillMaxSize().background(Surface1), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Surface1)
+                    .padding(bottom = bottomReserve),
+                contentAlignment = Alignment.Center,
+            ) {
+                val faceText = pending.filename ?: stringResource(R.string.importing)
                 Text(
-                    pending.filename ?: stringResource(R.string.importing),
+                    faceText,
                     color = PaperDim,
-                    fontFamily = MonoFont,
+                    fontFamily = if (pending.filename != null) MonoFont else null,
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
                     textAlign = TextAlign.Center,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .then(if (faceText == captionName) Modifier.clearAndSetSemantics {} else Modifier),
                 )
             }
         }
@@ -1034,7 +1115,7 @@ private fun PendingFace(pending: GalleryItem.Pending, sourceThumb: File?) {
                 Modifier
                     .fillMaxSize()
                     .background(Surface1)
-                    .padding(10.dp),
+                    .padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = bottomReserve + 4.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -1241,7 +1322,7 @@ private fun ImportReportDialog(report: ImportReport, onDismiss: () -> Unit) {
                         modifier = Modifier.padding(top = 8.dp),
                     )
                     report.converted.take(MAX_LISTED_FILES).forEach { name ->
-                        ReportLine(name)
+                        ReportLine(name, fileName = name)
                     }
                     MoreLine(report.converted.size - MAX_LISTED_FILES)
                 }
@@ -1253,7 +1334,10 @@ private fun ImportReportDialog(report: ImportReport, onDismiss: () -> Unit) {
                     )
                     report.failures.take(MAX_LISTED_FILES).forEach { failure ->
                         val reason = stringResource(failure.reason)
-                        ReportLine(stringResource(R.string.lib_gallery_import_failed_item, failure.name, reason))
+                        ReportLine(
+                            stringResource(R.string.lib_gallery_import_failed_item, failure.name, reason),
+                            fileName = failure.name,
+                        )
                     }
                     MoreLine(report.failures.size - MAX_LISTED_FILES)
                 }
@@ -1271,13 +1355,20 @@ private fun ImportReportDialog(report: ImportReport, onDismiss: () -> Unit) {
     )
 }
 
+/** A report line; only [fileName] inside [text] is mono, the localized reason stays sans. */
 @Composable
-private fun ReportLine(text: String) {
+private fun ReportLine(text: String, fileName: String) {
+    val styled = remember(text, fileName) {
+        buildAnnotatedString {
+            append(text)
+            val start = if (fileName.isEmpty()) -1 else text.indexOf(fileName)
+            if (start >= 0) addStyle(SpanStyle(fontFamily = MonoFont), start, start + fileName.length)
+        }
+    }
     Text(
-        text,
+        styled,
         color = PaperDim,
-        fontSize = 12.sp,
-        fontFamily = MonoFont,
+        style = MaterialTheme.typography.bodySmall,
         modifier = Modifier.padding(top = 4.dp),
     )
 }
@@ -1288,7 +1379,7 @@ private fun MoreLine(extra: Int) {
     Text(
         stringResource(R.string.lib_gallery_import_more, extra),
         color = PaperDim,
-        fontSize = 12.sp,
+        style = MaterialTheme.typography.bodySmall,
         modifier = Modifier.padding(top = 4.dp),
     )
 }
