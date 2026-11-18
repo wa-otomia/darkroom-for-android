@@ -109,8 +109,10 @@ class AiJobs @Inject constructor(
         presetId: String,
         prompt: String,
         appliedFraming: AppliedFraming? = null,
+        // false for import automation: it must not move the Studio default (AUTG040-R02).
+        rememberPreset: Boolean = true,
     ) {
-        start(AiKind.Edit, photoId, source, presetId, prompt, appliedFraming)
+        start(AiKind.Edit, photoId, source, presetId, prompt, appliedFraming, rememberPreset)
     }
 
     /**
@@ -246,6 +248,7 @@ class AiJobs @Inject constructor(
         presetId: String,
         prompt: String,
         appliedFraming: AppliedFraming? = null,
+        rememberPreset: Boolean = true,
     ) {
         val id = UUID.randomUUID().toString()
         val targetPhotoId = if (kind == AiKind.Generate) UUID.randomUUID().toString() else photoId
@@ -270,7 +273,10 @@ class AiJobs @Inject constructor(
         val handle = appScope.launch {
             val ticker = tracker.launchTicks(this) { publish(id, tracker) }
             try {
-                if (presetId.isNotEmpty()) settings.setLastPreset(presetId)
+                if (presetId.isNotEmpty()) {
+                    if (rememberPreset) settings.setLastPreset(presetId)
+                    else if (settings.readPresets().presets.none { it.id == presetId }) error("预设不存在")
+                }
                 val store = settings.readPresets()
                 val preset = store.presets.find { it.id == presetId }
                 val presetPrompt = preset?.prompt.orEmpty()

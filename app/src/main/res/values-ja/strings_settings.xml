@@ -15,7 +15,7 @@
     <string name="settings_about_summary">バージョン、プライバシー、オープンソースライセンス</string>
     <string name="settings_reset">既定の設定に戻す</string>
     <string name="settings_reset_title">既定の設定に戻しますか？</string>
-    <string name="settings_reset_text">プリンタの登録、印刷の既定値、受信後に自動印刷、FTP アカウント、Grok の構成が既定値に戻り、FTP パスワードが再生成されます。アプリの言語、AI プリセットと写真カタログは影響を受けません。</string>
+    <string name="settings_reset_text">プリンタの登録、印刷の既定値、受信後に自動印刷（自動レタッチのプリセットを含む）、FTP アカウント、Grok の構成が既定値に戻り、FTP パスワードが再生成されます。アプリの言語、AI プリセット一覧と既定プリセット、写真カタログは影響を受けません。</string>
     <string name="settings_reset_confirm">戻す</string>
     <string name="settings_reset_done">既定の設定に戻しました</string>
     <string name="settings_unsaved">未保存の変更があります</string>

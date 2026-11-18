@@ -39,10 +39,12 @@
     <string name="lib_io_refresh_hosts">주소 새로 고침</string>
 
     <!-- 프리셋 -->
-    <string name="lib_presets_default_current">사용 중: %1$s</string>
+    <string name="lib_presets_default_current">현재 기본값: %1$s</string>
     <string name="lib_presets_default_none">없음</string>
     <string name="lib_presets_default_clear">기본값 해제</string>
     <string name="lib_presets_default_hint">기본값은 아래 프리셋 카드에서 설정합니다.</string>
+    <string name="lib_presets_auto_edit_badge">자동 보정</string>
+    <string name="lib_presets_delete_auto_edit_warning">수신 후 자동 보정이 이 프리셋을 사용하고 있습니다. 삭제하면 설정에서 다른 프리셋을 고를 때까지 자동 보정을 건너뜁니다.</string>
     <string name="lib_presets_char_count">%1$d / %2$d</string>
     <string name="lib_presets_category">카테고리</string>
     <string name="lib_presets_discard_title">초안을 버릴까요?</string>

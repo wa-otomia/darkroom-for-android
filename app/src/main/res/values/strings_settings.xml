@@ -15,7 +15,7 @@
     <string name="settings_about_summary">Version, privacy, open-source licenses</string>
     <string name="settings_reset">Restore default settings</string>
     <string name="settings_reset_title">Restore default settings?</string>
-    <string name="settings_reset_text">Printer binding, print defaults, print-on-receive, the FTP account and the Grok configuration return to their defaults, and a new FTP password is generated. The app language, AI presets and the photo catalog are not affected.</string>
+    <string name="settings_reset_text">Printer binding, print defaults, print-on-receive (including the auto-edit preset), the FTP account and the Grok configuration return to their defaults, and a new FTP password is generated. The app language, the AI preset library and default preset, and the photo catalog are not affected.</string>
     <string name="settings_reset_confirm">Restore</string>
     <string name="settings_reset_done">Default settings restored</string>
     <string name="settings_unsaved">Unsaved changes</string>

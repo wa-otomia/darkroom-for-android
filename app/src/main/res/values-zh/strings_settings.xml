@@ -15,7 +15,7 @@
     <string name="settings_about_summary">版本、隐私说明与开源许可</string>
     <string name="settings_reset">恢复默认设置</string>
     <string name="settings_reset_title">确认恢复默认设置？</string>
-    <string name="settings_reset_text">打印机绑定、打印默认值、收图后自动打印、FTP 账号与 Grok 配置将恢复为默认值，并重新生成 FTP 密码。界面语言、AI 预设与照片库不受影响。</string>
+    <string name="settings_reset_text">打印机绑定、打印默认值、收图后自动打印（含自动修图预设）、FTP 账号与 Grok 配置将恢复为默认值，并重新生成 FTP 密码。界面语言、AI 预设库与默认预设、照片库不受影响。</string>
     <string name="settings_reset_confirm">恢复</string>
     <string name="settings_reset_done">已恢复默认设置</string>
     <string name="settings_unsaved">存在未保存的更改</string>

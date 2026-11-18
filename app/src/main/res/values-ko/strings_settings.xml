@@ -15,7 +15,7 @@
     <string name="settings_about_summary">버전, 개인정보 처리 안내, 오픈소스 라이선스</string>
     <string name="settings_reset">기본 설정으로 복원</string>
     <string name="settings_reset_title">기본 설정으로 복원할까요?</string>
-    <string name="settings_reset_text">프린터 연결, 인쇄 기본값, 수신 후 자동 인쇄, FTP 계정, Grok 구성이 기본값으로 돌아가고 FTP 비밀번호가 새로 생성됩니다. 앱 언어, AI 프리셋과 사진 보관함은 영향을 받지 않습니다.</string>
+    <string name="settings_reset_text">프린터 연결, 인쇄 기본값, 수신 후 자동 인쇄(자동 보정 프리셋 포함), FTP 계정, Grok 구성이 기본값으로 돌아가고 FTP 비밀번호가 새로 생성됩니다. 앱 언어, AI 프리셋 목록과 기본 프리셋, 사진 보관함은 영향을 받지 않습니다.</string>
     <string name="settings_reset_confirm">복원</string>
     <string name="settings_reset_done">기본 설정으로 복원했습니다</string>
     <string name="settings_unsaved">저장하지 않은 변경 사항이 있습니다</string>
