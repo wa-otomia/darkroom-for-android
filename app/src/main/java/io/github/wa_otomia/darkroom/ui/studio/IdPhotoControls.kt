@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,17 +23,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,8 +52,10 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -79,15 +81,23 @@ import io.github.wa_otomia.darkroom.core.showsEdgeWarning
 import io.github.wa_otomia.darkroom.data.progress.ProgressUi
 import io.github.wa_otomia.darkroom.ui.UserErrorMessage
 import io.github.wa_otomia.darkroom.ui.components.AmberTrack
-import io.github.wa_otomia.darkroom.ui.components.GhostButton
+import io.github.wa_otomia.darkroom.ui.components.NoticeCard
 import io.github.wa_otomia.darkroom.ui.components.PaperButton
 import io.github.wa_otomia.darkroom.ui.components.SectionLabel
+import io.github.wa_otomia.darkroom.ui.components.SelectPill
+import io.github.wa_otomia.darkroom.ui.components.TonalButton
+import io.github.wa_otomia.darkroom.ui.components.darkroomSliderColors
 import io.github.wa_otomia.darkroom.ui.components.darkroomTextFieldColors
 import io.github.wa_otomia.darkroom.ui.theme.Amber
-import io.github.wa_otomia.darkroom.ui.theme.Ink
+import io.github.wa_otomia.darkroom.ui.theme.AmberSoft
+import io.github.wa_otomia.darkroom.ui.theme.FieldShape
+import io.github.wa_otomia.darkroom.ui.theme.MonoFont
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
 import io.github.wa_otomia.darkroom.ui.theme.PaperFaint
+import io.github.wa_otomia.darkroom.ui.theme.PanelShape
+import io.github.wa_otomia.darkroom.ui.theme.PhotoShape
+import io.github.wa_otomia.darkroom.ui.theme.Room
 
 // ---------------------------------------------------------------------------------------------
 // Pure helpers (no Compose), kept here so the labels and the resource mapping stay in one place.
@@ -193,18 +203,21 @@ private fun IdPhotoSizeDropdown(
     val selectedLayout = remember(selected) { idPhotoLayout(selected) }
     val perSheet = pluralStringResource(R.plurals.studio_id_per_sheet, selectedLayout.count, selectedLayout.count)
     ExposedDropdownMenuBox(expanded = open, onExpandedChange = { if (enabled) open = it }) {
-        TextField(
+        OutlinedTextField(
             value = "${idPresetMm(selected)} mm · $perSheet",
             onValueChange = {},
             readOnly = true,
             enabled = enabled,
-            singleLine = true,
+            // Wraps at large font sizes so the per-sheet count is not cut off.
+            singleLine = false,
+            maxLines = 3,
             label = { Text(stringResource(R.string.studio_id_size), color = PaperDim) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(open) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 4.dp)
                 .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled),
+            shape = FieldShape,
             colors = darkroomTextFieldColors(),
         )
         val menuMaxHeight = with(LocalDensity.current) {
@@ -214,16 +227,26 @@ private fun IdPhotoSizeDropdown(
             expanded = open,
             onDismissRequest = { open = false },
             modifier = Modifier.heightIn(max = menuMaxHeight),
+            shape = PanelShape,
         ) {
             ID_PHOTO_PRESETS.forEach { preset ->
                 val count = idPhotoLayout(preset).count
+                val current = preset.id == selected.id
                 DropdownMenuItem(
+                    // The current size is marked by a check and announced as selected, not by
+                    // the Amber text alone.
+                    modifier = Modifier.semantics { this.selected = current },
+                    trailingIcon = if (current) {
+                        { Icon(Icons.Outlined.Check, contentDescription = null, tint = Amber) }
+                    } else {
+                        null
+                    },
                     text = {
                         Column(Modifier.padding(vertical = 4.dp)) {
                             Text(
                                 "${idPresetMm(preset)} mm · " +
                                     pluralStringResource(R.plurals.studio_id_per_sheet, count, count),
-                                color = if (preset.id == selected.id) Amber else Paper,
+                                color = if (current) Amber else Paper,
                                 fontSize = 14.sp,
                                 lineHeight = 19.sp,
                             )
@@ -268,24 +291,26 @@ internal fun IdMaskJobRow(job: IdMaskJobUi, elsewhere: String?) {
                         stringResource(R.string.studio_id_cutting)
                     },
                     color = Paper,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Medium,
                 )
                 Text(
                     listOfNotNull(job.ui.phaseLabel.ifBlank { null }, job.ui.detail)
                         .joinToString(" · "),
                     color = PaperDim,
                     fontSize = 12.sp,
-                    lineHeight = 16.sp,
+                    lineHeight = 18.sp,
                 )
             }
-            GhostButton(
+            TonalButton(
                 stringResource(R.string.common_cancel),
                 fillMaxWidth = false,
+                modifier = Modifier.padding(start = 12.dp),
                 onClick = job.onCancel,
             )
         }
-        AmberTrack(ui = job.ui, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+        AmberTrack(ui = job.ui, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
     }
 }
 
@@ -340,14 +365,17 @@ internal fun IdPhotoProcessSection(
                 onCheckedChange = onLocalChange,
             )
             if (idShowNeedKey(local = local, keySet = keySet)) {
-                Text(
-                    stringResource(R.string.grok_need_key),
-                    color = Amber,
+                NoticeCard(
+                    text = stringResource(R.string.grok_need_key),
                     modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+                    actions = {
+                        TonalButton(
+                            stringResource(R.string.nav_settings),
+                            fillMaxWidth = false,
+                            onClick = onOpenSettings,
+                        )
+                    },
                 )
-                TextButton(onClick = onOpenSettings) {
-                    Text(stringResource(R.string.nav_settings), color = Amber)
-                }
             }
         }
         PaperButton(
@@ -369,7 +397,7 @@ internal fun IdPhotoProcessSection(
         }
         // Tied to the stored record, not to the on-screen error above (EDID040-R09).
         if (onViewCutoutResult != null) {
-            GhostButton(
+            TonalButton(
                 stringResource(R.string.studio_id_view_cutout_result),
                 fillMaxWidth = false,
                 onClick = onViewCutoutResult,
@@ -382,7 +410,10 @@ internal fun IdPhotoProcessSection(
             if (!hasMask) {
                 StudioNote(stringResource(R.string.studio_id_need_mask), topPadding = 0)
             }
-            Column(Modifier.fillMaxWidth().selectableGroup()) {
+            Column(
+                Modifier.fillMaxWidth().selectableGroup(),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
                 IdBackground.entries.forEach { option ->
                     IdBackgroundOption(
                         option = option,
@@ -400,15 +431,14 @@ internal fun IdPhotoProcessSection(
             SectionLabel(stringResource(R.string.studio_id_feather))
             FlowRow(
                 Modifier.fillMaxWidth().selectableGroup(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 IdFeather.entries.forEach { option ->
-                    IdFeatherChip(
-                        label = stringResource(idFeatherLabelRes(option)),
+                    SelectPill(
                         selected = hasMask && option == feather,
-                        enabled = featherEnabled,
+                        label = stringResource(idFeatherLabelRes(option)),
                         onClick = { onFeather(option) },
+                        enabled = featherEnabled,
                     )
                 }
             }
@@ -440,9 +470,19 @@ private fun IdMaskOffsetSlider(value: Int, enabled: Boolean, onCommit: (Int) -> 
             Text(
                 stringResource(R.string.studio_id_mask_offset),
                 color = if (enabled) Paper else PaperDim,
-                modifier = Modifier.weight(1f),
+                fontSize = 15.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f).padding(end = 12.dp),
             )
-            Text(valueText, color = if (enabled) Amber else PaperDim)
+            // A pixel count: a technical value, so monospace.
+            Text(
+                valueText,
+                color = if (enabled) Amber else PaperDim,
+                fontFamily = MonoFont,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+            )
         }
         Slider(
             value = drag ?: value.toFloat(),
@@ -454,7 +494,7 @@ private fun IdMaskOffsetSlider(value: Int, enabled: Boolean, onCommit: (Int) -> 
             valueRange = -ID_MASK_OFFSET_MAX_PX.toFloat()..ID_MASK_OFFSET_MAX_PX.toFloat(),
             steps = 2 * ID_MASK_OFFSET_MAX_PX - 1,
             enabled = enabled,
-            colors = SliderDefaults.colors(thumbColor = Amber, activeTrackColor = Amber),
+            colors = darkroomSliderColors(),
             modifier = Modifier.fillMaxWidth().semantics { stateDescription = valueText },
         )
         StudioNote(stringResource(R.string.studio_id_mask_offset_note), topPadding = 0)
@@ -463,7 +503,8 @@ private fun IdMaskOffsetSlider(value: Int, enabled: Boolean, onCommit: (Int) -> 
 
 /**
  * One palette row: swatch, name and use. The row is one radio button for TalkBack, which reads
- * the name, the use and the selected state together (EDID040-R04).
+ * the name, the use and the selected state together (EDID040-R04). A 14dp-radius row; the
+ * selected one is filled AmberSoft with an Amber name (6.10:1 over Surface1).
  */
 @Composable
 private fun IdBackgroundOption(
@@ -473,13 +514,18 @@ private fun IdBackgroundOption(
     onClick: () -> Unit,
 ) {
     val state = stringResource(if (selected) R.string.a11y_state_selected else R.string.a11y_state_not_selected)
-    val shape = RoundedCornerShape(2.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .clip(shape)
-            .background(if (selected) Amber.copy(alpha = if (enabled) 0.18f else 0.08f) else Color.Transparent)
+            .clip(FieldShape)
+            .background(
+                when {
+                    !selected -> Color.Transparent
+                    enabled -> AmberSoft
+                    else -> AmberSoft.copy(alpha = AmberSoft.alpha / 2f)
+                },
+            )
             .selectable(
                 selected = selected,
                 enabled = enabled,
@@ -487,7 +533,7 @@ private fun IdBackgroundOption(
                 onClick = onClick,
             )
             .semantics(mergeDescendants = true) { stateDescription = state }
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IdSwatch(option, enabled = enabled, selected = selected)
@@ -495,24 +541,31 @@ private fun IdBackgroundOption(
         Column(Modifier.weight(1f)) {
             Text(
                 stringResource(idBackgroundNameRes(option)),
-                color = if (enabled) Paper else PaperDim,
+                color = if (enabled && selected) Amber else if (enabled) Paper else PaperDim,
                 fontSize = 14.sp,
-                lineHeight = 19.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
             )
             Text(
                 stringResource(idBackgroundUseRes(option)),
-                color = PaperDim,
+                // PaperDim on the selected AmberSoft fill is 4.46:1 over Surface1, under the text
+                // minimum; Paper at 62% is 5.24:1 there.
+                color = if (selected && enabled) Paper.copy(alpha = 0.62f) else PaperDim,
                 fontSize = 12.sp,
-                lineHeight = 16.sp,
+                lineHeight = 18.sp,
             )
         }
     }
 }
 
-/** Colour chip; "original" is drawn as a struck-through empty chip, never by colour alone. */
+/**
+ * Round colour chip; "original" is drawn as a struck-through empty chip, never by colour alone.
+ * The 1dp PaperFaint ring keeps dark swatches (navy) visible on the dark panel; selected, it is
+ * a 2dp Amber ring.
+ */
 @Composable
 private fun IdSwatch(option: IdBackground, enabled: Boolean, selected: Boolean) {
-    val shape = RoundedCornerShape(2.dp)
+    val shape = CircleShape
     val alpha = if (enabled) 1f else 0.45f
     Box(
         Modifier
@@ -527,33 +580,6 @@ private fun IdSwatch(option: IdBackground, enabled: Boolean, selected: Boolean) 
                 drawLine(stroke, Offset(size.width * 0.2f, size.height * 0.8f), Offset(size.width * 0.8f, size.height * 0.2f), 2.dp.toPx())
             }
         }
-    }
-}
-
-@Composable
-private fun IdFeatherChip(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(2.dp)
-    Box(
-        modifier = Modifier
-            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .clip(shape)
-            .background(if (selected) Amber.copy(alpha = if (enabled) 0.9f else 0.4f) else Color.Transparent)
-            .then(if (selected) Modifier else Modifier.border(1.dp, PaperFaint, shape))
-            .selectable(
-                selected = selected,
-                enabled = enabled,
-                role = Role.RadioButton,
-                onClick = onClick,
-            )
-            .padding(horizontal = 14.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            color = if (selected) Ink else if (enabled) Paper else PaperDim,
-            fontSize = 13.sp,
-            lineHeight = 18.sp,
-        )
     }
 }
 
@@ -596,7 +622,7 @@ internal fun IdCutoutResultViewer(failure: IdMaskFailure, onDismiss: () -> Unit)
         Column(
             Modifier
                 .fillMaxSize()
-                .background(Ink)
+                .background(Room)
                 .systemBarsPadding()
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -611,6 +637,7 @@ internal fun IdCutoutResultViewer(failure: IdMaskFailure, onDismiss: () -> Unit)
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
+                        .clip(PhotoShape)
                         .background(Color.Black),
                 )
             } else {
@@ -637,9 +664,10 @@ internal fun IdCutoutResultViewer(failure: IdMaskFailure, onDismiss: () -> Unit)
                     stringResource(R.string.studio_id_cutout_result_at, whenText),
                     color = PaperDim,
                     fontSize = 12.sp,
+                    lineHeight = 18.sp,
                 )
             }
-            GhostButton(stringResource(R.string.studio_id_failed_mask_close), onClick = onDismiss)
+            TonalButton(stringResource(R.string.studio_id_failed_mask_close), onClick = onDismiss)
         }
     }
 }
