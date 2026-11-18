@@ -39,6 +39,7 @@
     <string name="phase_generate_saving">保存中</string>
     <string name="phase_generate_uploading">上传照片</string>
     <string name="phase_generate_processing">处理</string>
+    <string name="phase_generate_segmenting">识别人像</string>
     <string name="phase_generate_downloading">下载</string>
     <string name="phase_generate_done">完成</string>
     <string name="phase_generate_error">出错</string>

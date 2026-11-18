@@ -143,7 +143,7 @@
     <string name="preset_none">処理しない</string>
     <string name="presets_eyebrow">プリセット</string>
     <string name="presets_title">AI プリセット</string>
-    <string name="presets_desc">ポートレート補正と AI クリエイティブ。ギャラリー、印刷、受信後の自動印刷は最後に選んだプリセットを共有します。</string>
+    <string name="presets_desc">ポートレート補正と AI クリエイティブ。ギャラリーと印刷は最後に選んだプリセットを共有し、受信後の自動レタッチは設定で別に選んだプリセットを使います。</string>
     <string name="default_preset">既定のプリセット</string>
     <string name="default_badge">既定</string>
     <string name="add_preset">プリセットを追加</string>
@@ -174,6 +174,7 @@
     <string name="settings_automation_blocked_edit">AI レタッチはスキップされます:</string>
     <string name="settings_automation_blocked_print">印刷はまだ実行できません:</string>
     <string name="settings_automation_preset">自動レタッチのプリセット</string>
+    <string name="settings_automation_preset_hint">受信後の自動レタッチ専用です。スタジオとプリセット一覧の既定プリセットには影響されません。</string>
     <string name="settings_watermark">透かし</string>
     <string name="settings_watermark_sns">SNS 透かし</string>
     <string name="settings_watermark_date">日付透かし</string>

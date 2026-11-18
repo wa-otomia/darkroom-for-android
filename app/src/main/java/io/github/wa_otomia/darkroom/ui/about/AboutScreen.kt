@@ -42,12 +42,15 @@ import io.github.wa_otomia.darkroom.ui.theme.PaperHairline
 import io.github.wa_otomia.darkroom.ui.theme.Room
 
 private const val APACHE_2 = "Apache License 2.0"
+private const val MLKIT_TERMS = "ML Kit Terms of Service"
+private const val ANDROID_SDK_LICENSE = "Android Software Development Kit License"
 
 private data class Component(val name: String, val license: String)
 
 /**
- * Every shipped third-party component and its license. Mirrors `gradle/libs.versions.toml`;
- * update both together when a dependency is added or removed.
+ * Every shipped third-party component and its license. Mirrors `gradle/libs.versions.toml` and
+ * `THIRD-PARTY-NOTICES.md`; update all three together when a dependency is added or removed, and
+ * name each license as it is, not as Apache 2.0 (SYPM040-R03).
  */
 private val COMPONENTS = listOf(
     Component("Kotlin Standard Library — JetBrains", APACHE_2),
@@ -65,6 +68,12 @@ private val COMPONENTS = listOf(
     Component("OkHttp — Square", APACHE_2),
     Component("Okio — Square", APACHE_2),
     Component("Coil — Coil Contributors", APACHE_2),
+    Component("ML Kit Selfie Segmentation (MediaPipe runtime) — Google", MLKIT_TERMS),
+    Component("Google Play services client libraries (base, basement, tasks) — Google", ANDROID_SDK_LICENSE),
+    Component("ODML Image — Google", ANDROID_SDK_LICENSE),
+    Component("Firebase Components and Encoders — Google", APACHE_2),
+    Component("Android Data Transport — Google", APACHE_2),
+    Component("AndroidX AppCompat and Fragment (via ML Kit) — Google", APACHE_2),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -118,6 +127,7 @@ fun AboutScreen(onBack: () -> Unit) {
 
             SectionLabel(stringResource(R.string.about_privacy_title))
             Paragraph(stringResource(R.string.about_privacy_ai))
+            Paragraph(stringResource(R.string.about_privacy_local_cutout))
             Paragraph(stringResource(R.string.about_privacy_ftp))
             Paragraph(stringResource(R.string.about_privacy_storage))
             Paragraph(stringResource(R.string.about_privacy_local))

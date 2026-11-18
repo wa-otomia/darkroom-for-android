@@ -87,6 +87,7 @@ private const val PROMPT_MAX = 4000
 @Composable
 fun PresetsScreen(settings: SettingsRepository) {
     val store by settings.presets.collectAsState()
+    val autoEditPresetId by settings.autoEditPreset.collectAsState()
     var title by rememberSaveable { mutableStateOf("") }
     var prompt by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("custom") }
@@ -240,6 +241,7 @@ fun PresetsScreen(settings: SettingsRepository) {
                     PresetCard(
                         preset = preset,
                         isDefault = store.lastSelectedId == preset.id,
+                        isAutoEdit = autoEditPresetId == preset.id,
                         canRestore = builtin && differsFromSeed(preset),
                         canDelete = !builtin,
                         menuOpen = menuFor == preset.id,
@@ -366,7 +368,19 @@ fun PresetsScreen(settings: SettingsRepository) {
         AlertDialog(
             onDismissRequest = { pendingDeleteId = null },
             title = { Text(stringResource(R.string.delete_preset_title)) },
-            text = { Text(pendingDelete.title) },
+            text = {
+                Column {
+                    Text(pendingDelete.title)
+                    // AIPS030-R04: warn only when import automation uses this preset.
+                    if (pendingDelete.id == autoEditPresetId) {
+                        Text(
+                            stringResource(R.string.lib_presets_delete_auto_edit_warning),
+                            color = PaperDim,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     runCatching { settings.deletePreset(pendingDelete.id) }
@@ -439,10 +453,12 @@ private fun CountedField(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PresetCard(
     preset: AiPreset,
     isDefault: Boolean,
+    isAutoEdit: Boolean,
     canRestore: Boolean,
     canDelete: Boolean,
     menuOpen: Boolean,
@@ -517,11 +533,18 @@ private fun PresetCard(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 4.dp, end = 8.dp),
         )
-        DefaultMarker(
-            isDefault = isDefault,
-            onSetDefault = onSetDefault,
+        // FlowRow so the two markers wrap under large font scales instead of clipping.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(top = 6.dp),
-        )
+        ) {
+            DefaultMarker(isDefault = isDefault, onSetDefault = onSetDefault)
+            // Read-only (AIPS030-R04): no click or semantics action; its text merges into the card for TalkBack.
+            // Min height only while shown, so a hidden badge never adds an empty wrapped line.
+            Box(Modifier.heightIn(min = if (isAutoEdit) 48.dp else 0.dp), contentAlignment = Alignment.CenterStart) {
+                StatusBadge(visible = isAutoEdit, text = stringResource(R.string.lib_presets_auto_edit_badge))
+            }
+        }
     }
 }
 

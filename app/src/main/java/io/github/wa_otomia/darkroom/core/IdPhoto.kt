@@ -29,6 +29,8 @@ data class IdPhotoPreset(val id: String, val widthMm: Double, val heightMm: Doub
 /** Built-in sizes. Order and ids are stable: they are stored and shown in this order. */
 val ID_PHOTO_PRESETS: List<IdPhotoPreset> = listOf(
     IdPhotoPreset("35x45", 35.0, 45.0),
+    IdPhotoPreset("kr-visa", 35.0, 45.0),
+    IdPhotoPreset("jp-visa", 45.0, 45.0),
     IdPhotoPreset("33x48", 33.0, 48.0),
     IdPhotoPreset("25x35", 25.0, 35.0),
     IdPhotoPreset("22x32", 22.0, 32.0),
@@ -363,6 +365,9 @@ fun idBackground(id: String?): IdBackground {
 
 val DEFAULT_ID_BACKGROUND_AFTER_MASK = IdBackground.NAVY
 
+/** "本地抠图" starts off (EDID040-R10): AI cut-out stays the default. */
+const val DEFAULT_ID_PHOTO_LOCAL_CUTOUT = false
+
 enum class IdFeather(val id: String, val radiusMm: Double) {
     NONE("none", 0.0),
     WEAK("weak", 0.1),
@@ -394,6 +399,10 @@ data class IdPhotoState(
     val background: String = IdBackground.ORIGINAL.id,
     val feather: String = IdFeather.WEAK.id,
     val maskRev: String? = null,
+    /** Shrink the mask by the feather radius before smoothing, so the blend stays inside (EDID040-R07). */
+    val featherInward: Boolean = true,
+    /** Mask edge shift in print px, −10 (inward) to +10 (outward), applied before the feather (EDID040-R14). */
+    val maskOffset: Int = 0,
 ) {
     val pose: IdPhotoPose get() = IdPhotoPose(zoom, panX, panY, rotation)
 
@@ -413,10 +422,25 @@ data class IdPhotoState(
         background = idBackground(background).id,
         feather = idFeather(feather).id,
         maskRev = maskRev?.trim()?.takeIf { it.isNotEmpty() },
+        featherInward = featherInward,
+        maskOffset = idMaskOffset(maskOffset),
     )
 }
 
 fun PhotoMeta.idPhotoFor(source: String?): IdPhotoState? = idPhotos[framingVersionKey(source)]
+
+/** Whether the version [source] (the original or one of [PhotoMeta.edits]) still exists. */
+fun PhotoMeta.hasVersion(source: String?): Boolean {
+    val key = framingVersionKey(source)
+    return key == ORIGINAL_VERSION_ID || edits.any { it.id == key }
+}
+
+/**
+ * Names of `idmask-failed/<photoId>` folders whose photo has no catalog row: a reply kept for a
+ * photo that has since been deleted (EDID040-R09).
+ */
+fun orphanIdMaskFailureDirs(dirNames: Collection<String>, knownIds: Set<String>): List<String> =
+    dirNames.filter { it !in knownIds }
 
 /**
  * A version's ID state after a Studio save of its toggle, size and pose (EDID010-R03), or null to
@@ -520,18 +544,111 @@ const val ID_MASK_MSG_UNDECODABLE = "抠图失败：无法解码返回图"
 const val ID_MASK_MSG_NEED_KEY = "抠图失败：未配置 AI 密钥"
 const val ID_MASK_MSG_VERSION_GONE = "抠图失败：该版本已删除"
 const val ID_MASK_MSG_MISSING = "证件照蒙版缺失或损坏"
+const val ID_MASK_MSG_BACKGROUND_KEPT = "抠图失败：返回图保留了原背景，不是蒙版"
+const val ID_MASK_MSG_SHADED = "抠图失败：返回图是带明暗的灰度图，不是蒙版"
+
+/** On-device cut-out failure (EDID040-R11); the thrown message adds "：<exception class>". */
+const val ID_MASK_MSG_LOCAL_FAILED = "本地抠图失败"
+
+// ---------------------------------------------------------------------------------------------
+// Failed cut-out record (EDID040-R09)
+// ---------------------------------------------------------------------------------------------
+
+/** Longest failure reason kept with a failed cut-out. */
+const val ID_MASK_FAILURE_MESSAGE_MAX = 500
+
+/**
+ * What a version keeps after a mask job fails for any reason but a user cancel: the sanitized
+ * reason, when it failed (epoch ms), whether the reply bytes were kept next to it and whether the
+ * job was an on-device cut-out ([local], EDID040-R11; absent in older records, read as false).
+ * Stored as `idmask-failed/<photoId>/<versionKey>.json` in the app cache; its presence is the record.
+ */
+@Serializable
+data class IdMaskFailureRecord(
+    val message: String,
+    val at: Long,
+    val hasImage: Boolean,
+    val local: Boolean = false,
+)
+
+/** [message] with secrets redacted (AIPV040-R03), trimmed and cut to [ID_MASK_FAILURE_MESSAGE_MAX] chars. */
+fun idMaskFailureMessage(message: String?): String {
+    val clean = sanitizeAiSecrets(message.orEmpty()).trim()
+    if (clean.length <= ID_MASK_FAILURE_MESSAGE_MAX) return clean
+    // Never leave half of a surrogate pair at the cut.
+    val end = if (Character.isHighSurrogate(clean[ID_MASK_FAILURE_MESSAGE_MAX - 1])) {
+        ID_MASK_FAILURE_MESSAGE_MAX - 1
+    } else {
+        ID_MASK_FAILURE_MESSAGE_MAX
+    }
+    return clean.substring(0, end)
+}
+
+/**
+ * The reply bytes a failed cut-out keeps: any reply that arrived, as is, whatever went wrong
+ * after it (undecodable, wrong aspect, not a matte, version gone). Null when none arrived.
+ */
+fun idMaskFailureReply(reply: ByteArray?): ByteArray? = reply?.takeIf { it.isNotEmpty() }
+
+/**
+ * True when a cut-out job that threw [error] ends as a user cancel (no failure record): the
+ * error is a cancellation, or the job was already cancelled ([jobActive] false). A cancel that
+ * lands while a reply is decoded can surface as the decode's own error instead of a
+ * cancellation, so the job's state decides (EDID040-R09).
+ */
+fun idMaskEndsAsCancel(error: Throwable, jobActive: Boolean): Boolean =
+    error is kotlin.coroutines.cancellation.CancellationException || !jobActive
+
+/**
+ * The record of a failed cut-out with [message], at [at], given the [reply] bytes received;
+ * [local] when the job ran on device.
+ */
+fun idMaskFailureRecord(message: String?, reply: ByteArray?, at: Long, local: Boolean = false): IdMaskFailureRecord =
+    IdMaskFailureRecord(idMaskFailureMessage(message), at, idMaskFailureReply(reply) != null, local)
+
+private val idMaskFailureJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
+fun encodeIdMaskFailureRecord(record: IdMaskFailureRecord): String =
+    idMaskFailureJson.encodeToString(IdMaskFailureRecord.serializer(), record)
+
+/** The stored record, or null when [raw] is missing, not JSON or lacks a field. */
+fun parseIdMaskFailureRecord(raw: String?): IdMaskFailureRecord? {
+    if (raw.isNullOrBlank()) return null
+    val record = runCatching { idMaskFailureJson.decodeFromString(IdMaskFailureRecord.serializer(), raw) }
+        .getOrNull() ?: return null
+    // Re-cleaned on read: the file is outside the app's control once written.
+    return record.copy(message = idMaskFailureMessage(record.message))
+}
 
 // ---------------------------------------------------------------------------------------------
 // AI mask request (AIPV030-R04)
 // ---------------------------------------------------------------------------------------------
 
-/** Fixed instruction for the matte request. Presets and extra prompts never join it. */
+/**
+ * Fixed instruction for the matte request (AIPV030-R04). Presets and extra prompts never join it.
+ * One sentence per literal, joined by exactly one space.
+ */
 const val ID_PHOTO_MASK_PROMPT: String =
-    "Create a pure black-and-white segmentation matte of this photo. " +
-        "Paint the person pure white (#FFFFFF): the whole head, hair, ears, neck, shoulders and clothing. " +
-        "Paint everything else pure black (#000000), including the background and any solid border or padding. " +
-        "Keep exactly the same image size, framing and composition as the input. " +
-        "Do not crop, shift, resize or add anything. No grey shading, colours, text or other content."
+    "Task: produce an alpha matte for replacing the background of a portrait or ID photo. " +
+        "This is a segmentation task, not a photo edit: do not relight, recolour, restyle or re-render the photo. " +
+        "Output only the matte, at exactly the same width, height, framing and composition as the input; " +
+        "do not crop, pad, shift, rotate, resize or redraw anything, so that every matte pixel lines up with the same pixel of the input. " +
+        "Foreground is the main person only: hair, face, ears, neck, shoulders, arms and hands if visible, " +
+        "worn clothing and worn accessories such as glasses, earrings, hats and headscarves. " +
+        "Background is everything else, even where it touches or overlaps the person: walls, floors, ceilings, sky, doors, windows, " +
+        "furniture including chairs, chair backs, headrests, sofas and cushions, shelves, hanging clothes and coats, bags, objects, " +
+        "other people, shadows cast on the background, and any border or padding. " +
+        "Background seen through gaps in the person is background too: between hair strands and locks, inside curls and loose ends, " +
+        "between the hair and the face, neck or shoulders, and between the arms and the body. " +
+        "Paint the background pure black (#000000), even where it is white or light-coloured in the photo and even inside those gaps. " +
+        "Paint the person as one flat, solid, pure white (#FFFFFF) silhouette with no shading, lighting, gradients, texture, " +
+        "facial features or outlines inside it; eyes, mouth, glasses, hair texture and clothing details must not be visible. " +
+        "Keep the edge tight to the person, with no glow, halo or margin around it. " +
+        "Only where fine hair strands or flyaways overlap the background, use grey levels to show partial transparency " +
+        "(lighter means more hair, darker means more background); only dense hair with no background showing through " +
+        "stays solid white, and everywhere else make a clean, sharp edge. " +
+        "If no person is visible, return an all-black image. " +
+        "Use only black, white and that grey hair transition: no colours, text, watermarks or other content."
 
 val OPENAI_MASK_CANVASES: List<Pair<Int, Int>> = listOf(1024 to 1024, 1536 to 1024, 1024 to 1536)
 

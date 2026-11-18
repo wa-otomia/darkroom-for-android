@@ -13,6 +13,8 @@
     <string name="studio_id_mask_missing">오려내기 마스크가 없습니다. 다시 오려내거나 원래 배경을 선택하세요.</string>
 
     <string name="studio_id_preset_35x45">ICAO 표준: 솅겐/EU, 영국, 호주, 싱가포르, 일본·한국 여권 등</string>
+    <string name="studio_id_preset_kr_visa">한국 비자</string>
+    <string name="studio_id_preset_jp_visa">일본 비자(주중 일본 대사관·총영사관)</string>
     <string name="studio_id_preset_33x48">중국 여권·비자</string>
     <string name="studio_id_preset_25x35">중국 1촌 (이력서, 증명서, 원서)</string>
     <string name="studio_id_preset_22x32">중국 소1촌 (운전면허 등)</string>
@@ -29,6 +31,9 @@
     <string name="studio_id_explain">AI는 인물 마스크만 만듭니다. 인물의 픽셀은 모두 원본 사진 그대로이며, 배경은 이 기기에서 바꿉니다. 이 버전의 사진 전체가 설정에서 지정한 AI 서비스로 업로드됩니다.</string>
     <string name="studio_id_cutout">AI로 인물 오려내기</string>
     <string name="studio_id_recut">다시 오려내기</string>
+    <string name="studio_id_cutout_local">기기에서 인물 오려내기</string>
+    <string name="studio_id_local_cutout">기기에서 오려내기</string>
+    <string name="studio_id_local_explain">이 기기에서 Google ML Kit로 인물을 오려냅니다. 사진과 결과는 업로드되지 않으며 API 키가 필요 없습니다. 머리카락 등 가장자리는 AI 오려내기보다 거칠 수 있습니다.</string>
     <string name="studio_id_cutting">오려내는 중…</string>
     <string name="studio_id_cutting_other">다른 버전(%1$s)을 오려내는 중…</string>
     <string name="studio_id_mask_ready">오려내기 완료</string>
@@ -57,6 +62,22 @@
     <string name="studio_id_feather_weak">약하게</string>
     <string name="studio_id_feather_medium">중간</string>
     <string name="studio_id_feather_strong">강하게</string>
+    <string name="studio_id_feather_inward">안쪽으로 부드럽게</string>
+    <string name="studio_id_mask_offset">마스크 범위 축소/확장</string>
+    <string name="studio_id_mask_offset_note">음수는 마스크를 안쪽으로 줄이고 양수는 바깥쪽으로 넓힙니다. 단위는 인화지 픽셀(1 px ≈ 0.05 mm)이며 가장자리를 부드럽게 하기 전에 적용됩니다.</string>
+    <string name="studio_id_compositing">새 배경을 합성하는 중…</string>
+
+    <!-- Last failed cut-out viewer (EDID040-R09) -->
+    <string name="studio_id_view_cutout_result">이번 오려내기 결과 보기</string>
+    <string name="studio_id_cutout_result_title">이번 오려내기 결과</string>
+    <string name="studio_id_cutout_result_no_image">AI가 사용할 수 있는 이미지를 반환하지 않았습니다.</string>
+    <string name="studio_id_cutout_result_no_image_local">기기에서 오려내기로 이미지를 만들지 못했습니다.</string>
+    <string name="studio_id_cutout_result_at">실패 시각: %1$s</string>
+    <string name="studio_id_failed_mask_close">닫기</string>
+
+    <!-- On/off state of square switch chips (ID photo) -->
+    <string name="studio_toggle_on">켜짐</string>
+    <string name="studio_toggle_off">꺼짐</string>
 
     <!-- 출력 탭 -->
     <string name="studio_id_preset_print_off">증명사진 모드에서는 \'프리셋으로 편집 후 대기열에 추가\'를 사용할 수 없습니다.</string>
@@ -71,4 +92,7 @@
     <string name="id_error_mask_version_gone">오려내기 결과를 버렸습니다: 이 버전이 삭제되었습니다.</string>
     <string name="id_error_mask_missing">증명사진 마스크가 없거나 손상되었습니다. 다시 오려내거나 원래 배경을 선택하세요.</string>
     <string name="id_error_mask_save">오려내기 마스크를 저장하지 못했습니다. 남은 저장 공간을 확인한 뒤 다시 시도하세요.</string>
+    <string name="id_error_mask_background_kept">오려내기 실패: 결과에 원래 배경이 남아 있어 마스크가 아닙니다.</string>
+    <string name="id_error_mask_shaded">오려내기 실패: 결과가 음영이 있는 흑백 이미지라 마스크가 아닙니다.</string>
+    <string name="id_error_mask_local_failed">기기에서 오려내지 못했습니다. 다시 시도하거나 \'기기에서 오려내기\'를 끄고 AI를 사용하세요.</string>
 </resources>

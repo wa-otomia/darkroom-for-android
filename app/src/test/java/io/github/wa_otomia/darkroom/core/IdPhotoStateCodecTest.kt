@@ -40,6 +40,7 @@ class IdPhotoStateCodecTest {
         assertEquals("original", s.background)
         assertEquals("weak", s.feather)
         assertNull(s.maskRev)
+        assertTrue(s.featherInward)
         assertFalse(s.hasMask)
         assertEquals(IdPhotoPose(), s.pose)
         val moved = s.withPose(IdPhotoPose(1.3f, 0.2f, -0.1f, 270f))
@@ -80,6 +81,25 @@ class IdPhotoStateCodecTest {
         assertEquals(MIN_PRINT_ZOOM, IdPhotoState(zoom = 0.1f).normalized().zoom, 0f)
         assertEquals(0f, IdPhotoState(rotation = Float.NaN).normalized().rotation, 0f)
         assertEquals(idOriginal, idOriginal.normalized())
+        assertFalse(IdPhotoState(featherInward = false).normalized().featherInward)
+        assertTrue(IdPhotoState(featherInward = true).normalized().featherInward)
+    }
+
+    @Test
+    fun featherInwardDefaultsOnAndRoundTrips() {
+        // Legacy idPhoto JSON without the field reads as inward.
+        val legacy = """{"e1":{"idPhoto":{"active":true,"presetId":"25x35","background":"white","feather":"strong","maskRev":"abc"}}}"""
+        val (_, old) = decodeVersionStates(legacy)
+        assertTrue(old.getValue("e1").featherInward)
+        val off = IdPhotoState(active = true, presetId = "jp-visa", background = "white", maskRev = "r1", featherInward = false)
+        val raw = encodeVersionStates(emptyMap(), mapOf("e1" to off))
+        assertTrue(raw.contains("\"featherInward\":false"))
+        val (_, back) = decodeVersionStates(raw)
+        assertEquals(off, back["e1"])
+        // A pose save leaves the switch as stored.
+        val merged = mergeIdPhotoPose(off, active = false, presetId = "kr-visa", pose = IdPhotoPose(), createIfMissing = false)!!
+        assertFalse(merged.featherInward)
+        assertEquals("kr-visa", merged.presetId)
     }
 
     @Test
@@ -260,5 +280,20 @@ class IdPhotoStateCodecTest {
         assertEquals(idOriginal.background, merged.background)
         assertEquals(idOriginal.feather, merged.feather)
         assertEquals(idOriginal.maskRev, merged.maskRev)
+    }
+
+    @Test
+    fun hasVersionCoversOriginalAndExistingEditsOnly() {
+        val withEdit = photo().copy(edits = listOf(EditRecord("e1", "p", "c", "e1.jpg")))
+        assertTrue(withEdit.hasVersion(ORIGINAL_VERSION_ID))
+        assertTrue(withEdit.hasVersion("e1"))
+        assertFalse(withEdit.hasVersion("e2"))
+        assertFalse(photo().hasVersion("e1"))
+    }
+
+    @Test
+    fun orphanFailureDirsAreThoseWithoutARow() {
+        assertEquals(listOf("gone"), orphanIdMaskFailureDirs(listOf("p", "gone"), setOf("p", "q")))
+        assertEquals(emptyList<String>(), orphanIdMaskFailureDirs(emptyList(), setOf("p")))
     }
 }

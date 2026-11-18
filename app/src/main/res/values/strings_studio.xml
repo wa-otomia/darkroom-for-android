@@ -39,6 +39,7 @@
     <string name="phase_generate_saving">Saving</string>
     <string name="phase_generate_uploading">Uploading photo</string>
     <string name="phase_generate_processing">Processing</string>
+    <string name="phase_generate_segmenting">Finding the person</string>
     <string name="phase_generate_downloading">Downloading</string>
     <string name="phase_generate_done">Done</string>
     <string name="phase_generate_error">Error</string>

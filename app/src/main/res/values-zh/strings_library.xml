@@ -39,10 +39,12 @@
     <string name="lib_io_refresh_hosts">刷新地址</string>
 
     <!-- 预设 -->
-    <string name="lib_presets_default_current">当前使用：%1$s</string>
+    <string name="lib_presets_default_current">当前默认：%1$s</string>
     <string name="lib_presets_default_none">无</string>
     <string name="lib_presets_default_clear">清除默认预设</string>
     <string name="lib_presets_default_hint">请在下方预设卡片上设置默认预设。</string>
+    <string name="lib_presets_auto_edit_badge">自动修图</string>
+    <string name="lib_presets_delete_auto_edit_warning">收图后自动修图正在使用此预设。删除后自动修图会跳过，直到你在设置中另选预设。</string>
     <string name="lib_presets_char_count">%1$d / %2$d</string>
     <string name="lib_presets_category">分类</string>
     <string name="lib_presets_discard_title">放弃当前草稿？</string>

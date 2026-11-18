@@ -39,10 +39,12 @@
     <string name="lib_io_refresh_hosts">アドレスを更新</string>
 
     <!-- プリセット -->
-    <string name="lib_presets_default_current">使用中: %1$s</string>
+    <string name="lib_presets_default_current">現在の既定: %1$s</string>
     <string name="lib_presets_default_none">なし</string>
     <string name="lib_presets_default_clear">既定を解除</string>
     <string name="lib_presets_default_hint">既定は下のプリセットカードで設定します。</string>
+    <string name="lib_presets_auto_edit_badge">自動レタッチ</string>
+    <string name="lib_presets_delete_auto_edit_warning">受信後の自動レタッチがこのプリセットを使用しています。削除すると、設定で別のプリセットを選ぶまで自動レタッチはスキップされます。</string>
     <string name="lib_presets_char_count">%1$d / %2$d</string>
     <string name="lib_presets_category">カテゴリ</string>
     <string name="lib_presets_discard_title">下書きを破棄しますか？</string>

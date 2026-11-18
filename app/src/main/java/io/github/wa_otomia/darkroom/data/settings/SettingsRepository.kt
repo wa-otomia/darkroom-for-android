@@ -16,11 +16,13 @@ import io.github.wa_otomia.darkroom.core.PrintFit
 import io.github.wa_otomia.darkroom.core.ProviderSettings
 import io.github.wa_otomia.darkroom.core.PublicAiSettings
 import io.github.wa_otomia.darkroom.core.WatermarkSettings
+import io.github.wa_otomia.darkroom.core.autoEditPresetAfterDelete
 import io.github.wa_otomia.darkroom.core.defaultProviderSettings
 import io.github.wa_otomia.darkroom.core.mergeBuiltinPresets
 import io.github.wa_otomia.darkroom.core.mergeFgsPause
 import io.github.wa_otomia.darkroom.core.mergeProviderSettings
 import io.github.wa_otomia.darkroom.core.newPresetId
+import io.github.wa_otomia.darkroom.core.DEFAULT_ID_PHOTO_LOCAL_CUTOUT
 import io.github.wa_otomia.darkroom.core.normalizeIdPhotoPresetId
 import io.github.wa_otomia.darkroom.core.normalizeAiBaseUrl
 import io.github.wa_otomia.darkroom.core.normalizeAiPresetStore
@@ -28,6 +30,8 @@ import io.github.wa_otomia.darkroom.core.parseGrokResolution
 import io.github.wa_otomia.darkroom.core.parseQuality
 import io.github.wa_otomia.darkroom.core.parsePrintFit
 import io.github.wa_otomia.darkroom.core.printFitWire
+import io.github.wa_otomia.darkroom.core.reconcileAutoEditPresetId
+import io.github.wa_otomia.darkroom.core.resolveAutoEditPresetId
 import io.github.wa_otomia.darkroom.core.seedAiPresets
 import io.github.wa_otomia.darkroom.core.toPublicAi
 import io.github.wa_otomia.darkroom.core.validateAiPresetFields
@@ -72,10 +76,16 @@ class SettingsRepository @Inject constructor(
     val settings: StateFlow<AppSettings> = _settings
     private val _presets = MutableStateFlow(seedAiPresets())
     val presets: StateFlow<AiPresetStore> = _presets
+    // Kept apart from AppSettings and the preset JSON: see autoEditPreset functions below (AUTG040).
+    private val _autoEditPreset = MutableStateFlow(AI_PRESET_NONE)
+    val autoEditPreset: StateFlow<String> = _autoEditPreset
     private val _ai = MutableStateFlow(toPublicAi(AiSettings(AiProvider.GROK, emptyMap())))
     val ai: StateFlow<PublicAiSettings> = _ai
     private val _watermark = MutableStateFlow(WatermarkSettings())
     val watermark: StateFlow<WatermarkSettings> = _watermark
+    // EDID040-R10: app-wide, not per version; resetAll() leaves it alone.
+    private val _idPhotoLocalCutout = MutableStateFlow(DEFAULT_ID_PHOTO_LOCAL_CUTOUT)
+    val idPhotoLocalCutoutFlow: StateFlow<Boolean> = _idPhotoLocalCutout
 
     init {
         if (prefs.getString(KEY_FTP_PASSWORD, "").isNullOrBlank()) {
@@ -96,9 +106,17 @@ class SettingsRepository @Inject constructor(
             val migrateEdit = prefs.getBoolean(KEY_AUTO_PRINT, false) && lastSelectedId != AI_PRESET_NONE
             prefs.edit().putBoolean(KEY_AUTO_EDIT, migrateEdit).apply()
         }
+        // AUTG040-R03/R05: runs after the built-in merge. A missing key migrates from lastSelectedId once;
+        // a saved value (including "" for none) is only validated against the library.
+        val storedAuto = if (prefs.contains(KEY_AUTO_EDIT_PRESET)) prefs.getString(KEY_AUTO_EDIT_PRESET, AI_PRESET_NONE) else null
+        val presetsNow = readPresets()
+        val nextAuto = reconcileAutoEditPresetId(storedAuto, presetsNow.lastSelectedId, presetsNow.presets)
+        if (storedAuto != nextAuto) prefs.edit().putString(KEY_AUTO_EDIT_PRESET, nextAuto).apply()
         _settings.value = readSettings()
         _presets.value = readPresets()
+        _autoEditPreset.value = readAutoEditPreset()
         _watermark.value = readWatermark()
+        _idPhotoLocalCutout.value = idPhotoLocalCutout()
         publishAi()
     }
 
@@ -316,8 +334,11 @@ class SettingsRepository @Inject constructor(
             .putString(KEY_OPENAI_MODELS, "[]")
             .putString(KEY_WATERMARK, json.encodeToString(WatermarkSettings()))
             .remove(KEY_ID_PHOTO_PRESET)
+            // put, not remove: a missing key would migrate from lastSelectedId again on next start (AUTG040-R06).
+            .putString(KEY_AUTO_EDIT_PRESET, AI_PRESET_NONE)
             .apply()
         _settings.value = readSettings()
+        _autoEditPreset.value = readAutoEditPreset()
         _watermark.value = readWatermark()
         publishAi()
     }
@@ -342,11 +363,31 @@ class SettingsRepository @Inject constructor(
         return writePresets(store.copy(lastSelectedId = last))
     }
 
+    /** Effective automation preset (AUTG040-R02): the stored ID resolved against the current library, never a fallback. */
+    fun readAutoEditPreset(): String =
+        resolveAutoEditPresetId(prefs.getString(KEY_AUTO_EDIT_PRESET, AI_PRESET_NONE), readPresets().presets)
+
+    /** Only the Settings automation section calls this (AUTG040-R01). */
+    fun setAutoEditPreset(id: String) {
+        val next = id.trim()
+        if (next.isNotEmpty() && readPresets().presets.none { it.id == next }) error("预设不存在")
+        prefs.edit().putString(KEY_AUTO_EDIT_PRESET, next).apply()
+        _autoEditPreset.value = readAutoEditPreset()
+    }
+
     /** The ID photo size picked last in Studio (EDID010-R02); unknown or unset gives 35×45. */
     fun lastIdPhotoPreset(): String = normalizeIdPhotoPresetId(prefs.getString(KEY_ID_PHOTO_PRESET, null))
 
     fun setLastIdPhotoPreset(id: String) {
         prefs.edit().putString(KEY_ID_PHOTO_PRESET, normalizeIdPhotoPresetId(id)).apply()
+    }
+
+    /** "本地抠图" (EDID040-R10): off unless the user turned it on. Settings reset keeps it. */
+    fun idPhotoLocalCutout(): Boolean = prefs.getBoolean(KEY_ID_PHOTO_LOCAL_CUTOUT, DEFAULT_ID_PHOTO_LOCAL_CUTOUT)
+
+    fun setIdPhotoLocalCutout(on: Boolean) {
+        prefs.edit().putBoolean(KEY_ID_PHOTO_LOCAL_CUTOUT, on).apply()
+        _idPhotoLocalCutout.value = on
     }
 
     fun createPreset(title: String, prompt: String, category: String): AiPresetStore {
@@ -372,12 +413,18 @@ class SettingsRepository @Inject constructor(
         val store = readPresets()
         val next = store.presets.filter { it.id != id }
         if (next.size == store.presets.size) error("预设不存在")
-        return writePresets(
-            store.copy(
-                presets = next,
-                lastSelectedId = if (store.lastSelectedId == id) AI_PRESET_NONE else store.lastSelectedId,
-            ),
+        val nextStore = store.copy(
+            presets = next,
+            lastSelectedId = if (store.lastSelectedId == id) AI_PRESET_NONE else store.lastSelectedId,
         )
+        // One commit for the library and the automation preset (AUTG040-R04).
+        prefs.edit()
+            .putString(KEY_PRESETS, json.encodeToString(nextStore))
+            .putString(KEY_AUTO_EDIT_PRESET, autoEditPresetAfterDelete(readAutoEditPreset(), id))
+            .apply()
+        _presets.value = nextStore
+        _autoEditPreset.value = readAutoEditPreset()
+        return nextStore
     }
 
     companion object {
@@ -418,6 +465,10 @@ class SettingsRepository @Inject constructor(
         private const val KEY_WATERMARK = "watermark"
         private const val KEY_PRESETS = "presets"
         private const val KEY_ID_PHOTO_PRESET = "id_photo_preset"
+        // Boolean, missing = DEFAULT_ID_PHOTO_LOCAL_CUTOUT; not written by resetAll() (EDID040-R10).
+        private const val KEY_ID_PHOTO_LOCAL_CUTOUT = "id_photo_local_cutout"
+        // Missing = never saved (migrate once); "" = none; otherwise a preset ID (AUTG040).
+        private const val KEY_AUTO_EDIT_PRESET = "auto_edit_preset"
 
         fun generatePassword(): String {
             val alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"

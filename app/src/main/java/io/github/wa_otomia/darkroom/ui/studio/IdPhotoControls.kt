@@ -1,5 +1,6 @@
 package io.github.wa_otomia.darkroom.ui.studio
 
+import android.text.format.DateUtils
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -11,12 +12,16 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +30,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -38,6 +45,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
@@ -47,12 +56,23 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import coil.size.Precision
+import coil.size.Scale
+import coil.size.Size
 import io.github.wa_otomia.darkroom.R
+import io.github.wa_otomia.darkroom.data.catalog.IdMaskFailure
+import io.github.wa_otomia.darkroom.core.ID_MASK_OFFSET_MAX_PX
 import io.github.wa_otomia.darkroom.core.ID_PHOTO_PRESETS
 import io.github.wa_otomia.darkroom.core.IdBackground
 import io.github.wa_otomia.darkroom.core.IdFeather
 import io.github.wa_otomia.darkroom.core.IdPhotoLayout
 import io.github.wa_otomia.darkroom.core.IdPhotoPreset
+import io.github.wa_otomia.darkroom.core.idMaskOffset
 import io.github.wa_otomia.darkroom.core.idPhotoLayout
 import io.github.wa_otomia.darkroom.core.idPhotoPreset
 import io.github.wa_otomia.darkroom.core.showsEdgeWarning
@@ -87,6 +107,8 @@ internal fun idSheetLabel(preset: IdPhotoPreset, layout: IdPhotoLayout): String 
 
 @StringRes
 internal fun idPresetPurposeRes(id: String): Int = when (id) {
+    "kr-visa" -> R.string.studio_id_preset_kr_visa
+    "jp-visa" -> R.string.studio_id_preset_jp_visa
     "33x48" -> R.string.studio_id_preset_33x48
     "25x35" -> R.string.studio_id_preset_25x35
     "22x32" -> R.string.studio_id_preset_22x32
@@ -268,31 +290,56 @@ internal fun IdMaskJobRow(job: IdMaskJobUi, elsewhere: String?) {
 }
 
 /**
- * Replaces the AI generate block in ID mode: what the AI does, the cut-out button and its gate,
- * the running job, the last failure, the palette and the feather selector.
- * Side-effect free: every action is a callback.
+ * Replaces the AI generate block in ID mode: what the cut-out does (AI or on this device), the
+ * "cut out on this device" switch row ([local], EDID040-R10), the cut-out button and its gate,
+ * the running job, the last failure, "view this cut-out's result" whenever [onViewCutoutResult]
+ * is set (a failure record exists for the version, EDID040-R09), the palette, the feather
+ * selector, the inward feather switch row below it (EDID040-R07) and the mask edge shift slider
+ * (EDID040-R14).
+ * [compositing] freezes the cut-out button, palette, feather and inward switch while the preview
+ * builds a new composite (EDID040-R08). Side-effect free: every action is a callback.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun IdPhotoProcessSection(
     keySet: Boolean,
+    local: Boolean,
+    localSwitchEnabled: Boolean,
     hasMask: Boolean,
     background: IdBackground,
     feather: IdFeather,
+    featherInward: Boolean,
+    maskOffset: Int,
+    compositing: Boolean,
     canCutOut: Boolean,
     maskJob: IdMaskJobUi?,
     maskJobElsewhere: String?,
     maskError: String?,
     onCutOut: () -> Unit,
+    onLocalChange: (Boolean) -> Unit,
     onOpenSettings: () -> Unit,
     onBackground: (IdBackground) -> Unit,
     onFeather: (IdFeather) -> Unit,
+    onFeatherInward: (Boolean) -> Unit,
+    onMaskOffset: (Int) -> Unit,
+    onViewCutoutResult: (() -> Unit)?,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.fillMaxWidth()) {
             SectionLabel(stringResource(R.string.studio_id_section))
-            StudioNote(stringResource(R.string.studio_id_explain), topPadding = 0)
-            if (!keySet) {
+            // Cloud: the whole photo is uploaded; on device: nothing is uploaded, no key needed.
+            StudioNote(
+                stringResource(if (local) R.string.studio_id_local_explain else R.string.studio_id_explain),
+                topPadding = 0,
+            )
+            // Only the setting changes; an existing mask and a running job keep their mode.
+            StudioSwitchRow(
+                label = stringResource(R.string.studio_id_local_cutout),
+                checked = local,
+                enabled = localSwitchEnabled,
+                onCheckedChange = onLocalChange,
+            )
+            if (idShowNeedKey(local = local, keySet = keySet)) {
                 Text(
                     stringResource(R.string.grok_need_key),
                     color = Amber,
@@ -304,8 +351,14 @@ internal fun IdPhotoProcessSection(
             }
         }
         PaperButton(
-            stringResource(if (hasMask) R.string.studio_id_recut else R.string.studio_id_cutout),
-            enabled = canCutOut,
+            stringResource(
+                when (idCutOutLabel(hasMask = hasMask, local = local)) {
+                    IdCutOutLabel.RECUT -> R.string.studio_id_recut
+                    IdCutOutLabel.LOCAL -> R.string.studio_id_cutout_local
+                    IdCutOutLabel.AI -> R.string.studio_id_cutout
+                },
+            ),
+            enabled = canCutOut && !compositing,
             onClick = onCutOut,
         )
         if (maskJob != null) {
@@ -314,8 +367,16 @@ internal fun IdPhotoProcessSection(
         if (!maskError.isNullOrBlank()) {
             UserErrorMessage(maskError)
         }
+        // Tied to the stored record, not to the on-screen error above (EDID040-R09).
+        if (onViewCutoutResult != null) {
+            GhostButton(
+                stringResource(R.string.studio_id_view_cutout_result),
+                fillMaxWidth = false,
+                onClick = onViewCutoutResult,
+            )
+        }
 
-        val paletteEnabled = hasMask && maskJob == null
+        val paletteEnabled = hasMask && maskJob == null && !compositing
         Column(Modifier.fillMaxWidth()) {
             SectionLabel(stringResource(R.string.studio_id_background))
             if (!hasMask) {
@@ -351,7 +412,52 @@ internal fun IdPhotoProcessSection(
                     )
                 }
             }
+            // Its own switch row below the levels, outside the radio group; no effect without a
+            // feather radius. Disabled, it still shows and announces its on/off state.
+            StudioSwitchRow(
+                label = stringResource(R.string.studio_id_feather_inward),
+                checked = featherInward,
+                enabled = featherEnabled && feather != IdFeather.NONE,
+                onCheckedChange = onFeatherInward,
+            )
+            IdMaskOffsetSlider(value = maskOffset, enabled = featherEnabled, onCommit = onMaskOffset)
         }
+    }
+}
+
+/**
+ * The mask edge shift (EDID040-R14), −10..+10 print px in steps of 1. The thumb follows the drag
+ * locally and only the released value is committed, so a drag never starts a composite (and its
+ * freeze) per step. Disabled, it still shows the value; the value text is its state description.
+ */
+@Composable
+private fun IdMaskOffsetSlider(value: Int, enabled: Boolean, onCommit: (Int) -> Unit) {
+    var drag by remember { mutableStateOf<Float?>(null) }
+    val shown = drag?.let { Math.round(it) } ?: value
+    val valueText = stringResource(R.string.studio_id_mask_offset_value, idMaskOffsetSigned(shown))
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.studio_id_mask_offset),
+                color = if (enabled) Paper else PaperDim,
+                modifier = Modifier.weight(1f),
+            )
+            Text(valueText, color = if (enabled) Amber else PaperDim)
+        }
+        Slider(
+            value = drag ?: value.toFloat(),
+            onValueChange = { drag = it },
+            onValueChangeFinished = {
+                drag?.let { onCommit(idMaskOffset(Math.round(it))) }
+                drag = null
+            },
+            valueRange = -ID_MASK_OFFSET_MAX_PX.toFloat()..ID_MASK_OFFSET_MAX_PX.toFloat(),
+            steps = 2 * ID_MASK_OFFSET_MAX_PX - 1,
+            enabled = enabled,
+            colors = SliderDefaults.colors(thumbColor = Amber, activeTrackColor = Amber),
+            modifier = Modifier.fillMaxWidth().semantics { stateDescription = valueText },
+        )
+        StudioNote(stringResource(R.string.studio_id_mask_offset_note), topPadding = 0)
     }
 }
 
@@ -450,3 +556,92 @@ private fun IdFeatherChip(label: String, selected: Boolean, enabled: Boolean, on
         )
     }
 }
+
+/**
+ * Full-screen view of the version's last failed cut-out (EDID040-R09): the reply as received,
+ * decoded bounded (long edge at most 2048 px) and never cached, or "the AI returned no usable
+ * image" when none was kept or it does not decode; then the failure reason, its time and Close.
+ * The files live only in the app cache; nothing here uploads or logs them.
+ */
+@Composable
+internal fun IdCutoutResultViewer(failure: IdMaskFailure, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val file = failure.bytesFile
+    // The file is replaced in place by a later failure, so never serve it from a cache.
+    val request = remember(file, failure.at) {
+        file?.let {
+            ImageRequest.Builder(context)
+                .data(it)
+                .size(Size(CUTOUT_RESULT_MAX_EDGE, CUTOUT_RESULT_MAX_EDGE))
+                .precision(Precision.INEXACT)
+                .scale(Scale.FIT)
+                .memoryCachePolicy(CachePolicy.DISABLED)
+                .diskCachePolicy(CachePolicy.DISABLED)
+                .build()
+        }
+    }
+    var decodeFailed by remember(file, failure.at) { mutableStateOf(false) }
+    val whenText = remember(failure.at) {
+        DateUtils.formatDateTime(
+            context,
+            failure.at,
+            DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_SHOW_YEAR,
+        )
+    }
+    val title = stringResource(R.string.studio_id_cutout_result_title)
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(Ink)
+                .systemBarsPadding()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SectionLabel(title)
+            if (request != null && !decodeFailed) {
+                AsyncImage(
+                    model = request,
+                    contentDescription = title,
+                    contentScale = ContentScale.Fit,
+                    onError = { decodeFailed = true },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(Color.Black),
+                )
+            } else {
+                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                    val noImage = if (idFailureIsLocal(failure.local, failure.message)) {
+                        R.string.studio_id_cutout_result_no_image_local
+                    } else {
+                        R.string.studio_id_cutout_result_no_image
+                    }
+                    Text(stringResource(noImage), color = Paper)
+                }
+            }
+            // Bounded and scrollable, so a long reason at a large font scale keeps Close on screen.
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 240.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                if (failure.message.isNotBlank()) {
+                    UserErrorMessage(failure.message)
+                }
+                Text(
+                    stringResource(R.string.studio_id_cutout_result_at, whenText),
+                    color = PaperDim,
+                    fontSize = 12.sp,
+                )
+            }
+            GhostButton(stringResource(R.string.studio_id_failed_mask_close), onClick = onDismiss)
+        }
+    }
+}
+
+private const val CUTOUT_RESULT_MAX_EDGE = 2048

@@ -15,7 +15,7 @@
     <string name="settings_about_summary">バージョン、プライバシー、オープンソースライセンス</string>
     <string name="settings_reset">既定の設定に戻す</string>
     <string name="settings_reset_title">既定の設定に戻しますか？</string>
-    <string name="settings_reset_text">プリンタの登録、印刷の既定値、受信後に自動印刷、FTP アカウント、Grok の構成が既定値に戻り、FTP パスワードが再生成されます。アプリの言語、AI プリセットと写真カタログは影響を受けません。</string>
+    <string name="settings_reset_text">プリンタの登録、印刷の既定値、受信後に自動印刷（自動レタッチのプリセットを含む）、FTP アカウント、Grok の構成が既定値に戻り、FTP パスワードが再生成されます。アプリの言語、AI プリセット一覧と既定プリセット、写真カタログは影響を受けません。</string>
     <string name="settings_reset_confirm">戻す</string>
     <string name="settings_reset_done">既定の設定に戻しました</string>
     <string name="settings_unsaved">未保存の変更があります</string>
@@ -120,6 +120,7 @@
     <string name="about_version">バージョン %1$s（ビルド %2$d）</string>
     <string name="about_privacy_title">プライバシー</string>
     <string name="about_privacy_ai">AI 画像処理を使用すると、選択した写真は設定で構成した API エンドポイントにアップロードされ、そのサービス上で処理されます。AI 機能を使わない場合、写真はアップロードされません。</string>
+    <string name="about_privacy_local_cutout">証明写真モードの「端末内で切り抜く」は Google ML Kit によりこの端末内で処理され、写真と切り抜き結果はアップロードされません。ML Kit の規約に基づき、ML Kit はパフォーマンスと利用状況の指標（端末モデル、OS バージョン、アプリのパッケージ名とバージョン、インストールごとの識別子）を Google に送信しますが、写真は含まれません。</string>
     <string name="about_privacy_ftp">カメラ FTP サービスの稼働中は、ローカルネットワーク上に待ち受けポートが開かれます。同じネットワーク上でアカウントを知る人は本端末に写真をアップロードできます。使用しないときはサービスを停止してください。</string>
     <string name="about_privacy_storage">API キーと FTP パスワードは本端末の暗号化ストレージに保存され、構成した API エンドポイント以外へ送信されることはありません。</string>
     <string name="about_privacy_local">写真、編集結果、操作ログは本端末内にのみ保存されます。</string>

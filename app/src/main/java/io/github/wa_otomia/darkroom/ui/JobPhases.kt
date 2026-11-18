@@ -20,6 +20,8 @@ private val GENERATE_PHASES: Map<String, Int> = mapOf(
     "saving" to R.string.phase_generate_saving,
     "uploading" to R.string.phase_generate_uploading,
     "processing" to R.string.phase_generate_processing,
+    // On-device ID photo cut-out (data/progress/JobProgress.kt localMaskPhases).
+    "segmenting" to R.string.phase_generate_segmenting,
     "downloading" to R.string.phase_generate_downloading,
     "done" to R.string.phase_generate_done,
     "error" to R.string.phase_generate_error,

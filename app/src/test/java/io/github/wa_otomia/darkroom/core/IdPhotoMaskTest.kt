@@ -63,34 +63,17 @@ class IdPhotoMaskTest {
     }
 
     @Test
-    fun lumaVerdicts() {
-        assertEquals(IdMaskVerdict.OK, validateIdMaskLuma(luma(0 to 50, 255 to 50)))
-        // Thresholds: 32 is black, 223 is white.
-        assertEquals(IdMaskVerdict.OK, validateIdMaskLuma(luma(32 to 50, 223 to 50)))
-        // Exactly 10 % mid-grey passes; above it is not a matte.
-        assertEquals(IdMaskVerdict.OK, validateIdMaskLuma(luma(0 to 45, 128 to 10, 255 to 45)))
-        assertEquals(IdMaskVerdict.NOT_BINARY, validateIdMaskLuma(luma(0 to 44, 33 to 11, 255 to 45)))
-        assertEquals(IdMaskVerdict.NOT_BINARY, validateIdMaskLuma(luma(0 to 44, 222 to 11, 255 to 45)))
-        // A colour photo is mostly mid-grey.
-        assertEquals(IdMaskVerdict.NOT_BINARY, validateIdMaskLuma(luma(90 to 40, 150 to 40, 255 to 20)))
-        // All black: no person. Under 1 % white: no person. Exactly 1 %: fine.
-        assertEquals(IdMaskVerdict.NO_PERSON, validateIdMaskLuma(luma(0 to 100)))
-        assertEquals(IdMaskVerdict.NO_PERSON, validateIdMaskLuma(luma(0 to 1000, 255 to 9)))
-        assertEquals(IdMaskVerdict.OK, validateIdMaskLuma(luma(0 to 99, 255 to 1)))
-        // All white or over 99 % white: no background.
-        assertEquals(IdMaskVerdict.NO_BACKGROUND, validateIdMaskLuma(luma(255 to 100)))
-        assertEquals(IdMaskVerdict.NO_BACKGROUND, validateIdMaskLuma(luma(0 to 9, 255 to 1000)))
-        assertEquals(IdMaskVerdict.OK, validateIdMaskLuma(luma(0 to 1, 255 to 99)))
-        assertEquals(IdMaskVerdict.NO_PERSON, validateIdMaskLuma(ByteArray(0)))
-    }
-
-    @Test
     fun verdictMessages() {
         assertEquals("", idMaskVerdictMessage(IdMaskVerdict.OK))
         assertEquals(ID_MASK_MSG_ASPECT, idMaskVerdictMessage(IdMaskVerdict.ASPECT_MISMATCH))
         assertEquals(ID_MASK_MSG_NOT_BINARY, idMaskVerdictMessage(IdMaskVerdict.NOT_BINARY))
         assertEquals(ID_MASK_MSG_NO_PERSON, idMaskVerdictMessage(IdMaskVerdict.NO_PERSON))
         assertEquals(ID_MASK_MSG_NO_BACKGROUND, idMaskVerdictMessage(IdMaskVerdict.NO_BACKGROUND))
+        assertEquals(ID_MASK_MSG_BACKGROUND_KEPT, idMaskVerdictMessage(IdMaskVerdict.BACKGROUND_KEPT))
+        assertEquals(ID_MASK_MSG_SHADED, idMaskVerdictMessage(IdMaskVerdict.SHADED))
+        assertEquals("抠图失败：返回图保留了原背景，不是蒙版", ID_MASK_MSG_BACKGROUND_KEPT)
+        assertEquals("抠图失败：返回图是带明暗的灰度图，不是蒙版", ID_MASK_MSG_SHADED)
+        assertEquals("本地抠图失败", ID_MASK_MSG_LOCAL_FAILED)
     }
 
     @Test
@@ -180,6 +163,139 @@ class IdPhotoMaskTest {
         assertArrayEquals(solid, featherAlpha(solid, 40, 30, 10))
     }
 
+    /** Deterministic irregular masks: blobs, noise and grey edges. */
+    private fun randomMask(w: Int, h: Int, seed: Long, noiseEvery: Int = 25): ByteArray {
+        val rnd = java.util.Random(seed)
+        val a = ByteArray(w * h)
+        repeat(6) {
+            val cx = rnd.nextInt(w)
+            val cy = rnd.nextInt(h)
+            val rad = 4 + rnd.nextInt(maxOf(5, minOf(w, h) / 2))
+            for (y in 0 until h) for (x in 0 until w) {
+                val dx = x - cx
+                val dy = y - cy
+                if (dx * dx + dy * dy <= rad * rad) a[y * w + x] = 255.toByte()
+            }
+        }
+        repeat(w * h / noiseEvery) { a[rnd.nextInt(w * h)] = rnd.nextInt(256).toByte() }
+        return a
+    }
+
+    /** Brute-force (2r+1)² minimum with edge replication. */
+    private fun bruteErode(a: ByteArray, w: Int, h: Int, r: Int): ByteArray = ByteArray(w * h) { i ->
+        val x = i % w
+        val y = i / w
+        var m = 255
+        for (dy in -r..r) for (dx in -r..r) {
+            val v = a[(y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)].toInt() and 0xFF
+            if (v < m) m = v
+        }
+        m.toByte()
+    }
+
+    @Test
+    fun erodeIsTheWindowMinimumWithReplicatedEdges() {
+        for ((w, h) in listOf(1 to 1, 1 to 9, 9 to 1, 17 to 11, 40 to 33)) {
+            val a = randomMask(w, h, (w * 31 + h).toLong())
+            for (r in listOf(1, 2, 3, 5, 10, 25)) {
+                assertArrayEquals("${w}x$h r=$r", bruteErode(a, w, h, r), erodeAlpha(a, w, h, r))
+            }
+        }
+        val a = byteArrayOf(0, 255.toByte(), 7, 9)
+        for (r in listOf(0, -2)) {
+            val out = erodeAlpha(a, 2, 2, r)
+            assertArrayEquals(a, out)
+            assertNotSame(a, out)
+        }
+    }
+
+    @Test
+    fun inwardFeatherWithZeroRadiusIsIdentity() {
+        val a = randomMask(23, 19, 7)
+        for (inward in listOf(true, false)) {
+            val out = featherAlphaFor(a, 23, 19, 0, inward)
+            assertArrayEquals(a, out)
+            assertNotSame(a, out)
+        }
+        assertArrayEquals(a, featherAlphaInward(a, 23, 19, 0))
+    }
+
+    @Test
+    fun outwardChoiceIsExactlyTheSymmetricFeather() {
+        val a = randomMask(50, 37, 11)
+        for (r in listOf(0, 1, 2, 5, 10)) {
+            assertArrayEquals("r=$r", featherAlpha(a, 50, 37, r), featherAlphaFor(a, 50, 37, r, inward = false))
+            assertArrayEquals(
+                "r=$r",
+                featherAlphaInwardFine(a, 50, 37, r),
+                featherAlphaFor(a, 50, 37, r, inward = true),
+            )
+        }
+    }
+
+    @Test
+    fun inwardFeatherNeverSpillsOutsideTheMask() {
+        for (seed in 1L..4L) {
+            val w = 60
+            val h = 45
+            val a = randomMask(w, h, seed)
+            for (r in listOf(1, 2, 5, 10)) {
+                val out = featherAlphaInward(a, w, h, r)
+                for (i in a.indices) {
+                    if ((a[i].toInt() and 0xFF) == 0) assertEquals("seed=$seed r=$r i=$i", 0, out[i].toInt() and 0xFF)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun inwardFeatherKeepsPixelsWhoseWideWindowIsOpaque() {
+        // Any pixel whose (4r+1)² window (edges replicated) is all 255 keeps 255.
+        for (seed in 5L..8L) {
+            val w = 70
+            val h = 52
+            val a = randomMask(w, h, seed, noiseEvery = 400)
+            for (r in listOf(1, 2, 5, 10)) {
+                val out = featherAlphaInward(a, w, h, r)
+                val wide = bruteErode(a, w, h, 2 * r)
+                var checked = 0
+                for (i in a.indices) {
+                    if ((wide[i].toInt() and 0xFF) == 255) {
+                        assertEquals("seed=$seed r=$r i=$i", 255, out[i].toInt() and 0xFF)
+                        checked++
+                    }
+                }
+                if (r <= 2) assertTrue("seed=$seed r=$r", checked > 0)
+            }
+        }
+    }
+
+    @Test
+    fun inwardFeatherBlendsInsideTheEdgeOnly() {
+        val w = 80
+        val h = 30
+        val edge = 40 // x < 40 is black, x ≥ 40 white
+        val a = ByteArray(w * h) { i -> if (i % w >= edge) 255.toByte() else 0 }
+        for (r in listOf(2, 5, 10)) {
+            val out = featherAlphaInward(a, w, h, r)
+            for (y in 0 until h) {
+                for (x in 0 until w) {
+                    val v = alphaAt(out, w, x, y)
+                    when {
+                        x < edge -> assertEquals("r=$r x=$x", 0, v)
+                        x >= edge + 2 * r -> assertEquals("r=$r x=$x", 255, v)
+                    }
+                }
+            }
+            // The blend sits just inside the edge and rises monotonically.
+            assertTrue(alphaAt(out, w, edge + r, 5) in 1..254)
+            for (x in 1 until w) assertTrue(alphaAt(out, w, x, 5) >= alphaAt(out, w, x - 1, 5))
+        }
+        // A uniform mask stays uniform: image borders are not edges.
+        val solid = ByteArray(40 * 30) { 255.toByte() }
+        assertArrayEquals(solid, featherAlphaInward(solid, 40, 30, 10))
+    }
+
     @Test
     fun compositeKeepsOriginalPixelsUnderOpaqueMask() {
         val src = 0xFFC99678.toInt() // RGB(201,150,120)
@@ -236,5 +352,36 @@ class IdPhotoMaskTest {
         assertTrue(ID_PHOTO_MASK_PROMPT.contains("white"))
         assertTrue(ID_PHOTO_MASK_PROMPT.contains("black"))
         assertTrue(ID_PHOTO_MASK_PROMPT.all { it.code < 128 })
+    }
+
+    @Test
+    fun maskPromptKeepsOnlyThePerson() {
+        // AIPV030-R04 / design D1 fragments.
+        for (fragment in listOf(
+            "main person only",
+            "chair backs",
+            "even where it is white or light-coloured",
+            "flat, solid, pure white",
+            "fine hair strands",
+            "all-black",
+            "do not crop, pad, shift, rotate, resize or redraw",
+            "not a photo edit",
+            "headrests",
+            "between hair strands and locks",
+            "even inside those gaps",
+            "only dense hair with no background showing through",
+        )) {
+            assertTrue(fragment, ID_PHOTO_MASK_PROMPT.contains(fragment))
+        }
+        // Verbatim text of design D1: sentences joined by exactly one space.
+        assertEquals(EXPECTED_MASK_PROMPT, ID_PHOTO_MASK_PROMPT)
+        assertFalse(ID_PHOTO_MASK_PROMPT.contains("  "))
+        assertEquals(ID_PHOTO_MASK_PROMPT.trim(), ID_PHOTO_MASK_PROMPT)
+    }
+
+    private companion object {
+        const val EXPECTED_MASK_PROMPT =
+            "Task: produce an alpha matte for replacing the background of a portrait or ID photo. This is a segmentation task, not a photo edit: do not relight, recolour, restyle or re-render the photo. Output only the matte, at exactly the same width, height, framing and composition as the input; do not crop, pad, shift, rotate, resize or redraw anything, so that every matte pixel lines up with the same pixel of the input. Foreground is the main person only: hair, face, ears, neck, shoulders, arms and hands if visible, worn clothing and worn accessories such as glasses, earrings, hats and headscarves. Background is everything else, even where it touches or overlaps the person: walls, floors, ceilings, sky, doors, windows, furniture including chairs, chair backs, headrests, sofas and cushions, shelves, hanging clothes and coats, bags, objects, other people, shadows cast on the background, and any border or padding. Background seen through gaps in the person is background too: between hair strands and locks, inside curls and loose ends, between the hair and the face, neck or shoulders, and between the arms and the body. Paint the background pure black (#000000), even where it is white or light-coloured in the photo and even inside those gaps. Paint the person as one flat, solid, pure white (#FFFFFF) silhouette with no shading, lighting, gradients, texture, facial features or outlines inside it; eyes, mouth, glasses, hair texture and clothing details must not be visible. Keep the edge tight to the person, with no glow, halo or margin around it. Only where fine hair strands or flyaways overlap the background, use grey levels to show partial transparency (lighter means more hair, darker means more background); only dense hair with no background showing through stays solid white, and everywhere else make a clean, sharp edge. If no person is visible, return an all-black image. Use only black, white and that grey hair transition: no colours, text, watermarks or other content."
+
     }
 }

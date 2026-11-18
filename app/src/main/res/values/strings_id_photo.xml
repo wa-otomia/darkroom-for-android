@@ -14,6 +14,8 @@
     <string name="studio_id_mask_missing">The cut-out mask is missing. Cut out again or choose the original background.</string>
 
     <string name="studio_id_preset_35x45">ICAO standard: Schengen/EU, UK, Australia, Singapore, Japanese and Korean passports</string>
+    <string name="studio_id_preset_kr_visa">Korean visa</string>
+    <string name="studio_id_preset_jp_visa">Japanese visa (Japanese missions in China)</string>
     <string name="studio_id_preset_33x48">Chinese passport and visa</string>
     <string name="studio_id_preset_25x35">Chinese 1-inch (résumé, certificates, applications)</string>
     <string name="studio_id_preset_22x32">Chinese small 1-inch (driving licence, etc.)</string>
@@ -30,6 +32,9 @@
     <string name="studio_id_explain">AI only draws a mask of the person. Every pixel of the person comes from your photo; the background is replaced on this device. The whole photo of this version is uploaded to the AI provider set in Settings.</string>
     <string name="studio_id_cutout">AI cut out person</string>
     <string name="studio_id_recut">Cut out again</string>
+    <string name="studio_id_cutout_local">Cut out person on device</string>
+    <string name="studio_id_local_cutout">Cut out on this device</string>
+    <string name="studio_id_local_explain">Uses Google ML Kit on this device. The photo and the cut-out are not uploaded and no API key is needed. Edges, especially hair, are usually rougher than an AI cut-out.</string>
     <string name="studio_id_cutting">Cutting out…</string>
     <string name="studio_id_cutting_other">Cutting out another version (%1$s)…</string>
     <string name="studio_id_mask_ready">Cut-out ready</string>
@@ -58,6 +63,23 @@
     <string name="studio_id_feather_weak">Weak</string>
     <string name="studio_id_feather_medium">Medium</string>
     <string name="studio_id_feather_strong">Strong</string>
+    <string name="studio_id_feather_inward">Soften inward</string>
+    <string name="studio_id_mask_offset">Mask edge shift</string>
+    <string name="studio_id_mask_offset_value" translatable="false">%1$s px</string>
+    <string name="studio_id_mask_offset_note">Negative values shrink the mask inward and positive values grow it outward, in print pixels (1 px ≈ 0.05 mm), before edge softening.</string>
+    <string name="studio_id_compositing">Applying the new background…</string>
+
+    <!-- Last failed cut-out viewer (EDID040-R09) -->
+    <string name="studio_id_view_cutout_result">View this cut-out result</string>
+    <string name="studio_id_cutout_result_title">Result of this cut-out</string>
+    <string name="studio_id_cutout_result_no_image">The AI did not return a usable image.</string>
+    <string name="studio_id_cutout_result_no_image_local">The on-device cut-out did not produce an image.</string>
+    <string name="studio_id_cutout_result_at">Failed at %1$s</string>
+    <string name="studio_id_failed_mask_close">Close</string>
+
+    <!-- On/off state of square switch chips (ID photo) -->
+    <string name="studio_toggle_on">On</string>
+    <string name="studio_toggle_off">Off</string>
 
     <!-- Output tab -->
     <string name="studio_id_preset_print_off">Edit with preset and queue is not available for ID photos.</string>
@@ -72,4 +94,7 @@
     <string name="id_error_mask_version_gone">Cut-out discarded: this version was deleted.</string>
     <string name="id_error_mask_missing">The ID photo mask is missing or damaged. Cut out again, or choose the original background.</string>
     <string name="id_error_mask_save">Couldn\'t save the cut-out mask. Check free storage and try again.</string>
+    <string name="id_error_mask_background_kept">Cut-out failed: the reply kept the original background, so it is not a mask.</string>
+    <string name="id_error_mask_shaded">Cut-out failed: the reply was a shaded greyscale image, not a mask.</string>
+    <string name="id_error_mask_local_failed">On-device cut-out failed. Try again, or turn off “Cut out on this device” to use AI.</string>
 </resources>

@@ -15,7 +15,7 @@
     <string name="settings_about_summary">Version, privacy, open-source licenses</string>
     <string name="settings_reset">Restore default settings</string>
     <string name="settings_reset_title">Restore default settings?</string>
-    <string name="settings_reset_text">Printer binding, print defaults, print-on-receive, the FTP account and the Grok configuration return to their defaults, and a new FTP password is generated. The app language, AI presets and the photo catalog are not affected.</string>
+    <string name="settings_reset_text">Printer binding, print defaults, print-on-receive (including the auto-edit preset), the FTP account and the Grok configuration return to their defaults, and a new FTP password is generated. The app language, the AI preset library and default preset, and the photo catalog are not affected.</string>
     <string name="settings_reset_confirm">Restore</string>
     <string name="settings_reset_done">Default settings restored</string>
     <string name="settings_unsaved">Unsaved changes</string>
@@ -128,6 +128,7 @@
     <string name="about_version">Version %1$s (build %2$d)</string>
     <string name="about_privacy_title">Privacy</string>
     <string name="about_privacy_ai">When you use an AI image feature, the selected photo is uploaded to the API endpoint configured in Settings and processed on that service. No photo is uploaded when AI processing is not used.</string>
+    <string name="about_privacy_local_cutout">On-device cut-out in ID photo mode runs on this device with Google ML Kit; the photo and the cut-out are not uploaded. As described in the ML Kit terms, ML Kit sends Google performance and usage metrics (device model, OS version, app package and version, a per-installation identifier), never photos.</string>
     <string name="about_privacy_ftp">While the camera FTP service runs, it opens a listening port on the local network. Anyone on the same network who knows the account can upload photos to this device. Stop the service when it is not needed.</string>
     <string name="about_privacy_storage">The API key and the FTP password are held in the encrypted storage of this device and are never transmitted anywhere except to the API endpoint you configured.</string>
     <string name="about_privacy_local">Photos, edits and the activity log remain on this device.</string>

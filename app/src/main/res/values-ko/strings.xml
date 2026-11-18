@@ -143,7 +143,7 @@
     <string name="preset_none">처리 안 함</string>
     <string name="presets_eyebrow">프리셋</string>
     <string name="presets_title">AI 프리셋</string>
-    <string name="presets_desc">인물 보정과 AI 크리에이티브 스타일. 갤러리, 인쇄, 수신 후 자동 인쇄가 마지막에 선택한 프리셋을 함께 사용합니다.</string>
+    <string name="presets_desc">인물 보정과 AI 크리에이티브 스타일. 갤러리와 인쇄는 마지막에 선택한 프리셋을 함께 쓰고, 수신 후 자동 보정은 설정에서 따로 고른 프리셋을 사용합니다.</string>
     <string name="default_preset">기본 프리셋</string>
     <string name="default_badge">기본</string>
     <string name="add_preset">프리셋 추가</string>
@@ -174,6 +174,7 @@
     <string name="settings_automation_blocked_edit">AI 보정은 건너뜁니다:</string>
     <string name="settings_automation_blocked_print">인쇄를 아직 실행할 수 없습니다:</string>
     <string name="settings_automation_preset">자동 보정 프리셋</string>
+    <string name="settings_automation_preset_hint">수신 후 자동 보정에만 사용됩니다. 스튜디오와 프리셋 목록의 기본 프리셋과는 별개입니다.</string>
     <string name="settings_watermark">워터마크</string>
     <string name="settings_watermark_sns">SNS 워터마크</string>
     <string name="settings_watermark_date">날짜 워터마크</string>

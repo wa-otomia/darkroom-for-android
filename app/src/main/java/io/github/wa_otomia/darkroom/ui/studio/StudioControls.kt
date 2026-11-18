@@ -70,6 +70,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -659,18 +660,65 @@ internal fun FramingControls(
 
 @Composable
 private fun ToggleChip(label: String, active: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    ChipFrame(
+        label = label,
+        active = active,
+        enabled = enabled,
+        interaction = Modifier.selectable(
+            selected = active,
+            enabled = enabled,
+            role = Role.RadioButton,
+            onClick = onClick,
+        ),
+    )
+}
+
+/**
+ * An on/off switch drawn as the square portrait/landscape chip (EDID010-R01): Amber when on,
+ * outlined when off, at least 48 dp. TalkBack hears the label, the Switch role and the on/off
+ * state, also while disabled (a disabled toggleable ignores taps but keeps its semantics).
+ */
+@Composable
+internal fun StudioToggleChip(
+    label: String,
+    checked: Boolean,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val state = stringResource(if (checked) R.string.studio_toggle_on else R.string.studio_toggle_off)
+    ChipFrame(
+        label = label,
+        active = checked,
+        enabled = enabled,
+        modifier = modifier,
+        interaction = Modifier
+            .toggleable(
+                value = checked,
+                enabled = enabled,
+                role = Role.Switch,
+                onValueChange = onCheckedChange,
+            )
+            .semantics { stateDescription = state },
+    )
+}
+
+@Composable
+private fun ChipFrame(
+    label: String,
+    active: Boolean,
+    enabled: Boolean,
+    interaction: Modifier,
+    modifier: Modifier = Modifier,
+) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .heightIn(min = 48.dp)
+            .widthIn(min = 48.dp)
             .clip(RoundedCornerShape(2.dp))
             .background(if (active) Amber.copy(alpha = if (enabled) 0.9f else 0.4f) else Color.Transparent)
             .then(if (active) Modifier else Modifier.border(1.dp, PaperFaint, RoundedCornerShape(2.dp)))
-            .selectable(
-                selected = active,
-                enabled = enabled,
-                role = Role.RadioButton,
-                onClick = onClick,
-            )
+            .then(interaction)
             .padding(horizontal = 14.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
