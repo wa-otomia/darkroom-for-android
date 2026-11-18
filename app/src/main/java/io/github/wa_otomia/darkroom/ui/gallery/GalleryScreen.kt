@@ -18,6 +18,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -32,6 +34,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -52,7 +55,7 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -77,6 +80,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -84,6 +88,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -120,16 +129,19 @@ import io.github.wa_otomia.darkroom.data.progress.toUi
 import io.github.wa_otomia.darkroom.data.transfer.IncomingTransfer
 import io.github.wa_otomia.darkroom.ui.UserErrorDialog
 import io.github.wa_otomia.darkroom.ui.components.AmberTrack
+import io.github.wa_otomia.darkroom.ui.components.DarkroomCard
 import io.github.wa_otomia.darkroom.ui.components.DarkroomSnackbarHost
 import io.github.wa_otomia.darkroom.ui.components.DeleteUndoBar
+import io.github.wa_otomia.darkroom.ui.components.IconCircleButton
 import io.github.wa_otomia.darkroom.ui.components.JobOverlayBar
 import io.github.wa_otomia.darkroom.ui.components.JobProgressStrip
 import io.github.wa_otomia.darkroom.ui.components.JobScrim
-import io.github.wa_otomia.darkroom.ui.components.ScreenHeader
+import io.github.wa_otomia.darkroom.ui.components.PageTitle
 import io.github.wa_otomia.darkroom.ui.components.StatusBadge
 import io.github.wa_otomia.darkroom.ui.components.StatusChip
 import io.github.wa_otomia.darkroom.ui.components.contentBlur
-import io.github.wa_otomia.darkroom.ui.theme.SurfacePanel
+import io.github.wa_otomia.darkroom.ui.components.pressScale
+import io.github.wa_otomia.darkroom.ui.navigation.LocalBottomBarClearance
 import io.github.wa_otomia.darkroom.ui.jobFieldKey
 import io.github.wa_otomia.darkroom.ui.localizedByteProgress
 import io.github.wa_otomia.darkroom.ui.localizedGeneratePhase
@@ -139,12 +151,16 @@ import io.github.wa_otomia.darkroom.ui.theme.Amber
 import io.github.wa_otomia.darkroom.ui.theme.Danger
 import io.github.wa_otomia.darkroom.ui.theme.Ink
 import io.github.wa_otomia.darkroom.ui.theme.MonoFont
+import io.github.wa_otomia.darkroom.ui.theme.OnPhotoScrim
+import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
-import io.github.wa_otomia.darkroom.ui.theme.PaperHairline
+import io.github.wa_otomia.darkroom.ui.theme.PaperPressed
+import io.github.wa_otomia.darkroom.ui.theme.PhotoShape
 import io.github.wa_otomia.darkroom.ui.theme.Room
+import io.github.wa_otomia.darkroom.ui.theme.Surface1
+import io.github.wa_otomia.darkroom.ui.theme.Surface3
 import io.github.wa_otomia.darkroom.ui.userErrorRes
-import io.github.wa_otomia.darkroom.ui.theme.SurfaceLow
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
@@ -162,6 +178,12 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 
 private const val MAX_LISTED_FILES = 6
+
+/** Both FABs, the extended one included, use 18dp corners (D4). */
+private val FabShape = RoundedCornerShape(18.dp)
+
+/** Scaffold FAB spacing (16dp) + FAB height (56dp) + a 16dp gap over the last row. */
+private val FabRowClearance = 88.dp
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -427,6 +449,8 @@ fun GalleryScreen(
 
     BackHandler(enabled = selectionMode) { selection = emptySet() }
 
+    val clearance = LocalBottomBarClearance.current
+
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val columns = when {
             maxWidth >= 840.dp -> 4
@@ -467,24 +491,40 @@ fun GalleryScreen(
                     }
                 }
             },
-            snackbarHost = { DarkroomSnackbarHost(snackbar) },
+            // With the FABs showing, the Scaffold already stacks the snackbar above them (and they
+            // sit above the floating bar); without them it has to clear the bar itself.
+            snackbarHost = {
+                DarkroomSnackbarHost(
+                    snackbar,
+                    Modifier.padding(bottom = if (selectionMode) clearance else 0.dp),
+                )
+            },
             floatingActionButton = {
                 if (!selectionMode) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        SmallFloatingActionButton(
+                    Row(
+                        // The Scaffold adds its own 16dp above this, so the FABs float 16dp
+                        // over the navigation pill.
+                        modifier = Modifier.padding(bottom = clearance),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        FloatingActionButton(
                             onClick = { if (!busy) launchCamera() },
-                            containerColor = Paper,
-                            contentColor = Ink,
+                            shape = FabShape,
+                            // Paper on Surface3 11.82:1.
+                            containerColor = Surface3,
+                            contentColor = Paper,
                         ) {
                             Icon(
                                 Icons.Outlined.PhotoCamera,
                                 contentDescription = stringResource(R.string.gallery_take_photo),
                             )
                         }
-                        Spacer(Modifier.size(12.dp))
                         ExtendedFloatingActionButton(
                             text = { Text(if (busy) stringResource(R.string.importing) else stringResource(R.string.manual_import)) },
                             icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
+                            shape = FabShape,
+                            // Ink on Paper 14.85:1.
                             containerColor = Paper,
                             contentColor = Ink,
                             onClick = { if (!busy) picker.launch("image/*") },
@@ -497,9 +537,16 @@ fun GalleryScreen(
                 LazyVerticalGrid(
                     state = grid,
                     columns = GridCells.Fixed(columns),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 168.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    // The bottom inset clears the floating navigation pill plus the FAB row above
+                    // it, so the last row can scroll fully into view.
+                    contentPadding = PaddingValues(
+                        start = 20.dp,
+                        end = 20.dp,
+                        top = 8.dp,
+                        bottom = clearance + FabRowClearance,
+                    ),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
@@ -568,6 +615,23 @@ fun GalleryScreen(
                             }
                         }
                     }
+                    // Usage hint, shown once there is something to tap. It sits under the grid so
+                    // nothing but the title and status pills stands between the header and the
+                    // photos.
+                    if (items.isNotEmpty()) {
+                        item(span = { GridItemSpan(maxLineSpan) }, key = "gallery_footer_hint") {
+                            Text(
+                                stringResource(R.string.lib_gallery_long_press_hint),
+                                color = PaperDim,
+                                fontSize = 12.sp,
+                                lineHeight = 18.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp, vertical = 12.dp),
+                            )
+                        }
+                    }
                 }
                 if (newArrivals > 0) {
                     NewArrivalsPill(
@@ -600,6 +664,9 @@ fun GalleryScreen(
                     detail = stringResource(R.string.lib_gallery_import_label, importDone, importTotal),
                     indeterminate = importIndeterminate || importTotal == 0,
                 ),
+                // The panel runs to the screen edge behind the floating navigation pill; this
+                // keeps its progress text above the pill.
+                extra = { Spacer(Modifier.height(clearance)) },
             )
         }
     }
@@ -622,35 +689,15 @@ private fun GalleryHeader(
     autoPrint: Boolean,
     onSettings: (String) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-        ScreenHeader(
-            eyebrow = stringResource(R.string.gallery_inbox_live),
-            title = if (empty) stringResource(R.string.gallery_waiting) else stringResource(R.string.gallery_count, count),
+    Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        PageTitle(
+            title = stringResource(R.string.gallery_inbox_live),
+            supporting = if (empty) stringResource(R.string.gallery_waiting) else stringResource(R.string.gallery_count, count),
+            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
         )
-        Text(
-            stringResource(R.string.gallery_desc),
-            style = MaterialTheme.typography.bodyMedium,
-            color = PaperDim,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        Text(
-            stringResource(R.string.lib_gallery_import_formats),
-            color = PaperDim,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-        if (count > 0) {
-            Text(
-                stringResource(R.string.lib_gallery_long_press_hint),
-                color = PaperDim,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
+        // StatusChip draws a 36dp pill in a 48dp touch box, so the rows need no extra gap.
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 16.dp),
         ) {
             StatusChip(grokReady, stringResource(R.string.chip_grok_ok), stringResource(R.string.chip_grok_off)) { onSettings("grok") }
             StatusChip(printerReady, stringResource(R.string.chip_printer_ok), stringResource(R.string.chip_printer_off)) { onSettings("printer") }
@@ -672,18 +719,28 @@ private fun GalleryHeader(
             ) { onSettings("autoprint") }
         }
         if (empty) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
-                    // Decorative frame, not an affordance, so it stays at hairline weight.
-                    .border(1.dp, PaperHairline, RoundedCornerShape(2.dp))
-                    .padding(28.dp),
+            // The setup and import notes only matter before the first photo; once there is
+            // one, the grid follows the status pills directly (SYUI020-R05).
+            DarkroomCard(
+                modifier = Modifier.padding(top = 12.dp),
+                contentPadding = 20.dp,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column {
-                    Text(stringResource(R.string.empty_title), style = MaterialTheme.typography.headlineMedium)
-                    Text(stringResource(R.string.empty_desc), style = MaterialTheme.typography.bodyMedium, color = PaperDim, modifier = Modifier.padding(top = 8.dp))
-                }
+                Text(
+                    stringResource(R.string.empty_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Paper,
+                    modifier = Modifier.semantics { heading() },
+                )
+                // PaperDim on Surface1 5.16:1.
+                Text(stringResource(R.string.empty_desc), style = MaterialTheme.typography.bodyMedium, color = PaperDim)
+                Text(stringResource(R.string.gallery_desc), style = MaterialTheme.typography.bodyMedium, color = PaperDim)
+                Text(
+                    stringResource(R.string.lib_gallery_import_formats),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PaperDim,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
         }
     }
@@ -724,14 +781,18 @@ private fun PhotoCard(
     }
     val failedPending = pending != null && (!pending.error.isNullOrBlank() || pending.dismissId != null)
     val selectable = photo != null && pending == null
+    val selectedText = stringResource(R.string.a11y_state_selected)
+    val notSelectedText = stringResource(R.string.a11y_state_not_selected)
 
-    Column(
+    // The tile is the 2:3 image frame itself (LBBR010-R01): no outline and no caption bar. Only a
+    // selected or located photo gets a frame, 2dp Amber, drawn over the photo's edge.
+    Box(
         modifier
-            .clip(RoundedCornerShape(2.dp))
-            .background(SurfaceLow)
-            // The photo is the affordance here, so the unselected outline is a hairline: at
-            // PaperFaint it competes with the image it frames.
-            .border(1.dp, if (selected || highlighted) Amber else PaperHairline, RoundedCornerShape(2.dp))
+            .fillMaxWidth()
+            .aspectRatio(2f / 3f)
+            .clip(PhotoShape)
+            .background(Surface1)
+            .then(if (selected || highlighted) Modifier.border(2.dp, Amber, PhotoShape) else Modifier)
             .combinedClickable(
                 onClick = {
                     when {
@@ -745,141 +806,133 @@ private fun PhotoCard(
                         if (selectionMode) onToggle() else onEnterSelection()
                     }
                 },
+            )
+            .then(
+                if (selectionMode && selectable) {
+                    Modifier.semantics { stateDescription = if (selected) selectedText else notSelectedText }
+                } else {
+                    Modifier
+                },
             ),
     ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .background(SurfaceLow),
-        ) {
-            Crossfade(
-                targetState = pending != null,
-                animationSpec = tween(220),
-                label = "galleryPending",
-            ) { isPending ->
-                if (isPending && pending != null) {
-                    PendingFace(pending = pending, sourceThumb = sourceThumb)
-                } else if (photo != null) {
-                    AsyncImage(
-                        model = request,
-                        contentDescription = photo.filename,
-                        contentScale = ContentScale.Crop,
-                        onState = { state ->
-                            thumbState = when (state) {
-                                is AsyncImagePainter.State.Success -> ThumbState.OK
-                                is AsyncImagePainter.State.Error -> ThumbState.FAILED
-                                else -> ThumbState.LOADING
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Box(Modifier.fillMaxSize().background(SurfaceLow))
-                }
+        Crossfade(
+            targetState = pending != null,
+            animationSpec = tween(220),
+            label = "galleryPending",
+        ) { isPending ->
+            if (isPending && pending != null) {
+                PendingFace(pending = pending, sourceThumb = sourceThumb)
+            } else if (photo != null) {
+                AsyncImage(
+                    model = request,
+                    contentDescription = photo.filename,
+                    contentScale = ContentScale.Crop,
+                    onState = { state ->
+                        thumbState = when (state) {
+                            is AsyncImagePainter.State.Success -> ThumbState.OK
+                            is AsyncImagePainter.State.Error -> ThumbState.FAILED
+                            else -> ThumbState.LOADING
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Box(Modifier.fillMaxSize().background(Surface1))
             }
-            // Keeps the badge and the selection mark readable on bright photos.
-            if (pending == null) {
-                Box(
-                    Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                0f to Room.copy(alpha = 0.5f),
-                                0.35f to Color.Transparent,
-                            ),
+        }
+        // Keeps the badge and the selection mark readable on bright photos.
+        if (pending == null) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Room.copy(alpha = 0.5f),
+                            0.35f to Color.Transparent,
                         ),
+                    ),
+            )
+        }
+        if (selected) {
+            Box(Modifier.matchParentSize().background(Room.copy(alpha = 0.4f)))
+        }
+        if (pending == null && thumbState == ThumbState.FAILED) {
+            Column(
+                Modifier
+                    .matchParentSize()
+                    .background(Room.copy(alpha = 0.88f))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    Icons.Outlined.BrokenImage,
+                    contentDescription = null,
+                    tint = PaperDim,
+                    modifier = Modifier.size(24.dp),
                 )
-            }
-            if (selected) {
-                Box(Modifier.matchParentSize().background(Room.copy(alpha = 0.4f)))
-            }
-            if (pending == null && thumbState == ThumbState.FAILED) {
-                Column(
-                    Modifier
-                        .matchParentSize()
-                        .background(Room.copy(alpha = 0.88f))
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Icon(
-                        Icons.Outlined.BrokenImage,
-                        contentDescription = null,
-                        tint = PaperDim,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Text(
-                        stringResource(R.string.lib_gallery_thumb_failed),
-                        color = PaperDim,
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
-            }
-            if (photo != null && pending == null) {
-                FlowRow(
-                    modifier = Modifier.align(Alignment.TopStart).padding(6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    StatusBadge(
-                        visible = photo.edits.isNotEmpty(),
-                        text = stringResource(R.string.badge_edited),
-                    )
-                    StatusBadge(
-                        visible = photo.isGenerated(),
-                        text = stringResource(R.string.photo_tag_generated),
-                    )
-                }
-            }
-            if (selectionMode && selectable) {
-                Box(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(if (selected) Amber else Room.copy(alpha = 0.6f))
-                        .border(1.dp, if (selected) Amber else Paper, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (selected) {
-                        Icon(
-                            Icons.Outlined.Check,
-                            contentDescription = null,
-                            tint = Ink,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-            } else if (overlay != null && !selectionMode) {
-                IconButton(
-                    onClick = onCancelOverlay,
-                    modifier = Modifier.align(Alignment.TopEnd),
-                ) {
-                    Icon(
-                        Icons.Outlined.Close,
-                        contentDescription = stringResource(R.string.common_cancel),
-                        tint = Paper,
-                    )
-                }
-            }
-            if (pending != null) {
-                PendingFooter(
-                    pending = pending,
-                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
-                    onCancel = onCancelPending,
-                )
-            } else if (overlay != null) {
-                OverlayBar(
-                    overlay = overlay,
-                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+                // PaperDim on Room 88% over white ≥ 4.6:1.
+                Text(
+                    stringResource(R.string.lib_gallery_thumb_failed),
+                    color = PaperDim,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 6.dp),
                 )
             }
         }
-        Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp)) {
+        if (photo != null && pending == null) {
+            FlowRow(
+                modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                StatusBadge(
+                    visible = photo.edits.isNotEmpty(),
+                    text = stringResource(R.string.badge_edited),
+                )
+                StatusBadge(
+                    visible = photo.isGenerated(),
+                    text = stringResource(R.string.photo_tag_generated),
+                )
+            }
+        }
+        if (selectionMode && selectable) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) Amber else OnPhotoScrim)
+                    .then(if (selected) Modifier else Modifier.border(2.dp, Paper, CircleShape)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Icon(
+                        Icons.Outlined.Check,
+                        contentDescription = null,
+                        tint = Ink,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        } else if (overlay != null && !selectionMode) {
+            IconCircleButton(
+                icon = Icons.Outlined.Close,
+                contentDescription = stringResource(R.string.common_cancel),
+                onClick = onCancelOverlay,
+                modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
+                container = OnPhotoScrim,
+                size = 36.dp,
+            )
+        }
+        Column(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(),
+        ) {
             val name = pending?.filename
                 ?: pending?.let { stringResource(if (it.kind == PendingKind.Generate) R.string.generating else R.string.importing) }
                 ?: photo?.filename.orEmpty()
@@ -888,19 +941,56 @@ private fun PhotoCard(
             } else {
                 ""
             }
+            PhotoCaption(name = prefix + name, time = timeLabel)
+            if (pending != null) {
+                PendingFooter(
+                    pending = pending,
+                    modifier = Modifier.fillMaxWidth(),
+                    onCancel = onCancelPending,
+                )
+            } else if (overlay != null) {
+                OverlayBar(
+                    overlay = overlay,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * File name (mono, a technical value) and time laid over the bottom of the photo. The gradient
+ * reaches Room 72% where the text starts, so Paper stays at ≥ 6:1 even over a white photo.
+ */
+@Composable
+private fun PhotoCaption(name: String, time: String) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.3f to Room.copy(alpha = 0.72f),
+                    1f to Room.copy(alpha = 0.88f),
+                ),
+            )
+            .padding(start = 10.dp, end = 10.dp, top = 20.dp, bottom = 8.dp),
+    ) {
+        Text(
+            name,
+            color = Paper,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            fontFamily = MonoFont,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (time.isNotEmpty()) {
             Text(
-                prefix + name,
+                time,
                 color = Paper,
                 fontSize = 12.sp,
-                fontFamily = MonoFont,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                timeLabel,
-                color = PaperDim,
-                fontSize = 12.sp,
-                fontFamily = MonoFont,
+                lineHeight = 16.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 2.dp),
@@ -911,7 +1001,7 @@ private fun PhotoCard(
 
 @Composable
 private fun PendingFace(pending: GalleryItem.Pending, sourceThumb: File?) {
-    Box(Modifier.fillMaxSize().background(SurfaceLow)) {
+    Box(Modifier.fillMaxSize().background(Surface1)) {
         if (pending.kind == PendingKind.Generate && sourceThumb != null) {
             AsyncImage(
                 model = sourceThumb,
@@ -925,12 +1015,13 @@ private fun PendingFace(pending: GalleryItem.Pending, sourceThumb: File?) {
                 Box(Modifier.matchParentSize().background(Room.copy(alpha = 0.32f)))
             }
         } else {
-            Box(Modifier.fillMaxSize().background(SurfaceLow), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().background(Surface1), contentAlignment = Alignment.Center) {
                 Text(
                     pending.filename ?: stringResource(R.string.importing),
                     color = PaperDim,
                     fontFamily = MonoFont,
                     fontSize = 12.sp,
+                    lineHeight = 16.sp,
                     textAlign = TextAlign.Center,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
@@ -942,7 +1033,7 @@ private fun PendingFace(pending: GalleryItem.Pending, sourceThumb: File?) {
             Column(
                 Modifier
                     .fillMaxSize()
-                    .background(SurfacePanel)
+                    .background(Surface1)
                     .padding(10.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -951,12 +1042,15 @@ private fun PendingFace(pending: GalleryItem.Pending, sourceThumb: File?) {
                     stringResource(R.string.transfer_phase_failed),
                     color = Amber,
                     fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
                 )
                 Text(
                     pending.error,
                     color = PaperDim,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
                     textAlign = TextAlign.Center,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
@@ -987,11 +1081,7 @@ private fun PendingFooter(
             indeterminateUi(phase, detail)
         }
     val estimated = stringResource(R.string.progress_estimated)
-    Column(
-        modifier
-            .background(SurfacePanel)
-            .border(1.dp, PaperHairline),
-    ) {
+    Column(modifier.background(Surface1)) {
         Row(
             Modifier.fillMaxWidth().padding(start = 8.dp, end = 2.dp, top = 6.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1004,7 +1094,8 @@ private fun PendingFooter(
                 },
                 color = if (failed) Amber else Paper,
                 fontSize = 12.sp,
-                fontFamily = MonoFont,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -1047,74 +1138,93 @@ private fun SelectionBar(
     onSelectAll: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().background(SurfaceLow)) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onExit) {
+    // A Surface1 panel set off from the page by fill alone; no divider underneath.
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp)
+            .clip(PanelShape)
+            .background(Surface1)
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onExit) {
+            Icon(
+                Icons.Outlined.Close,
+                contentDescription = stringResource(R.string.lib_gallery_selection_exit),
+                tint = Paper,
+            )
+        }
+        Text(
+            stringResource(R.string.lib_gallery_selection_count, count),
+            style = MaterialTheme.typography.titleMedium,
+            color = Paper,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).padding(start = 4.dp),
+        )
+        if (!allSelected) {
+            IconButton(onClick = onSelectAll) {
                 Icon(
-                    Icons.Outlined.Close,
-                    contentDescription = stringResource(R.string.lib_gallery_selection_exit),
+                    Icons.Outlined.SelectAll,
+                    contentDescription = stringResource(R.string.lib_gallery_select_all),
                     tint = Paper,
                 )
             }
-            Text(
-                stringResource(R.string.lib_gallery_selection_count, count),
-                color = Paper,
-                fontFamily = MonoFont,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(start = 4.dp),
-            )
-            if (!allSelected) {
-                IconButton(onClick = onSelectAll) {
-                    Icon(
-                        Icons.Outlined.SelectAll,
-                        contentDescription = stringResource(R.string.lib_gallery_select_all),
-                        tint = Paper,
-                    )
-                }
-            }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Outlined.Delete,
-                    contentDescription = stringResource(R.string.common_delete),
-                    tint = Danger,
-                )
-            }
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(PaperHairline))
+        // Danger on Surface1 10.67:1.
+        IconButton(onClick = onDelete) {
+            Icon(
+                Icons.Outlined.Delete,
+                contentDescription = stringResource(R.string.common_delete),
+                tint = Danger,
+            )
+        }
     }
 }
 
 @Composable
 private fun NewArrivalsPill(count: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    // Ink on Paper 14.85:1, on PaperPressed 11.92:1. Fixed 24dp corners rather than a stadium so
+    // a wrapped label at a large font scale never meets the curve.
     Row(
         modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(Paper)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .heightIn(min = 48.dp)
+            .shadow(6.dp, NewArrivalsShape)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .pressScale(interaction)
+            .clip(NewArrivalsShape)
+            .background(if (pressed) PaperPressed else Paper)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             Icons.Outlined.ArrowUpward,
             contentDescription = null,
             tint = Ink,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(18.dp),
         )
         Text(
             stringResource(R.string.lib_gallery_new_photos, count),
             color = Ink,
-            fontSize = 13.sp,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Medium,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(start = 8.dp),
         )
     }
 }
+
+private val NewArrivalsShape = RoundedCornerShape(24.dp)
 
 @Composable
 private fun ImportReportDialog(report: ImportReport, onDismiss: () -> Unit) {
@@ -1149,14 +1259,14 @@ private fun ImportReportDialog(report: ImportReport, onDismiss: () -> Unit) {
                 }
                 Text(
                     stringResource(R.string.lib_gallery_import_formats),
+                    style = MaterialTheme.typography.bodySmall,
                     color = PaperDim,
-                    fontSize = 12.sp,
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_back)) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_back), color = Paper) }
         },
     )
 }
