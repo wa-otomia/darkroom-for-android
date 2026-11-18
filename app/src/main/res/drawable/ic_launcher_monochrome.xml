@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed icon: one opaque colour, same silhouette at 0.8 scale. Generated from the logo source SVGs; keep in step with the other icon layers. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#000000"
+        android:pathData="M38.56 36.48H54.88A1.44 1.44 0 0 1 56.32 37.92V70.08A1.44 1.44 0 0 1 54.88 71.52H38.56A5.6 5.6 0 0 1 32.96 65.92V42.08A5.6 5.6 0 0 1 38.56 36.48ZM59.52 37.81A1.28 1.28 0 0 1 60.9 36.53A17.52 17.52 0 0 1 60.9 71.47A1.28 1.28 0 0 1 59.52 70.19Z" />
+</vector>
