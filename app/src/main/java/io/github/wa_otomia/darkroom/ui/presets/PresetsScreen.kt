@@ -222,17 +222,10 @@ fun PresetsScreen(settings: SettingsRepository) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
-            // One page heading (SYUI020-R05); the intro moves to small text right under it.
+            // One page heading (SYUI020-R05); the intro moves under the default-preset item it explains.
             PageTitle(
                 title = stringResource(R.string.presets_title),
-                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
-            )
-            Text(
-                stringResource(R.string.presets_desc),
-                color = PaperDim,
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                modifier = Modifier.padding(bottom = 20.dp),
+                modifier = Modifier.padding(top = 12.dp, bottom = 12.dp),
             )
 
             SectionLabel(stringResource(R.string.default_preset))
@@ -245,6 +238,12 @@ fun PresetsScreen(settings: SettingsRepository) {
                     fontWeight = FontWeight.Medium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    stringResource(R.string.presets_desc),
+                    color = PaperDim,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
                 )
                 Text(
                     stringResource(R.string.lib_presets_default_hint),
@@ -332,7 +331,14 @@ fun PresetsScreen(settings: SettingsRepository) {
                     title = it
                     titleTouched = true
                 }
-                SectionLabel(stringResource(R.string.lib_presets_category))
+                // Same field-label style as Title and Prompt (CountedField), not a page-level heading.
+                Text(
+                    stringResource(R.string.lib_presets_category),
+                    color = PaperDim,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
                 // Mutually exclusive choice: SelectPills in a selectable group (radio semantics).
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),

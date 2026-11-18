@@ -45,7 +45,6 @@ import io.github.wa_otomia.darkroom.ui.components.ListRowPadding
 import io.github.wa_otomia.darkroom.ui.components.SectionLabel
 import io.github.wa_otomia.darkroom.ui.navigation.LocalBottomBarClearance
 import io.github.wa_otomia.darkroom.ui.theme.Amber
-import io.github.wa_otomia.darkroom.ui.theme.MonoFont
 import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
@@ -142,11 +141,10 @@ fun AboutScreen(onBack: () -> Unit) {
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 16.dp),
                 )
-                // Version string is a technical value, so it keeps the monospace face.
+                // A translated sentence around the numbers, so sans (monospace is for bare technical values).
                 Text(
                     stringResource(R.string.about_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
                     color = Amber,
-                    fontFamily = MonoFont,
                     fontSize = 13.sp,
                     lineHeight = 18.sp,
                     textAlign = TextAlign.Center,
@@ -213,7 +211,7 @@ private fun Paragraph(text: String) {
  * Privacy-policy placeholder in the NoticeCard look (Surface1, 16dp corners, 1dp Amber 50%
  * outline, Amber icon). Built locally because [io.github.wa_otomia.darkroom.ui.components.NoticeCard]
  * has a single text slot and this box carries a Paper title plus an Amber note (8.10:1 on Surface1).
- * Read as one unit by TalkBack, as the old box was.
+ * Merged so TalkBack reads the title and note as one item (the old box read them separately).
  */
 @Composable
 private fun PolicyNotice(modifier: Modifier = Modifier) {
