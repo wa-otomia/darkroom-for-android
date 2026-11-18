@@ -1,5 +1,6 @@
 package io.github.wa_otomia.darkroom.ui.studio
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -10,13 +11,14 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -27,20 +29,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.BrandingWatermark
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Rotate90DegreesCcw
+import androidx.compose.material.icons.outlined.Rotate90DegreesCw
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -61,31 +64,39 @@ import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
-import io.github.wa_otomia.darkroom.ui.theme.Room
-import kotlinx.coroutines.launch
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import io.github.wa_otomia.darkroom.R
 import io.github.wa_otomia.darkroom.ui.components.DarkroomTextField
-import io.github.wa_otomia.darkroom.ui.components.GhostButton
+import io.github.wa_otomia.darkroom.ui.components.IconCircleButton
+import io.github.wa_otomia.darkroom.ui.components.SegmentedPills
+import io.github.wa_otomia.darkroom.ui.components.SelectPill
+import io.github.wa_otomia.darkroom.ui.components.TonalButton
+import io.github.wa_otomia.darkroom.ui.components.darkroomSwitchColors
+import io.github.wa_otomia.darkroom.ui.components.pressScale
 import io.github.wa_otomia.darkroom.ui.theme.Amber
-import io.github.wa_otomia.darkroom.ui.theme.Ink
+import io.github.wa_otomia.darkroom.ui.theme.AmberSoft
+import io.github.wa_otomia.darkroom.ui.theme.DarkroomMotion
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
 import io.github.wa_otomia.darkroom.ui.theme.PaperFaint
-import io.github.wa_otomia.darkroom.ui.theme.PaperHairline
-import io.github.wa_otomia.darkroom.ui.theme.SurfaceLow
-import coil.compose.AsyncImage
+import io.github.wa_otomia.darkroom.ui.theme.SheetTopShape
+import io.github.wa_otomia.darkroom.ui.theme.Surface1
+import io.github.wa_otomia.darkroom.ui.theme.Surface2
+import io.github.wa_otomia.darkroom.ui.theme.Surface3
+import kotlinx.coroutines.launch
 
 internal enum class StudioTab(val key: String, val labelRes: Int) {
     Compose("compose", R.string.studio_tab_compose),
@@ -107,6 +118,12 @@ internal fun studioEqualPanelHeight(measuredHeights: IntArray, capPx: Int): Int 
     return tallest.coerceAtMost(capPx)
 }
 
+/**
+ * The three Studio tabs as one segmented control (Role.Tab, selected state). Tapping the current
+ * tab still calls [onSelect], which the drawer uses to collapse. Transparent, so it takes the
+ * colour of whatever holds it (drawer Surface1, wide-screen panel Room). Labels wrap at large
+ * font sizes instead of being cut.
+ */
 @Composable
 internal fun StudioTabBar(
     selected: StudioTab,
@@ -114,45 +131,21 @@ internal fun StudioTabBar(
     modifier: Modifier = Modifier,
     includeNavigationBars: Boolean = false,
 ) {
-    Row(
+    val tabs = StudioTab.entries
+    val labels = tabs.map { stringResource(it.labelRes) }
+    Box(
         modifier
             .fillMaxWidth()
-            .background(Room)
-            .then(if (includeNavigationBars) Modifier.navigationBarsPadding() else Modifier),
+            .then(if (includeNavigationBars) Modifier.navigationBarsPadding() else Modifier)
+            .padding(horizontal = 16.dp, vertical = 6.dp),
     ) {
-        StudioTab.entries.forEach { tab ->
-            val active = tab == selected
-            val label = stringResource(tab.labelRes)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 48.dp)
-                    .semantics {
-                        this.role = Role.Tab
-                        this.selected = active
-                    }
-                    .clickable(role = Role.Tab) { onSelect(tab) }
-                    .padding(vertical = 10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    text = label,
-                    color = if (active) Amber else PaperDim,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Box(
-                    Modifier
-                        .padding(top = 6.dp)
-                        .width(24.dp)
-                        .height(2.dp)
-                        .background(if (active) Amber else Color.Transparent),
-                )
-            }
-        }
+        SegmentedPills(
+            options = labels,
+            selectedIndex = tabs.indexOf(selected),
+            onSelect = { index -> onSelect(tabs[index]) },
+            modifier = Modifier.fillMaxWidth(),
+            role = Role.Tab,
+        )
     }
 }
 
@@ -220,9 +213,12 @@ internal fun StudioEqualHeightTabs(
 }
 
 /**
- * Tab bar stays on screen as the peek; the selected panel slides in above it.
- * BottomSheetScaffold peeks from the top of the sheet, so a bottom-anchored tab
- * bar has to be its own drawer rather than sheet content.
+ * Drag handle and tab bar stay on screen as the peek; the selected panel opens below the tabs
+ * and pushes them up. A Surface1 sheet with 28dp top corners. The navigation bar inset is taken
+ * at the bottom of the drawer itself; that also consumes it for a tab bar that asks for it
+ * (includeNavigationBars), so the inset is never applied twice. BottomSheetScaffold peeks from
+ * the top of a sheet whose height it owns, so this measured, equal-height drawer stays its own
+ * component.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -272,7 +268,13 @@ internal fun StudioControlsDrawer(
         scope.launch { revealed.snapTo(next) }
     }
 
-    Column(modifier.fillMaxWidth().background(Room)) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(SheetTopShape)
+            .background(Surface1)
+            .navigationBarsPadding(),
+    ) {
         Box(
             Modifier
                 .fillMaxWidth()
@@ -284,7 +286,19 @@ internal fun StudioControlsDrawer(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            BottomSheetDefaults.DragHandle(color = PaperDim)
+            // The stock handle keeps its TalkBack label and 48dp-high drag strip; drawn as the
+            // 32x4dp PaperFaint grabber (3.32:1 on Surface1, decorative).
+            BottomSheetDefaults.DragHandle(width = 32.dp, height = 4.dp, color = PaperFaint)
+        }
+        Box(
+            Modifier.draggable(
+                state = barDrag,
+                orientation = Orientation.Vertical,
+                enabled = contentPx > 0,
+                onDragStopped = { settleFromDrag() },
+            ),
+        ) {
+            tabBar()
         }
         Box(
             Modifier
@@ -301,16 +315,6 @@ internal fun StudioControlsDrawer(
                 panel()
             }
         }
-        Box(
-            Modifier.draggable(
-                state = barDrag,
-                orientation = Orientation.Vertical,
-                enabled = contentPx > 0,
-                onDragStopped = { settleFromDrag() },
-            ),
-        ) {
-            tabBar()
-        }
     }
 }
 
@@ -322,8 +326,14 @@ internal fun StudioControlsDrawer(
 @Composable
 private fun chipMaxWidth() = 160.dp * LocalDensity.current.fontScale.coerceIn(1f, 2f)
 
-private val VersionTileShape = RoundedCornerShape(8.dp)
+/** 12dp thumbnail corners (D4); the selected one carries the only outline, 2dp Amber. */
+private val VersionTileShape = RoundedCornerShape(12.dp)
 private val VersionTileSize = 72.dp
+
+/** Hand-drawn 36dp pills use a fixed radius, not a stadium, so a wrapped label never hits the curve. */
+private val StudioPillShape = RoundedCornerShape(18.dp)
+private val StudioPillVisualHeight = 36.dp
+private val StudioTouchTarget = 48.dp
 
 /**
  * One entry in the single-choice strip that picks which version of *this* photo
@@ -361,22 +371,22 @@ internal fun StudioVersionTile(
             modifier = Modifier
                 .size(VersionTileSize)
                 .clip(VersionTileShape)
-                .background(SurfaceLow)
-                .border(
-                    width = if (selected) 2.dp else 1.dp,
-                    color = if (selected) Amber else PaperHairline,
-                    shape = VersionTileShape,
+                .background(Surface2)
+                .then(
+                    if (selected) Modifier.border(2.dp, Amber, VersionTileShape) else Modifier,
                 ),
         )
         Text(
             text = label,
+            // Amber 8.10:1 and PaperDim 5.16:1 on Surface1.
             color = if (selected) Amber else if (enabled) PaperDim else PaperFaint,
-            fontSize = 11.sp,
-            lineHeight = 14.sp,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
         )
     }
 }
@@ -385,6 +395,7 @@ internal fun StudioVersionTile(
  * Leaves this photo for a sibling in the same lineage. Nothing here is ever
  * "selected" — the chip navigates away — so it is a plain button, and the full
  * label goes into the description because the visible one may be clipped.
+ * Drawn as a 36dp Surface2 pill (Paper 13.40:1) inside a 48dp touch box.
  */
 @Composable
 internal fun StudioNavChip(
@@ -393,26 +404,55 @@ internal fun StudioNavChip(
     enabled: Boolean = true,
 ) {
     val description = stringResource(R.string.studio_open_photo, label)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
     Box(
         modifier = Modifier
-            .heightIn(min = 48.dp)
+            .heightIn(min = StudioTouchTarget)
             .widthIn(max = chipMaxWidth())
-            .clip(RoundedCornerShape(999.dp))
-            .border(1.dp, PaperFaint, RoundedCornerShape(999.dp))
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = description }
-            .padding(horizontal = 12.dp),
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
-            color = if (enabled) Paper else PaperDim,
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Box(
+            Modifier
+                .pressScale(interaction)
+                .heightIn(min = StudioPillVisualHeight)
+                .clip(StudioPillShape)
+                .background(if (pressed && enabled) Surface3 else Surface2)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = label,
+                color = if (enabled) Paper else PaperDim,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
+}
+
+/** Label of a Studio switch row: 15sp Medium like a list row title, wraps at large font sizes. */
+@Composable
+private fun StudioSwitchLabel(text: String, enabled: Boolean, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        color = if (enabled) Paper else PaperDim,
+        fontSize = 15.sp,
+        lineHeight = 20.sp,
+        fontWeight = FontWeight.Medium,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -438,16 +478,12 @@ internal fun StudioSwitchRow(
                 ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                label,
-                color = if (enabled) Paper else PaperDim,
-                modifier = Modifier.weight(1f),
-            )
+            StudioSwitchLabel(label, enabled, Modifier.weight(1f).padding(end = 12.dp))
             Switch(
                 checked = checked,
                 onCheckedChange = null,
                 enabled = enabled,
-                colors = SwitchDefaults.colors(checkedTrackColor = Amber),
+                colors = darkroomSwitchColors(),
             )
         }
         if (hint != null) {
@@ -481,16 +517,23 @@ internal fun StudioWatermarkRow(
                 ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
+            // Decorative; the label next to it names the row.
+            Icon(
+                Icons.AutoMirrored.Outlined.BrandingWatermark,
+                contentDescription = null,
+                tint = PaperDim,
+                modifier = Modifier.padding(end = 12.dp).size(20.dp),
+            )
+            StudioSwitchLabel(
                 stringResource(R.string.studio_watermark),
-                color = if (enabled) Paper else PaperDim,
-                modifier = Modifier.weight(1f),
+                enabled,
+                Modifier.weight(1f).padding(end = 12.dp),
             )
             Switch(
                 checked = checked,
                 onCheckedChange = null,
                 enabled = enabled,
-                colors = SwitchDefaults.colors(checkedTrackColor = Amber),
+                colors = darkroomSwitchColors(),
             )
         }
         if (hint != null) {
@@ -499,17 +542,22 @@ internal fun StudioWatermarkRow(
     }
 }
 
+/** 12sp note under a control; PaperDim 5.16:1 on Surface1, Amber 8.10:1 for warnings. */
 @Composable
 internal fun StudioNote(text: String, tone: Color = PaperDim, topPadding: Int = 6) {
     Text(
         text = text,
         color = tone,
         fontSize = 12.sp,
-        lineHeight = 17.sp,
+        lineHeight = 18.sp,
         modifier = Modifier.fillMaxWidth().padding(top = topPadding.dp, bottom = 4.dp),
     )
 }
 
+/**
+ * The extra-prompt button next to the preset dropdown: a round tonal button, Amber icon once a
+ * prompt is set, with the prompt's first line beside it.
+ */
 @Composable
 internal fun StudioExtraPromptRow(
     prompt: String,
@@ -520,21 +568,15 @@ internal fun StudioExtraPromptRow(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.padding(start = 8.dp),
     ) {
-        IconButton(
+        IconCircleButton(
+            icon = if (hasPrompt) Icons.Filled.Edit else Icons.Outlined.Edit,
+            contentDescription = stringResource(R.string.studio_extra_prompt_edit),
             onClick = onEdit,
             enabled = enabled,
-        ) {
-            Icon(
-                imageVector = if (hasPrompt) Icons.Filled.Edit else Icons.Outlined.Edit,
-                contentDescription = stringResource(R.string.studio_extra_prompt_edit),
-                tint = when {
-                    !enabled -> PaperDim
-                    hasPrompt -> Amber
-                    else -> Paper
-                },
-            )
-        }
+            contentColor = if (hasPrompt) Amber else Paper,
+        )
         if (hasPrompt) {
             Text(
                 prompt.trim(),
@@ -594,7 +636,7 @@ internal fun ExtraPromptDialog(
  * Orientation and rotate/reset share one [FlowRow] so they sit on a single line
  * when width allows and wrap on narrow or large-font layouts.
  *
- * [orientationSelected] false shows neither orientation chip as selected while both stay
+ * [orientationSelected] false shows neither orientation pill as selected while both stay
  * usable (ID photo mode, where tapping one leaves the mode).
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -611,35 +653,44 @@ internal fun FramingControls(
     val shownDegrees = Math.round(rotationDegrees) % 360
     FlowRow(
         Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        ToggleChip(
-            label = stringResource(R.string.studio_frame_portrait),
-            active = orientationSelected && !landscape,
-            enabled = enabled,
-            onClick = { onOrientation(false) },
-        )
-        ToggleChip(
-            label = stringResource(R.string.studio_frame_landscape),
-            active = orientationSelected && landscape,
-            enabled = enabled,
-            onClick = { onOrientation(true) },
-        )
-        GlyphButton(
-            glyph = "↺",
-            description = stringResource(R.string.studio_rotate_left),
-            enabled = enabled,
+        // The two orientation pills form one radio group; they wrap on their own at large
+        // font sizes.
+        FlowRow(
+            Modifier.selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SelectPill(
+                selected = orientationSelected && !landscape,
+                label = stringResource(R.string.studio_frame_portrait),
+                onClick = { onOrientation(false) },
+                enabled = enabled,
+            )
+            SelectPill(
+                selected = orientationSelected && landscape,
+                label = stringResource(R.string.studio_frame_landscape),
+                onClick = { onOrientation(true) },
+                enabled = enabled,
+            )
+        }
+        // Counter-clockwise / clockwise quarter turns. Not auto-mirrored: the turn direction
+        // is the same in RTL.
+        IconCircleButton(
+            icon = Icons.Outlined.Rotate90DegreesCcw,
+            contentDescription = stringResource(R.string.studio_rotate_left),
             onClick = { onRotate(-1) },
-        )
-        GlyphButton(
-            glyph = "↻",
-            description = stringResource(R.string.studio_rotate_right),
             enabled = enabled,
+        )
+        IconCircleButton(
+            icon = Icons.Outlined.Rotate90DegreesCw,
+            contentDescription = stringResource(R.string.studio_rotate_right),
             onClick = { onRotate(1) },
+            enabled = enabled,
         )
         if (onReset != null) {
-            GhostButton(
+            TonalButton(
                 text = stringResource(R.string.studio_reset),
                 enabled = enabled,
                 fillMaxWidth = false,
@@ -658,25 +709,12 @@ internal fun FramingControls(
     }
 }
 
-@Composable
-private fun ToggleChip(label: String, active: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    ChipFrame(
-        label = label,
-        active = active,
-        enabled = enabled,
-        interaction = Modifier.selectable(
-            selected = active,
-            enabled = enabled,
-            role = Role.RadioButton,
-            onClick = onClick,
-        ),
-    )
-}
-
 /**
- * An on/off switch drawn as the square portrait/landscape chip (EDID010-R01): Amber when on,
- * outlined when off, at least 48 dp. TalkBack hears the label, the Switch role and the on/off
- * state, also while disabled (a disabled toggleable ignores taps but keeps its semantics).
+ * An on/off switch drawn as a choice pill (EDID010-R01): AmberSoft fill and Amber label when on,
+ * Surface2 and Paper when off, 36dp inside a 48dp touch box. TalkBack hears the label, the
+ * Switch role and the on/off state, also while disabled (a disabled toggleable ignores taps but
+ * keeps its semantics). Not a [SelectPill]: that one announces selected/not selected and a
+ * radio role, while this is a switch.
  */
 @Composable
 internal fun StudioToggleChip(
@@ -687,71 +725,57 @@ internal fun StudioToggleChip(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val state = stringResource(if (checked) R.string.studio_toggle_on else R.string.studio_toggle_off)
-    ChipFrame(
-        label = label,
-        active = checked,
-        enabled = enabled,
-        modifier = modifier,
-        interaction = Modifier
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val fill by animateColorAsState(
+        targetValue = when {
+            checked -> AmberSoft
+            pressed && enabled -> Surface3
+            else -> Surface2
+        },
+        animationSpec = DarkroomMotion.stateChange(),
+        label = "studioTogglePillFill",
+    )
+    val content by animateColorAsState(
+        targetValue = when {
+            !enabled -> PaperDim
+            checked -> Amber
+            else -> Paper
+        },
+        animationSpec = DarkroomMotion.stateChange(),
+        label = "studioTogglePillContent",
+    )
+    Box(
+        modifier = modifier
+            .heightIn(min = StudioTouchTarget)
+            .widthIn(min = StudioTouchTarget)
             .toggleable(
                 value = checked,
+                interactionSource = interaction,
+                indication = null,
                 enabled = enabled,
                 role = Role.Switch,
                 onValueChange = onCheckedChange,
             )
             .semantics { stateDescription = state },
-    )
-}
-
-@Composable
-private fun ChipFrame(
-    label: String,
-    active: Boolean,
-    enabled: Boolean,
-    interaction: Modifier,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .heightIn(min = 48.dp)
-            .widthIn(min = 48.dp)
-            .clip(RoundedCornerShape(2.dp))
-            .background(if (active) Amber.copy(alpha = if (enabled) 0.9f else 0.4f) else Color.Transparent)
-            .then(if (active) Modifier else Modifier.border(1.dp, PaperFaint, RoundedCornerShape(2.dp)))
-            .then(interaction)
-            .padding(horizontal = 14.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
-            color = if (active) Ink else if (enabled) Paper else PaperDim,
-            fontSize = 13.sp,
-            lineHeight = 18.sp,
-        )
-    }
-}
-
-/**
- * The glyph grows with the font scale, so the box takes 48dp as a floor rather
- * than a fixed size and lets the content push it out from there.
- */
-@Composable
-private fun GlyphButton(glyph: String, description: String, enabled: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .clip(RoundedCornerShape(2.dp))
-            .border(1.dp, PaperFaint, RoundedCornerShape(2.dp))
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = description }
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            glyph,
-            color = if (enabled) Paper else PaperDim,
-            fontSize = 20.sp,
-            lineHeight = 26.sp,
-        )
+        Box(
+            Modifier
+                .pressScale(interaction)
+                .heightIn(min = StudioPillVisualHeight)
+                .clip(StudioPillShape)
+                .background(fill)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = label,
+                color = content,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
     }
 }
