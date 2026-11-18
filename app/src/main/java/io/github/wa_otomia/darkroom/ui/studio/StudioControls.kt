@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -36,6 +37,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.BrandingWatermark
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Rotate90DegreesCcw
 import androidx.compose.material.icons.outlined.Rotate90DegreesCw
@@ -219,6 +221,12 @@ internal fun StudioEqualHeightTabs(
  * (includeNavigationBars), so the inset is never applied twice. BottomSheetScaffold peeks from
  * the top of a sheet whose height it owns, so this measured, equal-height drawer stays its own
  * component.
+ *
+ * The handle is the stock [BottomSheetDefaults.DragHandle] drawn with SheetGrabber's 32x4dp
+ * PaperFaint look, not SheetGrabber itself: the stock one keeps the localized "drag handle"
+ * TalkBack label and a 48dp-high drag strip (22dp above and below the bar), which a bare
+ * SheetGrabber (no semantics, no padding) lacks. Integration note: StudioScreen.kt on
+ * mvd/studio_shell has its own private drawer copy; only one of the two should survive.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -383,7 +391,8 @@ internal fun StudioVersionTile(
             fontSize = 12.sp,
             lineHeight = 16.sp,
             fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-            maxLines = 1,
+            // Two lines so "Original" stays whole at 200% font scale; long names still ellipsize.
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
@@ -504,16 +513,14 @@ internal fun StudioWatermarkRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
-                .then(
-                    if (enabled) {
-                        Modifier.toggleable(
-                            value = checked,
-                            role = Role.Switch,
-                            onValueChange = onCheckedChange,
-                        )
-                    } else {
-                        Modifier
-                    },
+                // Kept when disabled too (always so in ID photo mode), so TalkBack still hears
+                // the on/off state, the Switch role and "disabled"; a disabled toggleable
+                // ignores taps.
+                .toggleable(
+                    value = checked,
+                    enabled = enabled,
+                    role = Role.Switch,
+                    onValueChange = onCheckedChange,
                 ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -729,6 +736,9 @@ internal fun StudioToggleChip(
     val pressed by interaction.collectIsPressedAsState()
     val fill by animateColorAsState(
         targetValue = when {
+            // Pressed while on still changes the fill, so the press shows with animations off
+            // (pressScale is inert then). Amber stays 4.66:1 on it over Surface1.
+            checked && pressed && enabled -> Amber.copy(alpha = 0.28f)
             checked -> AmberSoft
             pressed && enabled -> Surface3
             else -> Surface2
@@ -769,13 +779,26 @@ internal fun StudioToggleChip(
                 .padding(horizontal = 14.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = label,
-                color = content,
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                fontWeight = FontWeight.Medium,
-            )
+            // The check mark and the heavier weight show "on" without relying on hue alone
+            // (the on/off fills differ by only ~1.2:1). Decorative: the state is announced.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (checked) {
+                    Icon(
+                        Icons.Outlined.Check,
+                        contentDescription = null,
+                        tint = content,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(
+                    text = label,
+                    color = content,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Medium,
+                )
+            }
         }
     }
 }

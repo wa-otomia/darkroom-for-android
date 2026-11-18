@@ -24,7 +24,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -49,6 +52,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -204,7 +208,9 @@ private fun IdPhotoSizeDropdown(
             onValueChange = {},
             readOnly = true,
             enabled = enabled,
-            singleLine = true,
+            // Wraps at large font sizes so the per-sheet count is not cut off.
+            singleLine = false,
+            maxLines = 3,
             label = { Text(stringResource(R.string.studio_id_size), color = PaperDim) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(open) },
             modifier = Modifier
@@ -225,13 +231,22 @@ private fun IdPhotoSizeDropdown(
         ) {
             ID_PHOTO_PRESETS.forEach { preset ->
                 val count = idPhotoLayout(preset).count
+                val current = preset.id == selected.id
                 DropdownMenuItem(
+                    // The current size is marked by a check and announced as selected, not by
+                    // the Amber text alone.
+                    modifier = Modifier.semantics { this.selected = current },
+                    trailingIcon = if (current) {
+                        { Icon(Icons.Outlined.Check, contentDescription = null, tint = Amber) }
+                    } else {
+                        null
+                    },
                     text = {
                         Column(Modifier.padding(vertical = 4.dp)) {
                             Text(
                                 "${idPresetMm(preset)} mm · " +
                                     pluralStringResource(R.plurals.studio_id_per_sheet, count, count),
-                                color = if (preset.id == selected.id) Amber else Paper,
+                                color = if (current) Amber else Paper,
                                 fontSize = 14.sp,
                                 lineHeight = 19.sp,
                             )
@@ -533,7 +548,9 @@ private fun IdBackgroundOption(
             )
             Text(
                 stringResource(idBackgroundUseRes(option)),
-                color = PaperDim,
+                // PaperDim on the selected AmberSoft fill is 4.46:1 over Surface1, under the text
+                // minimum; Paper at 62% is 5.24:1 there.
+                color = if (selected && enabled) Paper.copy(alpha = 0.62f) else PaperDim,
                 fontSize = 12.sp,
                 lineHeight = 18.sp,
             )
