@@ -40,6 +40,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -71,15 +73,22 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
@@ -349,12 +358,15 @@ fun IoScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 val active = listening || starting
-                Row(
+                // FlowRow, not Row: at large font scales the button wraps under the pill instead
+                // of squeezing the status text into mid-word breaks.
+                FlowRow(
                     Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Box(Modifier.weight(1f)) {
+                    Box(Modifier.padding(end = 12.dp)) {
                         StatusPill(
                             text = when {
                                 portBlocked -> stringResource(R.string.ftp_port_unavailable)
@@ -551,7 +563,6 @@ private fun SessionsBlock(sessions: List<FtpSessionInfo>, transfers: List<Incomi
             Text(
                 sessionSubtitle(session, now),
                 color = PaperDim,
-                fontFamily = MonoFont,
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
                 modifier = Modifier.padding(top = 2.dp),
@@ -571,11 +582,18 @@ private fun SessionsBlock(sessions: List<FtpSessionInfo>, transfers: List<Incomi
 }
 
 @Composable
-private fun sessionSubtitle(session: FtpSessionInfo, nowMs: Long): String {
+private fun sessionSubtitle(session: FtpSessionInfo, nowMs: Long): AnnotatedString {
     val user = session.user.ifBlank { stringResource(R.string.io_session_anonymous) }
     val auth = if (session.authed) user else stringResource(R.string.io_session_signing_in)
     val elapsed = formatSessionElapsed(session.connectedAt, nowMs)
-    return if (elapsed.isEmpty()) auth else "$auth · $elapsed"
+    // Sans for the (localised) sign-in state; Mono only for the ticking elapsed time.
+    return buildAnnotatedString {
+        append(auth)
+        if (elapsed.isNotEmpty()) {
+            append(" · ")
+            withStyle(SpanStyle(fontFamily = MonoFont)) { append(elapsed) }
+        }
+    }
 }
 
 @Composable
@@ -746,13 +764,19 @@ private fun HostRows(
                 ) {
                     Column(Modifier.weight(1f)) {
                         LabelWithConfirm(label, confirmedLabel == label)
-                        Text(
+                        // One line that shrinks to fit (24sp down to 12sp): an IP has no break
+                        // opportunity, and a split "192.168.1.2 / 4" invites a mistyped address.
+                        BasicText(
                             target.ip,
-                            color = Paper,
-                            fontFamily = MonoFont,
-                            fontSize = 24.sp,
-                            lineHeight = 30.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            style = TextStyle(
+                                color = Paper,
+                                fontFamily = MonoFont,
+                                fontSize = 24.sp,
+                                lineHeight = 30.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                            maxLines = 1,
+                            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 24.sp),
                         )
                     }
                     IconButton(onClick = { onCopy(label, target.ip) }) {
@@ -799,7 +823,9 @@ private fun Credential(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f, fill = false)) {
-            LabelWithConfirm(label, confirmedLabel == label)
+            // The cell is content-sized, so the marker's slot is always reserved: showing
+            // "Copied" must not widen the cell and reflow port/user in the FlowRow.
+            LabelWithConfirm(label, confirmedLabel == label, reserveSpace = true)
             Text(value, color = Paper, fontFamily = MonoFont, fontSize = 18.sp, lineHeight = 24.sp)
         }
         IconButton(onClick = { onCopy(label) }) {
@@ -823,16 +849,32 @@ private fun FieldLabel(text: String) {
 /**
  * Field label with room for the "copied" marker beside it. Putting the marker on the label line
  * keeps the value from being reflowed or ellipsised when the confirmation appears.
+ *
+ * With [reserveSpace], an invisible copy of the marker (InlineConfirm's 16dp icon, 6dp gap and
+ * 12sp/16 text) holds its width at all times, so a content-sized parent never changes size.
  */
 @Composable
-private fun LabelWithConfirm(label: String, confirmed: Boolean) {
+private fun LabelWithConfirm(label: String, confirmed: Boolean, reserveSpace: Boolean = false) {
+    val copied = stringResource(R.string.common_copied)
     Row(verticalAlignment = Alignment.CenterVertically) {
         FieldLabel(label)
-        InlineConfirm(
-            visible = confirmed,
-            text = stringResource(R.string.common_copied),
-            modifier = Modifier.padding(start = 8.dp),
-        )
+        Box(Modifier.padding(start = 8.dp), contentAlignment = Alignment.CenterStart) {
+            if (reserveSpace) {
+                Row(
+                    Modifier.alpha(0f).clearAndSetSemantics { },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Spacer(Modifier.size(16.dp))
+                    Text(
+                        copied,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+            }
+            InlineConfirm(visible = confirmed, text = copied)
+        }
     }
 }
 

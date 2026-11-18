@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -191,7 +192,12 @@ private fun PrintJobRow(
         contentPadding = 14.dp,
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // One TalkBack stop for "file name, origin, status"; the thumbnail is decorative here
+        // because the file name is already read from the text beside it.
+        Row(
+            Modifier.semantics(mergeDescendants = true) { },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Box(
                 Modifier
                     .width(40.dp)
@@ -201,7 +207,7 @@ private fun PrintJobRow(
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(context).data(thumb).crossfade(true).build(),
-                    contentDescription = filename,
+                    contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
