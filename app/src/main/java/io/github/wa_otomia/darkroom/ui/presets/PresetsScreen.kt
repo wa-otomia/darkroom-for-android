@@ -1,32 +1,38 @@
 package io.github.wa_otomia.darkroom.ui.presets
 
-import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +56,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,22 +71,29 @@ import io.github.wa_otomia.darkroom.core.EDIT_PRESETS
 import io.github.wa_otomia.darkroom.core.isSeedPresetId
 import io.github.wa_otomia.darkroom.data.settings.SettingsRepository
 import io.github.wa_otomia.darkroom.ui.UserErrorDialog
+import io.github.wa_otomia.darkroom.ui.components.DarkroomCard
 import io.github.wa_otomia.darkroom.ui.components.DarkroomSnackbarHost
 import io.github.wa_otomia.darkroom.ui.components.DarkroomTextField
-import io.github.wa_otomia.darkroom.ui.components.GhostButton
+import io.github.wa_otomia.darkroom.ui.components.PageTitle
 import io.github.wa_otomia.darkroom.ui.components.PaperButton
-import io.github.wa_otomia.darkroom.ui.components.ScreenHeader
 import io.github.wa_otomia.darkroom.ui.components.SectionLabel
+import io.github.wa_otomia.darkroom.ui.components.SelectPill
 import io.github.wa_otomia.darkroom.ui.components.StatusBadge
+import io.github.wa_otomia.darkroom.ui.components.TonalButton
+import io.github.wa_otomia.darkroom.ui.components.pressScale
+import io.github.wa_otomia.darkroom.ui.navigation.LocalBottomBarClearance
 import io.github.wa_otomia.darkroom.ui.theme.Amber
+import io.github.wa_otomia.darkroom.ui.theme.CardShape
 import io.github.wa_otomia.darkroom.ui.theme.Danger
-import io.github.wa_otomia.darkroom.ui.theme.Ink
 import io.github.wa_otomia.darkroom.ui.theme.MonoFont
+import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
 import io.github.wa_otomia.darkroom.ui.theme.PaperFaint
-import io.github.wa_otomia.darkroom.ui.theme.PaperHairline
-import io.github.wa_otomia.darkroom.ui.theme.Room
+import io.github.wa_otomia.darkroom.ui.theme.SheetTopShape
+import io.github.wa_otomia.darkroom.ui.theme.Surface1
+import io.github.wa_otomia.darkroom.ui.theme.Surface2
+import io.github.wa_otomia.darkroom.ui.theme.Surface3
 import kotlinx.coroutines.launch
 
 /** Mirrors the limits enforced by validateAiPresetFields. */
@@ -190,51 +207,67 @@ fun PresetsScreen(settings: SettingsRepository) {
     val defaultTitle = store.presets.firstOrNull { it.id == store.lastSelectedId }?.title
         ?: stringResource(R.string.lib_presets_default_none)
 
+    // Top-level tab: the floating nav bar sits over the bottom of this screen (design D3).
+    val clearance = LocalBottomBarClearance.current
+
     Scaffold(
         // containerColor/contentColor default to background/onBackground, i.e. Room/Paper.
         contentWindowInsets = WindowInsets(0),
-        snackbarHost = { DarkroomSnackbarHost(snackbar) },
+        snackbarHost = { DarkroomSnackbarHost(snackbar, Modifier.padding(bottom = clearance)) },
     ) { padding ->
         Column(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
+                .padding(horizontal = 20.dp),
         ) {
-            ScreenHeader(
-                eyebrow = stringResource(R.string.presets_eyebrow),
+            // One page heading (SYUI020-R05); the intro moves under the default-preset item it explains.
+            PageTitle(
                 title = stringResource(R.string.presets_title),
+                modifier = Modifier.padding(top = 12.dp, bottom = 12.dp),
             )
-            Text(stringResource(R.string.presets_desc), style = MaterialTheme.typography.bodyMedium, color = PaperDim, modifier = Modifier.padding(top = 8.dp, bottom = 16.dp))
+
             SectionLabel(stringResource(R.string.default_preset))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            DarkroomCard(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     stringResource(R.string.lib_presets_default_current, defaultTitle),
                     color = Paper,
-                    fontFamily = MonoFont,
-                    fontSize = 14.sp,
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                )
+                Text(
+                    stringResource(R.string.presets_desc),
+                    color = PaperDim,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                )
+                Text(
+                    stringResource(R.string.lib_presets_default_hint),
+                    color = PaperDim,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
                 )
                 if (store.lastSelectedId != AI_PRESET_NONE) {
-                    GhostButton(stringResource(R.string.lib_presets_default_clear), fillMaxWidth = false) {
+                    TonalButton(
+                        stringResource(R.string.lib_presets_default_clear),
+                        fillMaxWidth = false,
+                        modifier = Modifier.padding(top = 6.dp),
+                    ) {
                         setDefault(AI_PRESET_NONE)
                     }
                 }
             }
-            Text(
-                stringResource(R.string.lib_presets_default_hint),
-                color = PaperDim,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
-            )
-            PaperButton(stringResource(R.string.add_preset)) { openEditor(null) }
+            Spacer(Modifier.height(16.dp))
+            PaperButton(stringResource(R.string.add_preset), icon = Icons.Outlined.Add) { openEditor(null) }
 
             AI_PRESET_CATEGORIES.forEach { cat ->
                 val items = store.presets.filter { it.category == cat }
                 if (items.isEmpty()) return@forEach
+                Spacer(Modifier.height(24.dp))
                 SectionLabel(categoryLabel(cat))
                 items.forEach { preset ->
                     val builtin = isSeedPresetId(preset.id)
@@ -254,6 +287,8 @@ fun PresetsScreen(settings: SettingsRepository) {
                     )
                 }
             }
+            // The last card can scroll fully clear of the floating nav bar.
+            Spacer(Modifier.height(clearance + 16.dp))
         }
     }
 
@@ -264,22 +299,27 @@ fun PresetsScreen(settings: SettingsRepository) {
                 if (dirty) confirmDiscard = true else closeEditor()
             },
             sheetState = sheetState,
-            // Kept explicit: the sheet default is surfaceContainerLow (#141210), which would
-            // lift the editor off the page background and change the current look.
-            containerColor = Room,
+            // Sheets sit one layer up on Surface1 with 28dp top corners (design D4).
+            shape = SheetTopShape,
+            containerColor = Surface1,
             contentColor = Paper,
+            // Stock handle kept for its TalkBack label and expand/dismiss actions; only recoloured.
+            dragHandle = { BottomSheetDefaults.DragHandle(color = PaperFaint) },
         ) {
             Column(
                 Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .imePadding()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 16.dp),
             ) {
                 Text(
                     if (editingId == null) stringResource(R.string.add_preset) else stringResource(R.string.common_edit),
                     style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.padding(bottom = 12.dp),
+                    color = Paper,
+                    modifier = Modifier
+                        .padding(bottom = 16.dp)
+                        .semantics { heading() },
                 )
                 CountedField(
                     label = stringResource(R.string.preset_title),
@@ -291,23 +331,26 @@ fun PresetsScreen(settings: SettingsRepository) {
                     title = it
                     titleTouched = true
                 }
-                SectionLabel(stringResource(R.string.lib_presets_category))
+                // Same field-label style as Title and Prompt (CountedField), not a page-level heading.
+                Text(
+                    stringResource(R.string.lib_presets_category),
+                    color = PaperDim,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+                // Mutually exclusive choice: SelectPills in a selectable group (radio semantics).
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(bottom = 16.dp),
+                    modifier = Modifier
+                        .selectableGroup()
+                        .padding(bottom = 12.dp),
                 ) {
                     AI_PRESET_CATEGORIES.forEach { cat ->
-                        FilterChip(
+                        SelectPill(
                             selected = category == cat,
+                            label = categoryLabel(cat),
                             onClick = { category = cat },
-                            label = { Text(categoryLabel(cat)) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                labelColor = Paper,
-                                selectedContainerColor = Paper,
-                                selectedLabelColor = Ink,
-                                selectedLeadingIconColor = Ink,
-                            ),
                         )
                     }
                 }
@@ -333,9 +376,8 @@ fun PresetsScreen(settings: SettingsRepository) {
                         scope.launch { snackbar.showSnackbar(savedText) }
                     }.onFailure { editorError = it.message }
                 }
-                Box(Modifier.padding(top = 8.dp)) {
-                    GhostButton(stringResource(R.string.common_cancel)) { requestClose() }
-                }
+                Spacer(Modifier.height(8.dp))
+                TonalButton(stringResource(R.string.common_cancel)) { requestClose() }
             }
         }
     }
@@ -470,79 +512,88 @@ private fun PresetCard(
     onDelete: () -> Unit,
 ) {
     val editLabel = stringResource(R.string.common_edit)
-    Column(
-        Modifier
-            .fillMaxWidth()
+    // Surface1 card, no outline; the default preset alone gets the 1dp Amber selected-state
+    // border (SYUI020-R02). Tapping the card edits it; the click is clipped to the card corners
+    // and announced with the "Edit" action label, as before.
+    DarkroomCard(
+        modifier = Modifier
             .padding(bottom = 10.dp)
-            // Card frame: decorative, so a hairline. The pill inside it carries the affordance
-            // weight, which keeps the control more prominent than its container.
-            .border(1.dp, if (isDefault) Amber else PaperHairline, RoundedCornerShape(2.dp))
-            .clickable(onClickLabel = editLabel, onClick = onEdit)
-            .padding(start = 12.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+            .clip(CardShape)
+            .clickable(onClickLabel = editLabel, onClick = onEdit),
+        contentPadding = 0.dp,
+        border = if (isDefault) BorderStroke(1.dp, Amber) else null,
+        verticalArrangement = Arrangement.Top,
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                preset.title,
-                color = Paper,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
-            )
-            Box {
-                IconButton(onClick = onMenuOpen) {
-                    Icon(
-                        Icons.Outlined.MoreVert,
-                        contentDescription = stringResource(R.string.lib_presets_card_actions),
-                        tint = PaperDim,
-                    )
-                }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = onMenuDismiss) {
-                    DropdownMenuItem(
-                        text = { Text(editLabel) },
-                        onClick = {
-                            onMenuDismiss()
-                            onEdit()
-                        },
-                    )
-                    if (canRestore) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.lib_presets_restore_builtin)) },
-                            onClick = {
-                                onMenuDismiss()
-                                onRestore()
-                            },
+        Column(Modifier.padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    preset.title,
+                    color = Paper,
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                )
+                Box {
+                    IconButton(onClick = onMenuOpen) {
+                        Icon(
+                            Icons.Outlined.MoreVert,
+                            contentDescription = stringResource(R.string.lib_presets_card_actions),
+                            tint = PaperDim,
                         )
                     }
-                    if (canDelete) {
+                    // Container defaults to Surface2 (surfaceContainer); 16dp corners per D4.
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = onMenuDismiss, shape = PanelShape) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.common_delete), color = Danger) },
+                            text = { Text(editLabel) },
                             onClick = {
                                 onMenuDismiss()
-                                onDelete()
+                                onEdit()
                             },
                         )
+                        if (canRestore) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.lib_presets_restore_builtin)) },
+                                onClick = {
+                                    onMenuDismiss()
+                                    onRestore()
+                                },
+                            )
+                        }
+                        if (canDelete) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.common_delete), color = Danger) },
+                                onClick = {
+                                    onMenuDismiss()
+                                    onDelete()
+                                },
+                            )
+                        }
                     }
                 }
             }
-        }
-        Text(
-            preset.prompt,
-            color = PaperDim,
-            fontSize = 13.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 4.dp, end = 8.dp),
-        )
-        // FlowRow so the two markers wrap under large font scales instead of clipping.
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 6.dp),
-        ) {
-            DefaultMarker(isDefault = isDefault, onSetDefault = onSetDefault)
-            // Read-only (AIPS030-R04): no click or semantics action; its text merges into the card for TalkBack.
-            // Min height only while shown, so a hidden badge never adds an empty wrapped line.
-            Box(Modifier.heightIn(min = if (isAutoEdit) 48.dp else 0.dp), contentAlignment = Alignment.CenterStart) {
-                StatusBadge(visible = isAutoEdit, text = stringResource(R.string.lib_presets_auto_edit_badge))
+            Text(
+                preset.prompt,
+                color = PaperDim,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(end = 12.dp),
+            )
+            // FlowRow so the two markers wrap under large font scales instead of clipping.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 4.dp, end = 12.dp),
+            ) {
+                DefaultMarker(isDefault = isDefault, onSetDefault = onSetDefault)
+                // Read-only (AIPS030-R04): no click or semantics action; its text merges into the card for TalkBack.
+                // Min height only while shown, so a hidden badge never adds an empty wrapped line.
+                Box(Modifier.heightIn(min = if (isAutoEdit) 48.dp else 0.dp), contentAlignment = Alignment.CenterStart) {
+                    StatusBadge(visible = isAutoEdit, text = stringResource(R.string.lib_presets_auto_edit_badge))
+                }
             }
         }
     }
@@ -568,31 +619,51 @@ private fun DefaultMarker(isDefault: Boolean, onSetDefault: () -> Unit, modifier
     }
 }
 
-/** Outlined control, so its border is the sole affordance and stays at PaperFaint weight. */
+/**
+ * Action chip styled like an unselected [io.github.wa_otomia.darkroom.ui.components.SelectPill]:
+ * Surface2 fill with a Paper label (13.40:1), Surface3 while pressed (11.82:1), 36dp visual
+ * inside a 48dp touch box, press scale. It is an action, not a choice, so it stays a plain
+ * clickable button without selected state.
+ */
 @Composable
 private fun SetDefaultPill(onSetDefault: () -> Unit) {
-    val shape = RoundedCornerShape(999.dp)
-    Row(
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val shape = RoundedCornerShape(18.dp)
+    Box(
         Modifier
             .heightIn(min = 48.dp)
-            .clip(shape)
-            .border(1.dp, PaperFaint, shape)
-            .clickable(onClick = onSetDefault)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onSetDefault,
+            ),
+        contentAlignment = Alignment.CenterStart,
     ) {
-        Icon(
-            Icons.Outlined.RadioButtonUnchecked,
-            contentDescription = null,
-            tint = PaperDim,
-            modifier = Modifier.size(16.dp),
-        )
-        Text(
-            stringResource(R.string.set_as_default),
-            color = PaperDim,
-            fontSize = 12.sp,
-            maxLines = 1,
-            modifier = Modifier.padding(start = 6.dp),
-        )
+        Row(
+            Modifier
+                .pressScale(interaction)
+                .heightIn(min = 36.dp)
+                .clip(shape)
+                .background(if (pressed) Surface3 else Surface2)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Outlined.RadioButtonUnchecked,
+                contentDescription = null,
+                tint = PaperDim,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                stringResource(R.string.set_as_default),
+                color = Paper,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
     }
 }

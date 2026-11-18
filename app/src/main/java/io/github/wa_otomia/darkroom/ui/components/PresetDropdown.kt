@@ -8,8 +8,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,8 +23,11 @@ import androidx.compose.ui.unit.dp
 import io.github.wa_otomia.darkroom.R
 import io.github.wa_otomia.darkroom.core.AI_PRESET_NONE
 import io.github.wa_otomia.darkroom.core.AiPreset
+import io.github.wa_otomia.darkroom.ui.theme.FieldShape
+import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
+import io.github.wa_otomia.darkroom.ui.theme.Surface2
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,7 +41,8 @@ fun PresetDropdown(
     var open by remember { mutableStateOf(false) }
     val selected = presets.find { it.id == value }?.title ?: stringResource(R.string.preset_none)
     ExposedDropdownMenuBox(expanded = open, onExpandedChange = { if (enabled) open = it }) {
-        TextField(
+        // Outlined anchor: Surface2 fill, 14dp corners, PaperFaint/Amber outline (foundation 3.6).
+        OutlinedTextField(
             value = selected,
             onValueChange = {},
             readOnly = true,
@@ -49,6 +53,7 @@ fun PresetDropdown(
                 .fillMaxWidth()
                 .padding(bottom = 8.dp)
                 .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled),
+            shape = FieldShape,
             colors = darkroomTextFieldColors(),
         )
         val menuMaxHeight = with(LocalDensity.current) {
@@ -58,6 +63,9 @@ fun PresetDropdown(
             expanded = open,
             onDismissRequest = { open = false },
             modifier = Modifier.heightIn(max = menuMaxHeight),
+            // Menus sit on Surface2 with 16dp corners (design D4).
+            shape = PanelShape,
+            containerColor = Surface2,
         ) {
             DropdownMenuItem(text = { Text(stringResource(R.string.preset_none), color = Paper) }, onClick = {
                 onChange(AI_PRESET_NONE)
