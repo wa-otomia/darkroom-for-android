@@ -12,9 +12,10 @@
     <string name="nav_io">전송</string>
     <string name="nav_presets">프리셋</string>
     <string name="nav_settings">설정</string>
-    <string name="gallery_inbox_live">갤러리</string>
     <string name="gallery_waiting">카메라 전송을 기다리는 중</string>
-    <string name="gallery_count">총 %1$d장</string>
+    <plurals name="gallery_count">
+        <item quantity="other">%1$d장</item>
+    </plurals>
     <string name="gallery_desc">카메라는 JPG만 지원합니다. 수신한 사진은 여기에 표시됩니다. 설정에서 수신 후 자동 인쇄를 켜면 2:3으로 자른 뒤 자동으로 인쇄합니다. AI 편집은 선택 사항입니다.</string>
     <string name="chip_grok_ok">AI 준비됨</string>
     <string name="chip_grok_off">AI 미설정</string>
@@ -141,7 +142,6 @@
     <string name="cancel_print">인쇄 취소</string>
     <string name="crop_overlay">2×3인치 · 1040×1560</string>
     <string name="preset_none">처리 안 함</string>
-    <string name="presets_eyebrow">프리셋</string>
     <string name="presets_title">AI 프리셋</string>
     <string name="presets_desc">인물 보정과 AI 크리에이티브 스타일. 갤러리와 인쇄는 마지막에 선택한 프리셋을 함께 쓰고, 수신 후 자동 보정은 설정에서 따로 고른 프리셋을 사용합니다.</string>
     <string name="default_preset">기본 프리셋</string>
@@ -149,7 +149,6 @@
     <string name="add_preset">프리셋 추가</string>
     <string name="preset_title">제목</string>
     <string name="preset_prompt">프롬프트</string>
-    <string name="settings_eyebrow">설정</string>
     <string name="settings_title">설정</string>
     <string name="settings_desc">AI API 키, Xiaomi 프린터(Bluetooth Classic SPP), FTP 계정, 수신 후 자동 인쇄.</string>
     <string name="settings_grok">AI 이미지 처리</string>

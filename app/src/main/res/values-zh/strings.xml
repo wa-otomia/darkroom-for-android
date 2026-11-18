@@ -12,9 +12,10 @@
     <string name="nav_io">传输</string>
     <string name="nav_presets">预设</string>
     <string name="nav_settings">设置</string>
-    <string name="gallery_inbox_live">相册</string>
     <string name="gallery_waiting">等待相机传输</string>
-    <string name="gallery_count">共 %1$d 张</string>
+    <plurals name="gallery_count">
+        <item quantity="other">%1$d 张</item>
+    </plurals>
     <string name="gallery_desc">相机仅支持 JPG 格式，照片接收后会显示在这里。在设置中开启「收图后自动打印」，即可自动裁切为 2:3 并打印。AI 修图为可选项。</string>
     <string name="chip_grok_ok">AI 已就绪</string>
     <string name="chip_grok_off">AI 未配置</string>
@@ -141,7 +142,6 @@
     <string name="cancel_print">取消打印</string>
     <string name="crop_overlay">2×3 英寸 · 1040×1560</string>
     <string name="preset_none">不处理</string>
-    <string name="presets_eyebrow">预设</string>
     <string name="presets_title">AI 预设</string>
     <string name="presets_desc">人像美化与 AI 创意风格。相册与打印共用最近选择的预设；收图后自动修图使用设置中单独选择的预设。</string>
     <string name="default_preset">默认预设</string>
@@ -149,7 +149,6 @@
     <string name="add_preset">添加预设</string>
     <string name="preset_title">标题</string>
     <string name="preset_prompt">提示词</string>
-    <string name="settings_eyebrow">设置</string>
     <string name="settings_title">设置</string>
     <string name="settings_desc">AI API 密钥、小米照片打印机（蓝牙 SPP）、FTP 账号、收图后自动打印。</string>
     <string name="settings_grok">AI 图片处理</string>

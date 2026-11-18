@@ -89,6 +89,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -705,7 +706,11 @@ private fun GalleryHeader(
     Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
         PageTitle(
             title = stringResource(R.string.nav_gallery),
-            supporting = if (empty) stringResource(R.string.gallery_waiting) else stringResource(R.string.gallery_count, count),
+            supporting = if (empty) {
+                stringResource(R.string.gallery_waiting)
+            } else {
+                pluralStringResource(R.plurals.gallery_count, count, count)
+            },
             modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
         )
         // StatusChip draws a 36dp pill in a 48dp touch box, so the rows need no extra gap.
