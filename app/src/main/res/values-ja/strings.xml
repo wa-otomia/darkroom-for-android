@@ -293,7 +293,6 @@
     <string name="ds_error_storage">ファイルの読み書きに失敗しました。端末の空き容量をご確認ください。</string>
     <string name="ds_error_ftp_bind">この FTP ポートを開けませんでした。使用中の可能性があるため、別のポートをお試しください。</string>
     <string name="copied_to_clipboard">コピーしました</string>
-    <string name="io_ftp_connection">接続情報</string>
     <string name="settings_ftp_auto_start">起動時に FTP を自動開始</string>
     <string name="settings_keep_alive">アプリを常駐</string>
     <string name="settings_keep_alive_hint">FTP と自動印刷が継続できるよう、アプリをバックグラウンドで維持します。</string>

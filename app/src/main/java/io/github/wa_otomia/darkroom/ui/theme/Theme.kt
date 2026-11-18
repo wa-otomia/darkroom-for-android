@@ -123,7 +123,9 @@ val TonalPressed = Color(0xFF38332A)
 /**
  * Amber at 16%: selected pill fill and deep-link highlight. Amber text on it
  * measures 6.69:1 over [Room], 6.10:1 over [Surface1], 5.46:1 over [Surface2];
- * Paper text 12.14:1 / 11.07:1 / 9.91:1.
+ * Paper text 12.14:1 / 11.07:1 / 9.91:1. [PaperDim] on it is only 4.46:1 over
+ * Surface1 and 4.17:1 over Surface2: not for text. Use Paper at 62% (5.24:1
+ * over Surface1) for secondary text on this fill.
  */
 val AmberSoft = Color(0x29D9A441)
 

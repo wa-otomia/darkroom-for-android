@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -49,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -57,7 +59,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -92,8 +96,10 @@ import io.github.wa_otomia.darkroom.ui.theme.DarkroomMotion
 import io.github.wa_otomia.darkroom.ui.theme.Ink
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
+import io.github.wa_otomia.darkroom.ui.theme.PaperPressed
 import io.github.wa_otomia.darkroom.ui.theme.Room
 import io.github.wa_otomia.darkroom.ui.theme.Surface2
+import io.github.wa_otomia.darkroom.ui.theme.Surface3
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -371,10 +377,18 @@ private val FloatingBarFill = Surface2.copy(alpha = 0.92f)
  * PaperDim (5.00:1 on the bar over Room, still 4.36:1 if a white photo shows
  * through the 8% transparency — icons need 3:1). Each cell is a `Role.Tab`
  * with selected state inside a `selectableGroup`, and its content
- * description is the tab label, so TalkBack reads "Settings, tab, not
- * selected, 4 of 4". The selected cell's width change animates over
+ * description is the tab label. Compose gives tabs no "not selected" state
+ * text, so unselected cells set it themselves and TalkBack reads "Settings,
+ * not selected, tab"; the selected cell gets TalkBack's own "Selected". The
+ * selected cell's width change animates over
  * [DarkroomMotion.NavBarResizeMillis]. Row order follows layout direction,
  * so the bar mirrors in RTL.
+ *
+ * The selected cell is weighted (without fill), so the icon-only cells are
+ * measured first and always keep their 48dp; at large font sizes on narrow
+ * screens the label gives way and ends in an ellipsis instead. The whole pill
+ * takes touches (as the old Material bar did), so a tap on its rim or between
+ * cells never reaches the content scrolled underneath.
  */
 @Composable
 private fun FloatingNavBar(
@@ -388,27 +402,45 @@ private fun FloatingNavBar(
             .shadow(elevation = 8.dp, shape = FloatingBarShape, clip = false)
             .clip(FloatingBarShape)
             .background(FloatingBarFill)
+            // Swallow taps that miss a cell; the content runs under the bar.
+            .pointerInput(Unit) {}
             .selectableGroup()
             .padding(FloatingBarInset),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         tabs.forEach { tab ->
+            val selected = selectedId == tab.id
             FloatingNavItem(
                 tab = tab,
-                selected = selectedId == tab.id,
+                selected = selected,
                 onClick = { onSelect(tab) },
+                modifier = if (selected) Modifier.weight(1f, fill = false) else Modifier,
             )
         }
     }
 }
 
 @Composable
-private fun FloatingNavItem(tab: NavTab, selected: Boolean, onClick: () -> Unit) {
+private fun FloatingNavItem(
+    tab: NavTab,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val label = stringResource(tab.label)
+    val notSelected = stringResource(R.string.a11y_state_not_selected)
     val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    // Every press changes the fill, so it shows with animations off too:
+    // PaperPressed keeps Ink at 11.92:1, Surface3 keeps the PaperDim icon at 4.65:1.
     val fill by animateColorAsState(
-        targetValue = if (selected) Paper else Paper.copy(alpha = 0f),
+        targetValue = when {
+            selected && pressed -> PaperPressed
+            selected -> Paper
+            pressed -> Surface3
+            else -> Surface3.copy(alpha = 0f)
+        },
         animationSpec = DarkroomMotion.stateChange(),
         label = "navItemFill",
     )
@@ -418,7 +450,7 @@ private fun FloatingNavItem(tab: NavTab, selected: Boolean, onClick: () -> Unit)
         label = "navItemContent",
     )
     Row(
-        Modifier
+        modifier
             .heightIn(min = 48.dp)
             .widthIn(min = 48.dp)
             .selectable(
@@ -428,7 +460,10 @@ private fun FloatingNavItem(tab: NavTab, selected: Boolean, onClick: () -> Unit)
                 role = Role.Tab,
                 onClick = onClick,
             )
-            .semantics { contentDescription = label }
+            .semantics {
+                contentDescription = label
+                if (!selected) stateDescription = notSelected
+            }
             .pressScale(interaction)
             .clip(FloatingItemShape)
             .background(fill)
@@ -446,8 +481,10 @@ private fun FloatingNavItem(tab: NavTab, selected: Boolean, onClick: () -> Unit)
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 fontWeight = FontWeight.Medium,
-                // The cell already carries the label as its content description.
-                modifier = Modifier.clearAndSetSemantics {},
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                // The cell already carries the full label as its content description.
+                modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics {},
             )
         }
     }

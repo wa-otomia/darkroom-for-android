@@ -23,6 +23,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -73,6 +74,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -83,6 +85,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -392,15 +395,9 @@ fun IoScreen(
                     }
                 }
 
+                // No in-card heading: the "Camera FTP" section label above already names the card
+                // (and is the TalkBack heading), and the host field label leads the values.
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(
-                        stringResource(R.string.io_ftp_connection),
-                        color = PaperDim,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.semantics { heading() },
-                    )
                     HostRows(
                         // While running, show what is actually bound; otherwise (or when the
                         // port is blocked) the Wi-Fi addresses that would be used.
@@ -758,20 +755,7 @@ private fun HostRows(
                 ) {
                     Column(Modifier.weight(1f)) {
                         LabelWithConfirm(label, confirmedLabel == label)
-                        // One line that shrinks to fit (24sp down to 12sp): an IP has no break
-                        // opportunity, and a split "192.168.1.2 / 4" invites a mistyped address.
-                        BasicText(
-                            target.ip,
-                            style = TextStyle(
-                                color = Paper,
-                                fontFamily = MonoFont,
-                                fontSize = 24.sp,
-                                lineHeight = 30.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            ),
-                            maxLines = 1,
-                            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 24.sp),
-                        )
+                        HostAddress(target.ip)
                     }
                     IconButton(onClick = { onCopy(label, target.ip) }) {
                         Icon(Icons.Outlined.ContentCopy, contentDescription = copyLabel, tint = PaperDim)
@@ -797,6 +781,48 @@ private fun HostRows(
         }
     }
 }
+
+/**
+ * The host address to type into the camera, Mono SemiBold Paper. One line that shrinks to fit
+ * (24sp down to 12sp): an IP has no break opportunity, and a split "192.168.1.2 / 4" invites a
+ * mistyped address. If even 12sp does not fit (200% font on a narrow screen), it wraps at 12sp
+ * instead: a one-line value would be cut off silently and could read as a valid but wrong address.
+ */
+@Composable
+private fun HostAddress(ip: String) {
+    val style = TextStyle(
+        color = Paper,
+        fontFamily = MonoFont,
+        fontSize = 24.sp,
+        lineHeight = 30.sp,
+        fontWeight = FontWeight.SemiBold,
+    )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val measurer = rememberTextMeasurer()
+        val density = LocalDensity.current
+        val maxPx = constraints.maxWidth
+        val fitsAtFloor = remember(ip, maxPx, density) {
+            measurer.measure(
+                ip,
+                style = style.copy(fontSize = IP_MIN_SIZE),
+                softWrap = false,
+                maxLines = 1,
+            ).size.width <= maxPx
+        }
+        if (fitsAtFloor) {
+            BasicText(
+                ip,
+                style = style,
+                maxLines = 1,
+                autoSize = TextAutoSize.StepBased(minFontSize = IP_MIN_SIZE, maxFontSize = 24.sp),
+            )
+        } else {
+            BasicText(ip, style = style.copy(fontSize = IP_MIN_SIZE, lineHeight = 16.sp))
+        }
+    }
+}
+
+private val IP_MIN_SIZE = 12.sp
 
 /**
  * One copyable connection value: label (with the "copied" marker) over a Mono value, plus a copy

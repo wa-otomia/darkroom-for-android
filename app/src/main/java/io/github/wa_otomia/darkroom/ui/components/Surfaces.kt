@@ -93,6 +93,7 @@ import io.github.wa_otomia.darkroom.ui.theme.RadiusIconTile
 import io.github.wa_otomia.darkroom.ui.theme.Surface1
 import io.github.wa_otomia.darkroom.ui.theme.Surface2
 import io.github.wa_otomia.darkroom.ui.theme.Surface3
+import io.github.wa_otomia.darkroom.ui.theme.TonalPressed
 
 /**
  * Smallest touch target we ship, per the Material accessibility guidance. Hand-drawn controls use
@@ -319,7 +320,10 @@ fun IconTile(
  * and summary together. Text wraps at any font size. Add semantics such as an
  * expanded/collapsed `stateDescription`, or an [AmberSoft] highlight
  * background, through [modifier]: it is applied to the same node, outside the
- * padding.
+ * padding. Under an [AmberSoft] highlight the PaperDim [supporting] text drops
+ * to 4.46:1 over Surface1, under the text minimum, so do not highlight a row
+ * that shows [supporting]; draw such a row's summary in Paper at 62% (5.24:1)
+ * while it is highlighted, as the Settings fold rows do.
  */
 @Composable
 fun ListRow(
@@ -479,9 +483,11 @@ fun NoticeCard(
 
 /**
  * Choice chip. Selected: [AmberSoft] fill, Amber label (6.69:1 over Room,
- * 6.10:1 over Surface1). Unselected: [Surface2] fill, Paper label (13.40:1);
- * pressed: [Surface3] (Paper 11.82:1). Disabled labels are PaperDim (4.96:1 on
- * Surface2).
+ * 6.10:1 over Surface1); pressed while selected: Amber 28% (Amber 4.66:1 over
+ * Surface1, as [TogglePill]). Unselected: [Surface2] fill, Paper label
+ * (13.40:1); pressed: [Surface3] (Paper 11.82:1). Disabled labels are PaperDim
+ * (4.96:1 on Surface2). Every press changes the fill, so it shows with
+ * animations off too.
  *
  * 36dp pill inside a 48dp touch box. Announces [role] (radio button by
  * default; use `Role.Checkbox` for multi-select filters, `Role.Tab` for tabs)
@@ -502,6 +508,7 @@ fun SelectPill(
     val pressed by interaction.collectIsPressedAsState()
     val fill by animateColorAsState(
         targetValue = when {
+            selected && pressed && enabled -> Amber.copy(alpha = 0.28f)
             selected -> AmberSoft
             pressed && enabled -> Surface3
             else -> Surface2
@@ -638,6 +645,9 @@ fun TogglePill(
 /**
  * Segmented control: [Surface2] track; the selected segment is a [Surface3]
  * block with a Paper label (11.82:1), the others PaperDim (4.96:1 on Surface2).
+ * Pressed: [TonalPressed] when selected (Paper 10.11:1; tapping the current
+ * Studio tab collapses the drawer), Surface3 at 50% otherwise, so the press
+ * shows with animations off too.
  *
  * Each segment is a 48dp-high touch cell spanning the full track height; the
  * selected block is drawn 3dp inside it. Segments share the width equally and
@@ -674,6 +684,7 @@ fun SegmentedPills(
             val pressed by interaction.collectIsPressedAsState()
             val fill by animateColorAsState(
                 targetValue = when {
+                    selected && pressed && enabled -> TonalPressed
                     selected -> Surface3
                     pressed && enabled -> Surface3.copy(alpha = 0.5f)
                     else -> Surface3.copy(alpha = 0f)

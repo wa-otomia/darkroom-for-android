@@ -289,7 +289,6 @@
     <string name="ds_error_storage">Could not read or write the file. Check the free space on this phone.</string>
     <string name="ds_error_ftp_bind">Could not open the FTP port. It may already be in use; try another port.</string>
     <string name="copied_to_clipboard">Copied</string>
-    <string name="io_ftp_connection">Connection</string>
     <string name="settings_ftp_auto_start">Start FTP when the app launches</string>
     <string name="settings_keep_alive">Keep app alive</string>
     <string name="settings_keep_alive_hint">Keeps the app running in the background so FTP and auto-print keep working.</string>

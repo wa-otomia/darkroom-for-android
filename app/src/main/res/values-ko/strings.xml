@@ -293,7 +293,6 @@
     <string name="ds_error_storage">파일을 읽거나 쓰지 못했습니다. 기기의 남은 저장 공간을 확인하세요.</string>
     <string name="ds_error_ftp_bind">이 FTP 포트를 열 수 없습니다. 이미 사용 중일 수 있으므로 다른 포트를 사용하세요.</string>
     <string name="copied_to_clipboard">복사됨</string>
-    <string name="io_ftp_connection">연결 정보</string>
     <string name="settings_ftp_auto_start">앱 시작 시 FTP 자동 실행</string>
     <string name="settings_keep_alive">앱 유지</string>
     <string name="settings_keep_alive_hint">FTP와 자동 인쇄가 계속되도록 앱을 백그라운드에서 유지합니다.</string>

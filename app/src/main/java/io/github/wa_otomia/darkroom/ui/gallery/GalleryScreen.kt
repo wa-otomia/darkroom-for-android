@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -190,8 +191,12 @@ private const val MAX_LISTED_FILES = 6
 /** Both FABs, the extended one included, use 18dp corners (D4). */
 private val FabShape = RoundedCornerShape(18.dp)
 
-/** Scaffold FAB spacing (16dp) + FAB height (56dp) + a 16dp gap over the last row. */
-private val FabRowClearance = 88.dp
+/**
+ * Scaffold FAB spacing (16dp) + a 16dp gap over the last row; the FAB group's measured height
+ * (56dp for one row) is added on top.
+ */
+private val FabRowGaps = 32.dp
+private val FabRowDefaultHeight = 56.dp
 
 /** The undo bar and delete progress as inset [PanelShape] panels, matching [SelectionBar]. */
 private val TopStripModifier = Modifier
@@ -463,6 +468,9 @@ fun GalleryScreen(
     BackHandler(enabled = selectionMode) { selection = emptySet() }
 
     val clearance = LocalBottomBarClearance.current
+    val density = LocalDensity.current
+    // Measured, since the FABs can wrap to two rows or grow with the font size.
+    var fabGroupHeight by remember { mutableStateOf(FabRowDefaultHeight) }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val columns = when {
@@ -517,12 +525,22 @@ fun GalleryScreen(
             },
             floatingActionButton = {
                 if (!selectionMode) {
-                    Row(
+                    // Side by side (D4); when both do not fit inside the 16dp screen margins (large
+                    // font on a narrow screen) the extended FAB wraps under the camera FAB, end-aligned,
+                    // instead of pushing the group off the screen's start edge.
+                    FlowRow(
                         // The Scaffold adds its own 16dp above this, so the FABs float 16dp
                         // over the navigation pill.
-                        modifier = Modifier.padding(bottom = clearance),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .padding(bottom = clearance)
+                            .widthIn(max = (maxWidth - 32.dp).coerceAtLeast(0.dp))
+                            .onSizeChanged {
+                                val measured = with(density) { it.height.toDp() }
+                                if (measured != fabGroupHeight) fabGroupHeight = measured
+                            },
+                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically,
                     ) {
                         FloatingActionButton(
                             onClick = { if (!busy) launchCamera() },
@@ -555,13 +573,13 @@ fun GalleryScreen(
                     columns = GridCells.Fixed(columns),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    // The bottom inset clears the floating navigation pill plus the FAB row above
+                    // The bottom inset clears the floating navigation pill plus the FAB group above
                     // it, so the last row can scroll fully into view.
                     contentPadding = PaddingValues(
                         start = 20.dp,
                         end = 20.dp,
                         top = 8.dp,
-                        bottom = clearance + FabRowClearance,
+                        bottom = clearance + fabGroupHeight + FabRowGaps,
                     ),
                     modifier = Modifier.fillMaxSize(),
                 ) {
@@ -904,11 +922,13 @@ private fun PhotoCard(
             Box(Modifier.matchParentSize().background(Room.copy(alpha = 0.4f)))
         }
         if (pending == null && thumbState == ThumbState.FAILED) {
+            // The dimming covers the whole tile; the icon and text are centred above the caption
+            // and any overlay bar drawn over the tile's foot, as on PendingFace, so they stay visible.
             Column(
                 Modifier
                     .matchParentSize()
                     .background(Room.copy(alpha = 0.88f))
-                    .padding(8.dp),
+                    .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp + bottomStackHeight),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -925,6 +945,7 @@ private fun PhotoCard(
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
                     textAlign = TextAlign.Center,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 6.dp),
                 )
             }

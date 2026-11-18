@@ -293,7 +293,6 @@
     <string name="ds_error_storage">文件读写失败。请检查本机可用存储空间。</string>
     <string name="ds_error_ftp_bind">无法启用该 FTP 端口，可能已被占用，请更换端口。</string>
     <string name="copied_to_clipboard">已复制</string>
-    <string name="io_ftp_connection">连接信息</string>
     <string name="settings_ftp_auto_start">APP 启动时自动开启 FTP</string>
     <string name="settings_keep_alive">App 保活</string>
     <string name="settings_keep_alive_hint">保持应用在后台运行，以便 FTP 与自动打印持续工作。</string>

@@ -1285,29 +1285,11 @@ fun SettingsScreen(
                             onBlur = { pasvMaxBlurred = true },
                             onValueChange = { pasvMax = it },
                         )
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .toggleable(
-                                    value = cfg.ftpAutoStart,
-                                    role = Role.Switch,
-                                    onValueChange = { on -> settings.updateSettings { copy(ftpAutoStart = on) } },
-                                )
-                                .semantics(mergeDescendants = true) {},
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                stringResource(R.string.settings_ftp_auto_start),
-                                color = Paper,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Switch(
-                                checked = cfg.ftpAutoStart,
-                                onCheckedChange = null,
-                                colors = darkroomSwitchColors(),
-                            )
-                        }
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_ftp_auto_start),
+                            checked = cfg.ftpAutoStart,
+                            onCheckedChange = { on -> settings.updateSettings { copy(ftpAutoStart = on) } },
+                        )
                         PaperButton(text = stringResource(R.string.common_save), fillMaxWidth = false) {
                             ftpSubmitted = true
                             if (!ftpInvalid) {
@@ -1373,26 +1355,12 @@ fun SettingsScreen(
                         onToggle = { openAutoPrint = !openAutoPrint },
                         onTop = { sectionTops["autoprint"] = it },
                     ) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .toggleable(
-                                    value = cfg.autoEdit,
-                                    role = Role.Switch,
-                                    onValueChange = { on -> settings.updateSettings { copy(autoEdit = on) } },
-                                )
-                                .semantics(mergeDescendants = true) {},
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            StepBadge(1)
-                            Text(stringResource(R.string.settings_automation_step_edit), color = Paper, modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = cfg.autoEdit,
-                                onCheckedChange = null,
-                                colors = darkroomSwitchColors(),
-                            )
-                        }
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_automation_step_edit),
+                            checked = cfg.autoEdit,
+                            onCheckedChange = { on -> settings.updateSettings { copy(autoEdit = on) } },
+                            leading = { StepBadge(1) },
+                        )
                         // The automation preset only; the Studio and library default is not touched (AUTG040-R01).
                         PresetDropdown(
                             value = autoEditPresetId,
@@ -1420,26 +1388,12 @@ fun SettingsScreen(
                             )
                         }
                         StepConnector()
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .toggleable(
-                                    value = cfg.autoWatermark,
-                                    role = Role.Switch,
-                                    onValueChange = { on -> settings.updateSettings { copy(autoWatermark = on) } },
-                                )
-                                .semantics(mergeDescendants = true) {},
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            StepBadge(2)
-                            Text(stringResource(R.string.settings_automation_step_watermark), color = Paper, modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = cfg.autoWatermark,
-                                onCheckedChange = null,
-                                colors = darkroomSwitchColors(),
-                            )
-                        }
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_automation_step_watermark),
+                            checked = cfg.autoWatermark,
+                            onCheckedChange = { on -> settings.updateSettings { copy(autoWatermark = on) } },
+                            leading = { StepBadge(2) },
+                        )
                         if (!cfg.autoPrint) {
                             Text(
                                 stringResource(R.string.settings_automation_watermark_print_only),
@@ -1457,32 +1411,18 @@ fun SettingsScreen(
                             )
                         }
                         StepConnector()
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .toggleable(
-                                    value = cfg.autoPrint,
-                                    role = Role.Switch,
-                                    onValueChange = { on ->
-                                        when {
-                                            !on -> settings.updateSettings { copy(autoPrint = false) }
-                                            printerBound -> settings.updateSettings { copy(autoPrint = true) }
-                                            else -> scope.launch { snackbar.showSnackbar(needPrinterText) }
-                                        }
-                                    },
-                                )
-                                .semantics(mergeDescendants = true) {},
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            StepBadge(3)
-                            Text(stringResource(R.string.settings_automation_step_print), color = Paper, modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = cfg.autoPrint,
-                                onCheckedChange = null,
-                                colors = darkroomSwitchColors(),
-                            )
-                        }
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_automation_step_print),
+                            checked = cfg.autoPrint,
+                            onCheckedChange = { on ->
+                                when {
+                                    !on -> settings.updateSettings { copy(autoPrint = false) }
+                                    printerBound -> settings.updateSettings { copy(autoPrint = true) }
+                                    else -> scope.launch { snackbar.showSnackbar(needPrinterText) }
+                                }
+                            },
+                            leading = { StepBadge(3) },
+                        )
                         if (!printerBound) {
                             BlockedNotice(
                                 title = stringResource(R.string.settings_automation_blocked_print),
@@ -1502,27 +1442,13 @@ fun SettingsScreen(
                         onToggle = { openWatermark = !openWatermark },
                         onTop = { sectionTops["watermark"] = it },
                     ) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .toggleable(
-                                    value = watermark.sns.enabled,
-                                    role = Role.Switch,
-                                    onValueChange = { on ->
-                                        settings.updateWatermark { copy(sns = sns.copy(enabled = on)) }
-                                    },
-                                )
-                                .semantics(mergeDescendants = true) {},
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(stringResource(R.string.settings_watermark_sns), color = Paper, modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = watermark.sns.enabled,
-                                onCheckedChange = null,
-                                colors = darkroomSwitchColors(),
-                            )
-                        }
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_watermark_sns),
+                            checked = watermark.sns.enabled,
+                            onCheckedChange = { on ->
+                                settings.updateWatermark { copy(sns = sns.copy(enabled = on)) }
+                            },
+                        )
                         // Logos only, each named by its label for TalkBack; "none" has no logo and shows
                         // its label instead.
                         val logos = SnsLogo.entries
@@ -1563,49 +1489,21 @@ fun SettingsScreen(
                             valueRange = WATERMARK_SCALE_MIN..WATERMARK_SCALE_MAX,
                             colors = darkroomSliderColors(),
                         )
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .padding(top = 8.dp)
-                                .toggleable(
-                                    value = watermark.date.enabled,
-                                    role = Role.Switch,
-                                    onValueChange = { on ->
-                                        settings.updateWatermark { copy(date = date.copy(enabled = on)) }
-                                    },
-                                )
-                                .semantics(mergeDescendants = true) {},
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(stringResource(R.string.settings_watermark_date), color = Paper, modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = watermark.date.enabled,
-                                onCheckedChange = null,
-                                colors = darkroomSwitchColors(),
-                            )
-                        }
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .toggleable(
-                                    value = watermark.date.includeTime,
-                                    role = Role.Switch,
-                                    onValueChange = { on ->
-                                        settings.updateWatermark { copy(date = date.copy(includeTime = on)) }
-                                    },
-                                )
-                                .semantics(mergeDescendants = true) {},
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(stringResource(R.string.settings_watermark_include_time), color = Paper, modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = watermark.date.includeTime,
-                                onCheckedChange = null,
-                                colors = darkroomSwitchColors(),
-                            )
-                        }
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_watermark_date),
+                            checked = watermark.date.enabled,
+                            onCheckedChange = { on ->
+                                settings.updateWatermark { copy(date = date.copy(enabled = on)) }
+                            },
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_watermark_include_time),
+                            checked = watermark.date.includeTime,
+                            onCheckedChange = { on ->
+                                settings.updateWatermark { copy(date = date.copy(includeTime = on)) }
+                            },
+                        )
                         Text(
                             stringResource(R.string.settings_watermark_size),
                             color = PaperDim,
@@ -1622,31 +1520,13 @@ fun SettingsScreen(
                             valueRange = WATERMARK_SCALE_MIN..WATERMARK_SCALE_MAX,
                             colors = darkroomSliderColors(),
                         )
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .toggleable(
-                                    value = watermark.syncScale,
-                                    role = Role.Switch,
-                                    onValueChange = { on ->
-                                        settings.updateWatermark { copy(syncScale = on) }
-                                    },
-                                )
-                                .semantics(mergeDescendants = true) {},
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                stringResource(R.string.settings_watermark_sync_size),
-                                color = Paper,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Switch(
-                                checked = watermark.syncScale,
-                                onCheckedChange = null,
-                                colors = darkroomSwitchColors(),
-                            )
-                        }
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_watermark_sync_size),
+                            checked = watermark.syncScale,
+                            onCheckedChange = { on ->
+                                settings.updateWatermark { copy(syncScale = on) }
+                            },
+                        )
                         Text(
                             stringResource(R.string.settings_watermark_orientation_hint),
                             color = PaperDim,
@@ -1866,29 +1746,11 @@ fun SettingsScreen(
                         onToggle = { openKeepAlive = !openKeepAlive },
                         onTop = { sectionTops["keepalive"] = it },
                     ) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .toggleable(
-                                    value = cfg.keepAlive,
-                                    role = Role.Switch,
-                                    onValueChange = { setKeepAlive(it) },
-                                )
-                                .semantics(mergeDescendants = true) {},
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                stringResource(R.string.settings_keep_alive),
-                                color = Paper,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Switch(
-                                checked = cfg.keepAlive,
-                                onCheckedChange = null,
-                                colors = darkroomSwitchColors(),
-                            )
-                        }
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_keep_alive),
+                            checked = cfg.keepAlive,
+                            onCheckedChange = { setKeepAlive(it) },
+                        )
                         Text(
                             stringResource(R.string.settings_keep_alive_hint),
                             color = PaperDim,
@@ -2082,8 +1944,9 @@ private fun FoldGroup(
  *
  * Drawn here rather than with the shared ListRow because the header needs the expand/collapse
  * click label, the expanded state description and the [FOLD_MS] arrow timing of the body animation.
- * Title Paper 14.70:1 and summary PaperDim 5.16:1 on Surface1; on the AmberSoft highlight
- * (composited over Surface1) Paper stays above 11:1.
+ * Title Paper 14.70:1 and summary PaperDim 5.16:1 on Surface1. On the AmberSoft highlight
+ * (composited over Surface1) Paper stays above 11:1, but PaperDim would drop to 4.46:1, so the
+ * summary turns Paper at 62% (5.24:1) while the row is highlighted.
  */
 @Composable
 private fun Fold(
@@ -2104,6 +1967,11 @@ private fun Fold(
         targetValue = if (highlighted) AmberSoft else Color.Transparent,
         animationSpec = tween(FOLD_MS),
         label = "foldHighlight",
+    )
+    val summaryColor by animateColorAsState(
+        targetValue = if (highlighted) Paper.copy(alpha = 0.62f) else PaperDim,
+        animationSpec = tween(FOLD_MS),
+        label = "foldSummary",
     )
     val arrow by animateFloatAsState(
         targetValue = if (open) 180f else 0f,
@@ -2144,7 +2012,7 @@ private fun Fold(
                 if (summary.isNotBlank()) {
                     Text(
                         summary,
-                        color = PaperDim,
+                        color = summaryColor,
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
                         modifier = Modifier.padding(top = 2.dp),
@@ -2227,6 +2095,50 @@ private fun StepBadge(number: Int) {
             fontSize = 12.sp,
             lineHeight = 12.sp,
             fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+/**
+ * One on/off row of a settings fold: the whole row is a `toggleable` with `Role.Switch` and merged
+ * semantics, so TalkBack reads label, "switch" and the state once. The label is drawn like a list
+ * row title (15sp Medium Paper, 14.70:1 on Surface1, matching the Studio switch rows) and keeps
+ * 12dp clear of the switch when it wraps. [leading] (the automation [StepBadge]) sits before it.
+ */
+@Composable
+private fun SettingsSwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    leading: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .then(modifier)
+            .toggleable(
+                value = checked,
+                role = Role.Switch,
+                onValueChange = onCheckedChange,
+            )
+            .semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        leading?.invoke()
+        Text(
+            label,
+            color = Paper,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f).padding(end = 12.dp),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = null,
+            colors = darkroomSwitchColors(),
         )
     }
 }
