@@ -19,7 +19,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -28,6 +27,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,7 +37,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.progressSemantics
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -53,7 +53,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,15 +67,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -91,28 +94,29 @@ import io.github.wa_otomia.darkroom.data.catalog.PendingDeletion
 import io.github.wa_otomia.darkroom.data.progress.ProgressUi
 import io.github.wa_otomia.darkroom.ui.theme.Amber
 import io.github.wa_otomia.darkroom.ui.theme.Danger
+import io.github.wa_otomia.darkroom.ui.theme.FieldShape
 import io.github.wa_otomia.darkroom.ui.theme.DarkroomMotion
 import io.github.wa_otomia.darkroom.ui.theme.Ink
 import io.github.wa_otomia.darkroom.ui.theme.MonoFont
+import io.github.wa_otomia.darkroom.ui.theme.Ok
+import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
 import io.github.wa_otomia.darkroom.ui.theme.PaperDisabled
 import io.github.wa_otomia.darkroom.ui.theme.PaperFaint
 import io.github.wa_otomia.darkroom.ui.theme.PaperHairline
 import io.github.wa_otomia.darkroom.ui.theme.PaperPressed
+import io.github.wa_otomia.darkroom.ui.theme.PillShape
 import io.github.wa_otomia.darkroom.ui.theme.Room
-import io.github.wa_otomia.darkroom.ui.theme.SurfaceLow
-import io.github.wa_otomia.darkroom.ui.theme.SurfacePanel
+import io.github.wa_otomia.darkroom.ui.theme.SheetTopShape
+import io.github.wa_otomia.darkroom.ui.theme.Surface1
+import io.github.wa_otomia.darkroom.ui.theme.Surface2
+import io.github.wa_otomia.darkroom.ui.theme.Surface3
+import io.github.wa_otomia.darkroom.ui.theme.TonalPressed
 import kotlinx.coroutines.delay
 
-private val PillShape = RoundedCornerShape(999.dp)
-private val EdgeShape = RoundedCornerShape(2.dp)
-
-/** Smallest touch target we ship, per the Material accessibility guidance. */
-private val MinTouchTarget = 48.dp
-
-/** Height of the track in [AmberProgressBar]. */
-private val BarHeight = 8.dp
+/** Height of the track in [AmberProgressBar] and the default [AmberTrack]. */
+private val BarHeight = 6.dp
 
 /** Hairline track used by pending cards and a collapsed [JobProgressStrip]. */
 private val ThinBarHeight = 3.dp
@@ -135,19 +139,27 @@ fun OverlayTint(visible: Boolean, modifier: Modifier = Modifier) {
     }
 }
 
-/** Fully transparent Paper, so alpha cross-fades never dip through black. */
-private val PaperClear = Paper.copy(alpha = 0f)
+/** [JobOverlayBar] fill: Room at 85% so the photo still reads through. */
+private val OverlayBarFill = Room.copy(alpha = 0.85f)
 
+/**
+ * Colours for any Material text field (filled `TextField` or
+ * `OutlinedTextField`, including dropdown anchors): [Surface2] fill, Paper
+ * text (13.40:1), PaperDim label/placeholder/icons (4.96:1). The indicator
+ * roles double as the outline of an `OutlinedTextField`: 1dp PaperFaint at
+ * rest (3.28:1 on Surface2), Amber when focused (7.38:1), Danger on error
+ * (9.73:1). Pair with `shape = FieldShape` (14dp) on an outlined field.
+ */
 @Composable
 fun darkroomTextFieldColors() = TextFieldDefaults.colors(
     focusedTextColor = Paper,
     unfocusedTextColor = Paper,
     disabledTextColor = PaperDim,
     errorTextColor = Paper,
-    focusedContainerColor = SurfaceLow,
-    unfocusedContainerColor = SurfaceLow,
-    disabledContainerColor = SurfaceLow,
-    errorContainerColor = SurfaceLow,
+    focusedContainerColor = Surface2,
+    unfocusedContainerColor = Surface2,
+    disabledContainerColor = Surface2,
+    errorContainerColor = Surface2,
     focusedIndicatorColor = Amber,
     unfocusedIndicatorColor = PaperFaint,
     disabledIndicatorColor = PaperHairline,
@@ -162,8 +174,16 @@ fun darkroomTextFieldColors() = TextFieldDefaults.colors(
     focusedTrailingIconColor = PaperDim,
     unfocusedTrailingIconColor = PaperDim,
     errorTrailingIconColor = Danger,
+    focusedLeadingIconColor = PaperDim,
+    unfocusedLeadingIconColor = PaperDim,
 )
 
+/**
+ * Outlined text field: [Surface2] fill, 14dp corners, label above the field
+ * (PaperDim 14sp, 5.23:1 on Room / 5.16:1 on Surface1). See
+ * [darkroomTextFieldColors] for the outline states. [secret] adds the
+ * show/hide password toggle.
+ */
 @Composable
 fun DarkroomTextField(
     label: String,
@@ -212,11 +232,12 @@ fun DarkroomTextField(
                 modifier = Modifier.padding(bottom = 6.dp),
             )
         }
-        TextField(
+        OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             placeholder = { if (placeholder.isNotEmpty()) Text(placeholder) },
             modifier = Modifier.fillMaxWidth(),
+            shape = FieldShape,
             minLines = minLines,
             enabled = enabled,
             readOnly = readOnly,
@@ -230,36 +251,43 @@ fun DarkroomTextField(
     }
 }
 
+/**
+ * Tappable readiness pill (Gallery header): [Surface2] pill with a 6dp status
+ * dot ([Ok] when ready, Amber when not) and the matching label — Paper when
+ * ready (13.40:1 on Surface2), Amber when not (7.38:1). Pressed: [Surface3]
+ * (Paper 11.82:1, Amber 6.52:1). 36dp visual inside a 48dp touch box; button
+ * role plus a ready/not-ready state description, so the state never relies
+ * on colour alone.
+ */
 @Composable
-fun StatusChip(ok: Boolean, okText: String, badText: String, onClick: () -> Unit) {
+fun StatusChip(
+    ok: Boolean,
+    okText: String,
+    badText: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val border by animateColorAsState(
-        targetValue = when {
-            pressed && ok -> Paper
-            ok -> PaperFaint
-            else -> Amber
-        },
-        animationSpec = DarkroomMotion.stateChange(),
-        label = "statusChipBorder",
-    )
-    val content by animateColorAsState(
-        targetValue = if (ok) PaperDim else Amber,
-        animationSpec = DarkroomMotion.stateChange(),
-        label = "statusChipContent",
-    )
     val fill by animateColorAsState(
-        targetValue = if (pressed) Paper.copy(alpha = 0.14f) else PaperClear,
+        targetValue = if (pressed) Surface3 else Surface2,
         animationSpec = DarkroomMotion.stateChange(),
         label = "statusChipFill",
     )
+    val content by animateColorAsState(
+        targetValue = if (ok) Paper else Amber,
+        animationSpec = DarkroomMotion.stateChange(),
+        label = "statusChipContent",
+    )
+    val dot by animateColorAsState(
+        targetValue = if (ok) Ok else Amber,
+        animationSpec = DarkroomMotion.stateChange(),
+        label = "statusChipDot",
+    )
     val state = stringResource(if (ok) R.string.a11y_state_ready else R.string.a11y_state_not_ready)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .heightIn(min = MinTouchTarget)
-            .clip(PillShape)
-            .background(fill)
-            .border(1.dp, border, PillShape)
             // A bare Box reads as plain text to TalkBack, so the button role
             // and the ready/not-ready state have to be declared by hand.
             .clickable(
@@ -268,77 +296,67 @@ fun StatusChip(ok: Boolean, okText: String, badText: String, onClick: () -> Unit
                 role = Role.Button,
                 onClick = onClick,
             )
-            .padding(horizontal = 14.dp, vertical = 8.dp)
             .semantics(mergeDescendants = true) { stateDescription = state },
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = if (ok) okText else badText,
-            color = content,
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
-        )
-    }
-}
-
-@Composable
-fun VersionChip(active: Boolean, label: String, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val fill by animateColorAsState(
-        targetValue = when {
-            active -> Paper
-            pressed -> Paper.copy(alpha = 0.14f)
-            else -> PaperClear
-        },
-        animationSpec = DarkroomMotion.stateChange(),
-        label = "versionChipFill",
-    )
-    val border by animateColorAsState(
-        targetValue = when {
-            active -> PaperClear
-            pressed -> Paper
-            else -> PaperFaint
-        },
-        animationSpec = DarkroomMotion.stateChange(),
-        label = "versionChipBorder",
-    )
-    val content by animateColorAsState(
-        targetValue = if (active) Ink else Paper,
-        animationSpec = DarkroomMotion.stateChange(),
-        label = "versionChipContent",
-    )
-    val state = stringResource(
-        if (active) R.string.a11y_state_selected else R.string.a11y_state_not_selected,
-    )
-    Box(
-        modifier = Modifier
-            .heightIn(min = MinTouchTarget)
-            .clip(PillShape)
-            .background(fill)
-            .border(1.dp, border, PillShape)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClick = onClick,
+        Row(
+            Modifier
+                .pressScale(interaction)
+                .heightIn(min = ChipVisualHeight)
+                .clip(ChipShape)
+                .background(fill)
+                .padding(start = 12.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(6.dp).background(dot, CircleShape))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = if (ok) okText else badText,
+                color = content,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.Medium,
             )
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-            .semantics(mergeDescendants = true) {
-                selected = active
-                stateDescription = state
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = label, color = content, fontSize = 12.sp, lineHeight = 16.sp)
+        }
     }
 }
 
+/**
+ * Version selector chip in Studio. Same look as [SelectPill] (selected:
+ * AmberSoft fill, Amber label; unselected: Surface2, Paper label) but keeps
+ * its historical button role with a selected state description.
+ */
+@Composable
+fun VersionChip(
+    active: Boolean,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    SelectPill(
+        selected = active,
+        label = label,
+        onClick = onClick,
+        modifier = modifier,
+        role = Role.Button,
+    )
+}
+
+/**
+ * Primary action: Paper pill, Ink 15sp Medium label (14.85:1), at least 48dp
+ * high. Pressed: [PaperPressed] fill (Ink 11.92:1) and a 0.97 press scale.
+ * Disabled: [PaperDisabled] fill (Ink 4.96:1 over Room, 5.21:1 over Surface1).
+ * Use one per screen or panel; everything else is a [TonalButton].
+ * [icon] (18dp, optional) sits before the label. The label wraps at large
+ * font sizes; the pill grows taller instead of clipping.
+ */
 @Composable
 fun PaperButton(
     text: String,
     enabled: Boolean = true,
     fillMaxWidth: Boolean = true,
+    icon: ImageVector? = null,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -354,69 +372,104 @@ fun PaperButton(
         animationSpec = DarkroomMotion.stateChange(),
         label = "paperButtonFill",
     )
-    Text(
+    PillButton(
         text = text,
-        color = Ink,
-        fontSize = 15.sp,
-        lineHeight = 20.sp,
-        textAlign = TextAlign.Center,
-        modifier = Modifier
-            .then(if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier)
-            .heightIn(min = MinTouchTarget)
-            .clip(EdgeShape)
-            .background(fill)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                enabled = enabled,
-                role = Role.Button,
-                onClick = onClick,
-            )
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+        icon = icon,
+        fill = fill,
+        content = Ink,
+        enabled = enabled,
+        fillMaxWidth = fillMaxWidth,
+        interaction = interaction,
+        modifier = modifier,
+        onClick = onClick,
     )
 }
 
+/**
+ * Secondary action. Since 0.2.0 this is the tonal button — a [Surface3] pill
+ * with a Paper label (11.82:1), no outline — kept under its old name so
+ * existing call sites restyle without edits. New code says [TonalButton].
+ */
 @Composable
 fun GhostButton(
     text: String,
     enabled: Boolean = true,
     fillMaxWidth: Boolean = true,
+    icon: ImageVector? = null,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    TonalButton(
+        text = text,
+        enabled = enabled,
+        fillMaxWidth = fillMaxWidth,
+        icon = icon,
+        modifier = modifier,
+        onClick = onClick,
+    )
+}
+
+/**
+ * Secondary action: [Surface3] pill, Paper 15sp Medium label (11.82:1 on
+ * Surface3), no outline, at least 48dp high. Pressed: [TonalPressed] (Paper
+ * 10.11:1) and a 0.97 press scale. Disabled: [Surface2] fill with a PaperDim
+ * label (4.96:1).
+ */
+@Composable
+fun TonalButton(
+    text: String,
+    enabled: Boolean = true,
+    fillMaxWidth: Boolean = true,
+    icon: ImageVector? = null,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val border by animateColorAsState(
+    val fill by animateColorAsState(
         targetValue = when {
-            !enabled -> PaperHairline
-            pressed -> Paper
-            else -> PaperFaint
+            !enabled -> Surface2
+            pressed -> TonalPressed
+            else -> Surface3
         },
         animationSpec = DarkroomMotion.stateChange(),
-        label = "ghostButtonBorder",
-    )
-    val fill by animateColorAsState(
-        targetValue = if (pressed && enabled) Paper.copy(alpha = 0.14f) else PaperClear,
-        animationSpec = DarkroomMotion.stateChange(),
-        label = "ghostButtonFill",
+        label = "tonalButtonFill",
     )
     // Disabled used to look identical to enabled: same Paper label, same border.
     val content by animateColorAsState(
         targetValue = if (enabled) Paper else PaperDim,
         animationSpec = DarkroomMotion.stateChange(),
-        label = "ghostButtonContent",
+        label = "tonalButtonContent",
     )
-    Text(
+    PillButton(
         text = text,
-        color = content,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        textAlign = TextAlign.Center,
-        modifier = Modifier
+        icon = icon,
+        fill = fill,
+        content = content,
+        enabled = enabled,
+        fillMaxWidth = fillMaxWidth,
+        interaction = interaction,
+        modifier = modifier,
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun PillButton(
+    text: String,
+    icon: ImageVector?,
+    fill: Color,
+    content: Color,
+    enabled: Boolean,
+    fillMaxWidth: Boolean,
+    interaction: MutableInteractionSource,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier
             .then(if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier)
             .heightIn(min = MinTouchTarget)
-            .clip(EdgeShape)
-            .background(fill)
-            .border(1.dp, border, EdgeShape)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -424,10 +477,34 @@ fun GhostButton(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    )
+            .pressScale(interaction)
+            .clip(ControlShape)
+            .background(fill)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(
+            text = text,
+            color = content,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+        )
+    }
 }
 
+/**
+ * Job progress block: title (12sp Medium PaperDim, 5.16:1 on Surface1), phase
+ * label (Paper 14.70:1), percent (Amber Mono 8.10:1), a 6dp [AmberTrack] and
+ * optional detail. [framed] puts it on a [Surface1] panel with 16dp corners
+ * and no outline; unframed it inherits the parent surface.
+ */
 @Composable
 fun AmberProgressBar(
     title: String,
@@ -442,21 +519,20 @@ fun AmberProgressBar(
             .then(
                 if (framed) {
                     Modifier
-                        .background(SurfaceLow)
-                        .border(1.dp, PaperHairline, EdgeShape)
-                        .padding(12.dp)
+                        .clip(PanelShape)
+                        .background(Surface1)
+                        .padding(16.dp)
                 } else {
                     Modifier
                 },
             ),
     ) {
         Text(
-            title.uppercase(),
+            title,
             color = PaperDim,
             fontSize = 12.sp,
             lineHeight = 16.sp,
-            letterSpacing = 1.6.sp,
-            fontFamily = MonoFont,
+            fontWeight = FontWeight.Medium,
         )
         Row(
             Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -518,6 +594,11 @@ fun AmberProgressBar(
     )
 }
 
+/**
+ * Rounded amber progress track: 6dp by default, pass `height = 3.dp` for the
+ * thin variant on cards and strips. [Surface3] groove (Amber vs Surface3
+ * 6.52:1, ≥ 3:1 for the indicator), round ends.
+ */
 @Composable
 fun AmberTrack(
     ui: ProgressUi,
@@ -541,7 +622,7 @@ fun AmberTrack(
         modifier
             .height(height)
             .clip(PillShape)
-            .background(SurfaceLow)
+            .background(Surface3)
             .then(
                 if (indeterminate) {
                     Modifier.progressSemantics()
@@ -595,7 +676,7 @@ fun AmberTrack(
  * cropper, gallery, and FABs stay inert. The caller blurs the content behind
  * this overlay via [contentBlur]; this composable only tints on API 31+ and
  * never paints a cheap translucent wash on older APIs. The panel is a
- * bottom-anchored opaque sheet. Put cancel on the bar via [extra] or
+ * bottom-anchored opaque [Surface1] sheet with 28dp top corners. Put cancel on the bar via [extra] or
  * [cancel]. [secondaryAction] follows [cancel] (hide, while the job keeps
  * running).
  */
@@ -626,13 +707,8 @@ fun JobScrim(
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
-                .background(SurfacePanel)
-                .border(
-                    1.dp,
-                    PaperHairline,
-                    RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp),
-                )
+                .clip(SheetTopShape)
+                .background(Surface1)
                 .padding(20.dp),
         ) {
             AmberProgressBar(
@@ -676,8 +752,9 @@ fun JobScrim(
 }
 
 /**
- * Compact in-page job chrome: phase text, cancel / hide, and a slim amber
- * track. [collapsed] keeps only the track.
+ * Compact in-page job chrome on [Surface1]: title (PaperDim 5.16:1), phase
+ * text (Paper 14.70:1), cancel / hide, and a 3dp amber track. [collapsed]
+ * keeps only the track.
  */
 @Composable
 fun JobProgressStrip(
@@ -693,7 +770,7 @@ fun JobProgressStrip(
     Column(
         modifier
             .fillMaxWidth()
-            .background(SurfacePanel)
+            .background(Surface1)
             .semantics { contentDescription = a11y },
     ) {
         if (!collapsed) {
@@ -705,12 +782,11 @@ fun JobProgressStrip(
             ) {
                 Column(Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
-                        title.uppercase(),
+                        title,
                         color = PaperDim,
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
-                        letterSpacing = 1.6.sp,
-                        fontFamily = MonoFont,
+                        fontWeight = FontWeight.Medium,
                     )
                     Text(
                         stripLabel(ui),
@@ -762,6 +838,8 @@ fun JobProgressStrip(
 /**
  * Compact phase + fraction bar used on gallery tiles and over the Studio photo.
  * [onHide] only dismisses the chrome for this job; [onCancel] stops the job.
+ * Room at 85% over the photo: Paper text measures 10.44:1 even over a pure
+ * white photo.
  */
 @Composable
 fun JobOverlayBar(
@@ -774,8 +852,7 @@ fun JobOverlayBar(
     val estimated = stringResource(R.string.progress_estimated)
     Column(
         modifier
-            .background(SurfacePanel)
-            .border(1.dp, PaperHairline),
+            .background(OverlayBarFill),
     ) {
         Row(
             Modifier.fillMaxWidth(),
@@ -785,7 +862,8 @@ fun JobOverlayBar(
                 if (ui.estimated) "$phase · $estimated" else phase,
                 color = Paper,
                 fontSize = 12.sp,
-                fontFamily = MonoFont,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
@@ -868,8 +946,9 @@ private fun stripLabel(ui: ProgressUi): String {
 }
 
 /**
- * Undo window chrome in the [JobProgressStrip] slot: same panel, type,
- * and amber track, with a countdown that empties over the grace period.
+ * Undo window chrome in the [JobProgressStrip] slot: same [Surface1] panel,
+ * type, and amber track, with a countdown that empties over the grace period.
+ * Message Paper 14.70:1; "Undo" Amber 8.10:1.
  */
 @Composable
 fun DeleteUndoBar(
@@ -905,7 +984,7 @@ fun DeleteUndoBar(
         Column(
             Modifier
                 .fillMaxWidth()
-                .background(SurfacePanel)
+                .background(Surface1)
                 .semantics { liveRegion = LiveRegionMode.Polite },
         ) {
             Row(
@@ -968,8 +1047,9 @@ private fun rememberUndoFill(startedAtMs: Long, totalMs: Long): Float {
 }
 
 /**
- * Page header used by Gallery, Transfer, Presets and Settings: amber
- * `labelSmall` eyebrow, then the `headlineLarge` title 4.dp below it.
+ * Legacy page header: amber `labelSmall` eyebrow, then the `headlineLarge`
+ * title 4.dp below it. Superseded by [PageTitle] (design D2); kept until every
+ * screen has migrated, then removed.
  */
 @Composable
 fun ScreenHeader(
@@ -987,16 +1067,22 @@ fun ScreenHeader(
     }
 }
 
+/**
+ * Small group heading above a card or list: 12sp Medium sans, PaperDim
+ * (5.23:1 on Room), original casing, no letter-spacing, 4dp start inset so it
+ * lines up inside a 22dp card corner. Marked as a heading for TalkBack.
+ */
 @Composable
-fun SectionLabel(text: String) {
+fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(
-        text = text.uppercase(),
+        text = text,
         color = PaperDim,
         fontSize = 12.sp,
         lineHeight = 16.sp,
-        letterSpacing = 2.sp,
-        fontFamily = MonoFont,
-        modifier = Modifier.padding(bottom = 8.dp),
+        fontWeight = FontWeight.Medium,
+        modifier = modifier
+            .padding(start = 4.dp, bottom = 8.dp)
+            .semantics { heading() },
     )
 }
 
@@ -1009,13 +1095,14 @@ fun SectionLabel(text: String) {
  * the Material defaults the last two resolve through `inversePrimary`, which
  * this scheme never sets. Ink measures 14.85:1 on Paper; Amber, the accent
  * used for actions everywhere else, would be 1.81:1 and is not an option.
+ * 16dp corners ([PanelShape]).
  */
 @Composable
 fun DarkroomSnackbarHost(hostState: SnackbarHostState, modifier: Modifier = Modifier) {
     SnackbarHost(hostState, modifier) { data ->
         Snackbar(
             snackbarData = data,
-            shape = EdgeShape,
+            shape = PanelShape,
             containerColor = Paper,
             contentColor = Ink,
             actionColor = Ink,
@@ -1107,17 +1194,16 @@ fun StatusBadge(visible: Boolean, text: String, modifier: Modifier = Modifier) {
             scaleOut(animationSpec = DarkroomMotion.stateChange(), targetScale = 0.8f),
     ) {
         Text(
-            text = text.uppercase(),
+            text = text,
             color = Ink,
-            fontFamily = MonoFont,
             // 12sp is the floor; Ink on Amber measures 8.18:1.
             fontSize = 12.sp,
             lineHeight = 16.sp,
-            letterSpacing = 1.2.sp,
+            fontWeight = FontWeight.Medium,
             modifier = Modifier
                 .clip(PillShape)
                 .background(Amber)
-                .padding(horizontal = 8.dp, vertical = 3.dp),
+                .padding(horizontal = 10.dp, vertical = 3.dp),
         )
     }
 }

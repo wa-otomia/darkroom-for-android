@@ -1,32 +1,66 @@
 package io.github.wa_otomia.darkroom.ui.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -53,13 +87,28 @@ import io.github.wa_otomia.darkroom.ui.io.PrintQueueScreen
 import io.github.wa_otomia.darkroom.ui.presets.PresetsScreen
 import io.github.wa_otomia.darkroom.ui.settings.SettingsScreen
 import io.github.wa_otomia.darkroom.ui.studio.StudioScreen
-import io.github.wa_otomia.darkroom.ui.theme.Amber
+import io.github.wa_otomia.darkroom.ui.components.pressScale
+import io.github.wa_otomia.darkroom.ui.theme.DarkroomMotion
 import io.github.wa_otomia.darkroom.ui.theme.Ink
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
 import io.github.wa_otomia.darkroom.ui.theme.Room
+import io.github.wa_otomia.darkroom.ui.theme.Surface2
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+
+/**
+ * Space a screen must leave free at its bottom edge so its last item can be
+ * scrolled fully clear of the floating navigation bar (SYUI020-R05).
+ *
+ * On a top-level tab it is the bar's height + 12dp gap + the navigation-bar
+ * inset; on a detail screen (no bar) it is just the navigation-bar inset.
+ * Add it to the bottom `contentPadding` of the scrolling container (or as a
+ * trailing `Spacer`), and lift FABs/snackbars by it. Do not also add
+ * `navigationBarsPadding()` — the inset is already included. Outside
+ * [DarkroomNav] it is 0.dp.
+ */
+val LocalBottomBarClearance = compositionLocalOf<Dp> { 0.dp }
 
 @Composable
 fun DarkroomNav(
@@ -104,174 +153,280 @@ fun DarkroomNav(
         }
     }
 
-    Scaffold(
-        containerColor = Room,
-        bottomBar = {
-            if (showBar) {
-                NavigationBar(containerColor = Room, contentColor = Paper) {
-                    data class Tab(val id: String, val label: Int, val icon: androidx.compose.ui.graphics.vector.ImageVector)
-                    val items = listOf(
-                        Tab("gallery", R.string.nav_gallery, Icons.Outlined.PhotoLibrary),
-                        Tab("io", R.string.nav_io, Icons.Outlined.WifiTethering),
-                        Tab("presets", R.string.nav_presets, Icons.Outlined.AutoFixHigh),
-                        Tab("settings", R.string.nav_settings, Icons.Outlined.Settings),
-                    )
-                    items.forEach { tab ->
-                        NavigationBarItem(
-                            selected = destRoute == tab.id,
-                            onClick = {
-                                // Tapping the tab you are already on scrolls that tab back to the
-                                // top instead of re-navigating to it.
-                                if (destRoute == tab.id) {
-                                    if (tab.id == "gallery") galleryReselect.tryEmit(Unit)
-                                } else {
-                                    nav.navigateTab(tab.id)
+    val tabItems = remember {
+        listOf(
+            NavTab("gallery", R.string.nav_gallery, Icons.Outlined.PhotoLibrary),
+            NavTab("io", R.string.nav_io, Icons.Outlined.WifiTethering),
+            NavTab("presets", R.string.nav_presets, Icons.Outlined.AutoFixHigh),
+            NavTab("settings", R.string.nav_settings, Icons.Outlined.Settings),
+        )
+    }
+    val density = LocalDensity.current
+    var barHeight by remember { mutableStateOf(FloatingBarMinHeight) }
+    val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val clearance = if (showBar) barHeight + FloatingBarGap + navInset else navInset
+
+    // No bottomBar: the floating bar is drawn over the content, which runs to
+    // the bottom edge on every route. Top-level screens keep their last item
+    // clear of the bar through LocalBottomBarClearance.
+    Scaffold(containerColor = Room) { padding ->
+        Box(Modifier.fillMaxSize()) {
+            CompositionLocalProvider(LocalBottomBarClearance provides clearance) {
+                NavHost(
+                    nav,
+                    startDestination = "gallery",
+                    modifier = Modifier.padding(
+                        start = padding.calculateStartPadding(layoutDirection),
+                        top = padding.calculateTopPadding(),
+                        end = padding.calculateEndPadding(layoutDirection),
+                    ),
+                    // Tab switches cross-fade; drilling into a detail slides toward the layout end and
+                    // reverses on the way back. SlideDirection.Start/End already respect RTL.
+                    enterTransition = {
+                        if (targetState.isDetail()) {
+                            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(DETAIL_MS)) +
+                                fadeIn(tween(DETAIL_MS))
+                        } else {
+                            fadeIn(tween(TAB_MS))
+                        }
+                    },
+                    exitTransition = {
+                        if (targetState.isDetail()) {
+                            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(DETAIL_MS)) +
+                                fadeOut(tween(DETAIL_MS))
+                        } else {
+                            fadeOut(tween(TAB_MS))
+                        }
+                    },
+                    popEnterTransition = {
+                        if (initialState.isDetail()) {
+                            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(DETAIL_MS)) +
+                                fadeIn(tween(DETAIL_MS))
+                        } else {
+                            fadeIn(tween(TAB_MS))
+                        }
+                    },
+                    popExitTransition = {
+                        if (initialState.isDetail()) {
+                            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(DETAIL_MS)) +
+                                fadeOut(tween(DETAIL_MS))
+                        } else {
+                            fadeOut(tween(TAB_MS))
+                        }
+                    },
+                ) {
+                    composable("gallery") {
+                        GalleryScreen(
+                            photos = photos,
+                            transfers = transfers,
+                            aiJobs = aiJobList,
+                            grokReady = grokPub.keySet,
+                            printerReady = appSettings.printerMac.isNotBlank(),
+                            autoEdit = appSettings.autoEdit,
+                            autoWatermark = appSettings.autoWatermark,
+                            autoPrint = appSettings.autoPrint,
+                            catalog = catalog,
+                            automation = automation,
+                            printQueue = printQueue,
+                            reselect = galleryReselect,
+                            focusPhotoId = focusPhotoId,
+                            onFocusConsumed = { galleryFocus.value = null },
+                            onOpen = { nav.navigate("studio/$it") },
+                            onDismissTransfer = { transferRegistry.dismiss(it) },
+                            onCancelAi = { aiJobs.cancel(it) },
+                            onSettings = { section ->
+                                if (section.isBlank()) nav.navigateTab("settings")
+                                else nav.navigateSettingsSection(section)
+                            },
+                        )
+                    }
+                    composable("io") {
+                        IoScreen(
+                            settings = appSettings,
+                            sessions = sessions,
+                            transfers = transfers,
+                            printQueue = printQueue,
+                            onDismissTransfer = { transferRegistry.dismiss(it) },
+                            onOpenPrintQueue = { nav.navigate("io/print-queue") },
+                        )
+                    }
+                    composable("io/print-queue") {
+                        PrintQueueScreen(
+                            catalog = catalog,
+                            printQueue = printQueue,
+                            photos = photos,
+                            onBack = { nav.popBackStack() },
+                        )
+                    }
+                    composable("presets") { PresetsScreen(settings) }
+                    composable(
+                        route = "settings?section={section}",
+                        arguments = listOf(
+                            navArgument("section") {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                    ) { entry ->
+                        SettingsScreen(
+                            settings = settings,
+                            bluetooth = bluetooth,
+                            activityLog = activityLog,
+                            grokClient = grok,
+                            catalog = catalog,
+                            section = entry.arguments?.getString("section").orEmpty(),
+                            onAbout = { nav.navigate("about") },
+                        )
+                    }
+                    composable("about") { AboutScreen(onBack = { nav.popBackStack() }) }
+                    composable("studio/{id}") { entry ->
+                        val id = entry.arguments?.getString("id").orEmpty()
+                        StudioScreen(
+                            photoId = id,
+                            photos = photos,
+                            catalog = catalog,
+                            settings = settings,
+                            printQueue = printQueue,
+                            aiJobs = aiJobs,
+                            onBack = { nav.popBackStack() },
+                            // No launchSingleTop: sibling versions are a different photo, so the back stack
+                            // has to keep the one we came from.
+                            onOpen = { nav.navigate("studio/$it") },
+                            onOpenGallery = { openGallery(it) },
+                            onSettings = { section ->
+                                nav.navigate(if (section.isBlank()) "settings" else "settings?section=$section") {
+                                    launchSingleTop = true
                                 }
                             },
-                            icon = { Icon(tab.icon, contentDescription = null) },
-                            label = { Text(stringResource(tab.label)) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Ink,
-                                selectedTextColor = Amber,
-                                indicatorColor = Paper,
-                                unselectedIconColor = PaperDim,
-                                unselectedTextColor = PaperDim,
-                            ),
                         )
                     }
                 }
             }
-        },
-    ) { padding ->
-        NavHost(
-            nav,
-            startDestination = "gallery",
-            modifier = Modifier.padding(
-                start = padding.calculateStartPadding(layoutDirection),
-                top = padding.calculateTopPadding(),
-                end = padding.calculateEndPadding(layoutDirection),
-                bottom = if (showBar) padding.calculateBottomPadding() else 0.dp,
-            ),
-            // Tab switches cross-fade; drilling into a detail slides toward the layout end and
-            // reverses on the way back. SlideDirection.Start/End already respect RTL.
-            enterTransition = {
-                if (targetState.isDetail()) {
-                    slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(DETAIL_MS)) +
-                        fadeIn(tween(DETAIL_MS))
-                } else {
-                    fadeIn(tween(TAB_MS))
-                }
-            },
-            exitTransition = {
-                if (targetState.isDetail()) {
-                    slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(DETAIL_MS)) +
-                        fadeOut(tween(DETAIL_MS))
-                } else {
-                    fadeOut(tween(TAB_MS))
-                }
-            },
-            popEnterTransition = {
-                if (initialState.isDetail()) {
-                    slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(DETAIL_MS)) +
-                        fadeIn(tween(DETAIL_MS))
-                } else {
-                    fadeIn(tween(TAB_MS))
-                }
-            },
-            popExitTransition = {
-                if (initialState.isDetail()) {
-                    slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(DETAIL_MS)) +
-                        fadeOut(tween(DETAIL_MS))
-                } else {
-                    fadeOut(tween(TAB_MS))
-                }
-            },
-        ) {
-            composable("gallery") {
-                GalleryScreen(
-                    photos = photos,
-                    transfers = transfers,
-                    aiJobs = aiJobList,
-                    grokReady = grokPub.keySet,
-                    printerReady = appSettings.printerMac.isNotBlank(),
-                    autoEdit = appSettings.autoEdit,
-                    autoWatermark = appSettings.autoWatermark,
-                    autoPrint = appSettings.autoPrint,
-                    catalog = catalog,
-                    automation = automation,
-                    printQueue = printQueue,
-                    reselect = galleryReselect,
-                    focusPhotoId = focusPhotoId,
-                    onFocusConsumed = { galleryFocus.value = null },
-                    onOpen = { nav.navigate("studio/$it") },
-                    onDismissTransfer = { transferRegistry.dismiss(it) },
-                    onCancelAi = { aiJobs.cancel(it) },
-                    onSettings = { section ->
-                        if (section.isBlank()) nav.navigateTab("settings")
-                        else nav.navigateSettingsSection(section)
-                    },
-                )
-            }
-            composable("io") {
-                IoScreen(
-                    settings = appSettings,
-                    sessions = sessions,
-                    transfers = transfers,
-                    printQueue = printQueue,
-                    onDismissTransfer = { transferRegistry.dismiss(it) },
-                    onOpenPrintQueue = { nav.navigate("io/print-queue") },
-                )
-            }
-            composable("io/print-queue") {
-                PrintQueueScreen(
-                    catalog = catalog,
-                    printQueue = printQueue,
-                    photos = photos,
-                    onBack = { nav.popBackStack() },
-                )
-            }
-            composable("presets") { PresetsScreen(settings) }
-            composable(
-                route = "settings?section={section}",
-                arguments = listOf(
-                    navArgument("section") {
-                        type = NavType.StringType
-                        defaultValue = ""
-                    },
-                ),
-            ) { entry ->
-                SettingsScreen(
-                    settings = settings,
-                    bluetooth = bluetooth,
-                    activityLog = activityLog,
-                    grokClient = grok,
-                    catalog = catalog,
-                    section = entry.arguments?.getString("section").orEmpty(),
-                    onAbout = { nav.navigate("about") },
-                )
-            }
-            composable("about") { AboutScreen(onBack = { nav.popBackStack() }) }
-            composable("studio/{id}") { entry ->
-                val id = entry.arguments?.getString("id").orEmpty()
-                StudioScreen(
-                    photoId = id,
-                    photos = photos,
-                    catalog = catalog,
-                    settings = settings,
-                    printQueue = printQueue,
-                    aiJobs = aiJobs,
-                    onBack = { nav.popBackStack() },
-                    // No launchSingleTop: sibling versions are a different photo, so the back stack
-                    // has to keep the one we came from.
-                    onOpen = { nav.navigate("studio/$it") },
-                    onOpenGallery = { openGallery(it) },
-                    onSettings = { section ->
-                        nav.navigate(if (section.isBlank()) "settings" else "settings?section=$section") {
-                            launchSingleTop = true
+            if (showBar) {
+                FloatingNavBar(
+                    tabs = tabItems,
+                    selectedId = destRoute,
+                    onSelect = { tab ->
+                        // Tapping the tab you are already on scrolls that tab back to the
+                        // top instead of re-navigating to it.
+                        if (destRoute == tab.id) {
+                            if (tab.id == "gallery") galleryReselect.tryEmit(Unit)
+                        } else {
+                            nav.navigateTab(tab.id)
                         }
                     },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(start = 16.dp, end = 16.dp, bottom = FloatingBarGap)
+                        .onSizeChanged {
+                            val measured = with(density) { it.height.toDp() }
+                            if (measured != barHeight) barHeight = measured
+                        },
                 )
             }
+        }
+    }
+}
+
+private data class NavTab(val id: String, val label: Int, val icon: ImageVector)
+
+/** Gap between the floating bar and the navigation-bar inset. */
+private val FloatingBarGap = 12.dp
+
+/** 4dp inset + 48dp item + 4dp inset; the measured height wins once laid out. */
+private val FloatingBarMinHeight = 56.dp
+private val FloatingBarInset = 4.dp
+private val FloatingBarShape = RoundedCornerShape(28.dp)
+private val FloatingItemShape = RoundedCornerShape(24.dp)
+
+/** Surface2 at 92%; no backdrop blur on any API level (SYUI020-R05). */
+private val FloatingBarFill = Surface2.copy(alpha = 0.92f)
+
+/**
+ * Floating pill navigation (design D3). The selected tab is a Paper pill with
+ * icon and label in Ink (14.85:1); the others are 48dp icon-only cells in
+ * PaperDim (5.00:1 on the bar over Room, still 4.36:1 if a white photo shows
+ * through the 8% transparency — icons need 3:1). Each cell is a `Role.Tab`
+ * with selected state inside a `selectableGroup`, and its content
+ * description is the tab label, so TalkBack reads "Settings, tab, not
+ * selected, 4 of 4". The selected cell's width change animates over
+ * [DarkroomMotion.NavBarResizeMillis]. Row order follows layout direction,
+ * so the bar mirrors in RTL.
+ */
+@Composable
+private fun FloatingNavBar(
+    tabs: List<NavTab>,
+    selectedId: String,
+    onSelect: (NavTab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .shadow(elevation = 8.dp, shape = FloatingBarShape, clip = false)
+            .clip(FloatingBarShape)
+            .background(FloatingBarFill)
+            .selectableGroup()
+            .padding(FloatingBarInset),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        tabs.forEach { tab ->
+            FloatingNavItem(
+                tab = tab,
+                selected = selectedId == tab.id,
+                onClick = { onSelect(tab) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun FloatingNavItem(tab: NavTab, selected: Boolean, onClick: () -> Unit) {
+    val label = stringResource(tab.label)
+    val interaction = remember { MutableInteractionSource() }
+    val fill by animateColorAsState(
+        targetValue = if (selected) Paper else Paper.copy(alpha = 0f),
+        animationSpec = DarkroomMotion.stateChange(),
+        label = "navItemFill",
+    )
+    val content by animateColorAsState(
+        targetValue = if (selected) Ink else PaperDim,
+        animationSpec = DarkroomMotion.stateChange(),
+        label = "navItemContent",
+    )
+    Row(
+        Modifier
+            .heightIn(min = 48.dp)
+            .widthIn(min = 48.dp)
+            .selectable(
+                selected = selected,
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick,
+            )
+            .semantics { contentDescription = label }
+            .pressScale(interaction)
+            .clip(FloatingItemShape)
+            .background(fill)
+            .animateContentSize(tween(DarkroomMotion.NavBarResizeMillis, easing = DarkroomMotion.Standard))
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(tab.icon, contentDescription = null, tint = content, modifier = Modifier.size(24.dp))
+        if (selected) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                label,
+                color = content,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                // The cell already carries the label as its content description.
+                modifier = Modifier.clearAndSetSemantics {},
+            )
         }
     }
 }
