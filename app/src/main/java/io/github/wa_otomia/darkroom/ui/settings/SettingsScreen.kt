@@ -34,8 +34,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -118,6 +120,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -608,6 +613,10 @@ fun SettingsScreen(
         if (watermark.sns.enabled) add(stringResource(R.string.settings_watermark_sns))
         if (watermark.date.enabled) add(stringResource(R.string.settings_watermark_date))
     }
+    // Accessible names of the two otherwise identical "Size" sliders, e.g. "SNS watermark Size".
+    val sizeText = stringResource(R.string.settings_watermark_size)
+    val snsSizeLabel = "${stringResource(R.string.settings_watermark_sns)} $sizeText"
+    val dateSizeLabel = "${stringResource(R.string.settings_watermark_date)} $sizeText"
     val watermarkSummary = if (watermarkParts.isEmpty()) {
         stringResource(R.string.settings_off)
     } else {
@@ -784,6 +793,8 @@ fun SettingsScreen(
                         Text(
                             stringResource(R.string.grok_model),
                             color = PaperDim,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
                             modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
                         )
                         ExposedDropdownMenuBox(
@@ -862,6 +873,8 @@ fun SettingsScreen(
                         Text(
                             stringResource(R.string.settings_ai_quality),
                             color = PaperDim,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
                             modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                         )
                         SegmentedPills(
@@ -875,6 +888,8 @@ fun SettingsScreen(
                             Text(
                                 stringResource(R.string.grok_resolution),
                                 color = PaperDim,
+                                fontSize = 14.sp,
+                                lineHeight = 20.sp,
                                 modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                             )
                             val resolutions = listOf("1k", "2k")
@@ -1045,9 +1060,11 @@ fun SettingsScreen(
                                 Column(Modifier.weight(1f)) {
                                     Text(text, color = if (passed) Paper else Amber, fontSize = 13.sp, lineHeight = 18.sp)
                                     Text(
-                                        stringResource(R.string.settings_grok_test_target, probeTarget, keySource),
+                                        monoValues(
+                                            stringResource(R.string.settings_grok_test_target, probeTarget, keySource),
+                                            probeTarget,
+                                        ),
                                         color = PaperDim,
-                                        fontFamily = MonoFont,
                                         fontSize = 12.sp,
                                         lineHeight = 16.sp,
                                         modifier = Modifier.padding(top = 6.dp),
@@ -1066,9 +1083,13 @@ fun SettingsScreen(
                         onToggle = { openPrinter = !openPrinter },
                         onTop = { sectionTops["printer"] = it },
                     ) {
+                        // Sans text; only the MAC address is a technical value in mono.
                         Text(
-                            if (!printerBound) stringResource(R.string.chip_printer_off) else "${cfg.printerName} ${cfg.printerMac}",
-                            fontFamily = MonoFont,
+                            if (!printerBound) {
+                                AnnotatedString(stringResource(R.string.chip_printer_off))
+                            } else {
+                                monoValues("${cfg.printerName} ${cfg.printerMac}", cfg.printerMac)
+                            },
                             color = Paper,
                         )
                         if (printerBound) {
@@ -1326,6 +1347,8 @@ fun SettingsScreen(
                         Text(
                             stringResource(R.string.print_fit),
                             color = PaperDim,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
                             modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
                         )
                         val fits = listOf(
@@ -1390,23 +1413,13 @@ fun SettingsScreen(
                         if (cfg.autoEdit && (!autoAiReady || !autoHasPreset)) {
                             BlockedNotice(stringResource(R.string.settings_automation_blocked_edit)) {
                                 if (!autoAiReady) {
-                                    Text(
-                                        needKeyText,
-                                        color = Paper,
-                                        fontSize = 13.sp,
-                                        modifier = Modifier.padding(top = 6.dp),
-                                    )
+                                    BlockedDetail(needKeyText)
                                     TextButton(onClick = { revealSection("grok") }) {
                                         Text(stringResource(R.string.settings_goto_ai), color = Amber)
                                     }
                                 }
                                 if (!autoHasPreset) {
-                                    Text(
-                                        needPresetText,
-                                        color = Paper,
-                                        fontSize = 13.sp,
-                                        modifier = Modifier.padding(top = 6.dp),
-                                    )
+                                    BlockedDetail(needPresetText)
                                 }
                             }
                         }
@@ -1441,12 +1454,7 @@ fun SettingsScreen(
                         }
                         if (!watermark.isConfigured()) {
                             BlockedNotice(stringResource(R.string.settings_automation_blocked_watermark)) {
-                                Text(
-                                    needWatermarkText,
-                                    color = Paper,
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.padding(top = 6.dp),
-                                )
+                                BlockedDetail(needWatermarkText)
                                 TextButton(onClick = { revealSection("watermark") }) {
                                     Text(stringResource(R.string.settings_goto_watermark), color = Amber)
                                 }
@@ -1481,12 +1489,7 @@ fun SettingsScreen(
                         }
                         if (!printerBound) {
                             BlockedNotice(stringResource(R.string.settings_automation_blocked_print)) {
-                                Text(
-                                    needPrinterText,
-                                    color = Paper,
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.padding(top = 6.dp),
-                                )
+                                BlockedDetail(needPrinterText)
                                 TextButton(onClick = { revealSection("printer") }) {
                                     Text(stringResource(R.string.settings_goto_printer), color = Amber)
                                 }
@@ -1551,6 +1554,8 @@ fun SettingsScreen(
                         Text(
                             stringResource(R.string.settings_watermark_size),
                             color = PaperDim,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
                             modifier = Modifier.padding(bottom = 4.dp),
                         )
                         Slider(
@@ -1558,6 +1563,7 @@ fun SettingsScreen(
                             onValueChange = { next ->
                                 settings.updateWatermark { withSnsScale(next) }
                             },
+                            modifier = Modifier.semantics { contentDescription = snsSizeLabel },
                             valueRange = WATERMARK_SCALE_MIN..WATERMARK_SCALE_MAX,
                             colors = darkroomSliderColors(),
                         )
@@ -1607,6 +1613,8 @@ fun SettingsScreen(
                         Text(
                             stringResource(R.string.settings_watermark_size),
                             color = PaperDim,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
                             modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
                         )
                         Slider(
@@ -1614,6 +1622,7 @@ fun SettingsScreen(
                             onValueChange = { next ->
                                 settings.updateWatermark { withDateScale(next) }
                             },
+                            modifier = Modifier.semantics { contentDescription = dateSizeLabel },
                             valueRange = WATERMARK_SCALE_MIN..WATERMARK_SCALE_MAX,
                             colors = darkroomSliderColors(),
                         )
@@ -1751,7 +1760,10 @@ fun SettingsScreen(
                                         },
                                     )
                                     .semantics(mergeDescendants = true) {}
+                                    // A tappable entry keeps the 48dp touch target.
+                                    .then(if (hasDetail) Modifier.heightIn(min = 48.dp) else Modifier)
                                     .padding(vertical = 3.dp),
+                                verticalArrangement = Arrangement.Center,
                             ) {
                                 Text(
                                     "${formatLogTime(entry.at, timeFormatter)}  ${logKindLabel(entry.kind)}  ${entry.message}",
@@ -2068,7 +2080,8 @@ private fun FoldGroup(
 }
 
 /**
- * A collapsible row of a [FoldGroup]: icon tile, title, monospace summary of the current values and
+ * A collapsible row of a [FoldGroup]: icon tile, title, a sans summary of the current values (like
+ * the shared ListRow's supporting text) and
  * an expand arrow; the body expands in place underneath, inside the same card.
  *
  * Drawn here rather than with the shared ListRow because the header needs the expand/collapse
@@ -2136,9 +2149,8 @@ private fun Fold(
                     Text(
                         summary,
                         color = PaperDim,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        fontFamily = MonoFont,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
                         modifier = Modifier.padding(top = 2.dp),
                     )
                 }
@@ -2157,7 +2169,8 @@ private fun Fold(
             exit = shrinkVertically(tween(FOLD_MS)) + fadeOut(tween(FOLD_MS)),
         ) {
             Column(
-                Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+                // Lined up with the header's icon tile edge (ListRowPadding).
+                Modifier.padding(start = ListRowPadding, end = ListRowPadding, top = 4.dp, bottom = 16.dp),
                 content = content,
             )
         }
@@ -2175,54 +2188,47 @@ private fun Notice(text: String, action: @Composable () -> Unit) {
 }
 
 /**
- * Notice for an automation step that cannot run yet: an Amber [title] (8.10:1 on Surface1) over
- * Paper detail lines and Amber "go to …" links in [content]. Same look as the shared NoticeCard
- * (Surface1, 16dp corners, 1dp Amber 50% edge, info icon), which only takes a single line of text.
+ * Notice for an automation step that cannot run yet: the shared [NoticeCard] with the Amber [title]
+ * (8.10:1 on Surface1) and, in its actions flow, Paper detail lines ([BlockedDetail], one per line)
+ * and Amber "go to …" links.
  */
 @Composable
-private fun BlockedNotice(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp, bottom = 4.dp)
-            .clip(PanelShape)
-            .border(1.dp, Amber.copy(alpha = 0.5f), PanelShape)
-            .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 10.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Icon(
-            Icons.Outlined.Info,
-            contentDescription = null,
-            tint = Amber,
-            modifier = Modifier.padding(top = 1.dp, end = 10.dp).size(18.dp),
-        )
-        Column(Modifier.weight(1f)) {
-            Text(title, color = Amber, fontSize = 14.sp, lineHeight = 20.sp)
-            content()
-        }
-    }
+private fun BlockedNotice(title: String, content: @Composable RowScope.() -> Unit) {
+    NoticeCard(
+        text = title,
+        modifier = Modifier.padding(vertical = 4.dp),
+        actions = content,
+    )
+}
+
+/** A Paper detail line of a [BlockedNotice]; takes a whole line of the notice's actions flow. */
+@Composable
+private fun BlockedDetail(text: String) {
+    Text(text, color = Paper, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.fillMaxWidth())
 }
 
 /**
  * Number badge of an automation step: a 24dp [Surface3] circle with an Amber digit (6.52:1).
- * The digit stays in the merged switch row, so TalkBack still reads the step's position.
+ * The badge is a minimum size, not a fixed one, so at a large font scale it grows into a pill
+ * instead of clipping the digit. The digit stays in the merged switch row, so TalkBack still reads
+ * the step's position.
  */
 @Composable
 private fun StepBadge(number: Int) {
     Box(
         Modifier
             .padding(end = 12.dp)
-            .size(STEP_BADGE)
+            .defaultMinSize(minWidth = STEP_BADGE, minHeight = STEP_BADGE)
             .clip(CircleShape)
-            .background(Surface3),
+            .background(Surface3)
+            .padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             "$number",
             color = Amber,
-            fontFamily = MonoFont,
             fontSize = 12.sp,
-            lineHeight = 16.sp,
+            lineHeight = 12.sp,
             fontWeight = FontWeight.Medium,
         )
     }
@@ -2243,6 +2249,22 @@ private fun StepConnector() {
 
 private val STEP_BADGE = 24.dp
 
+/**
+ * [text] in the default sans family, with each occurrence of the technical [values] (MAC, RSSI,
+ * URL…) set in Monospace, so translated words around them stay sans (SYUI020-R03).
+ */
+private fun monoValues(text: String, vararg values: String): AnnotatedString = buildAnnotatedString {
+    append(text)
+    for (value in values) {
+        if (value.isEmpty()) continue
+        var at = text.indexOf(value)
+        while (at >= 0) {
+            addStyle(SpanStyle(fontFamily = MonoFont), at, at + value.length)
+            at = text.indexOf(value, at + value.length)
+        }
+    }
+}
+
 @Composable
 private fun DeviceRow(
     device: NearbyDevice,
@@ -2259,9 +2281,9 @@ private fun DeviceRow(
         Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clip(PanelShape)
+            .clip(FieldShape)
             .background(Surface2)
-            .then(if (bound) Modifier.border(1.dp, Amber, PanelShape) else Modifier)
+            .then(if (bound) Modifier.border(1.dp, Amber, FieldShape) else Modifier)
             .heightIn(min = 56.dp)
             .clickable(
                 enabled = enabled && !bound,
@@ -2283,9 +2305,8 @@ private fun DeviceRow(
         Column(Modifier.weight(1f)) {
             Text(device.name, color = Paper)
             Text(
-                device.mac + if (device.printerLike) " · $printerLike" else "",
+                monoValues(device.mac + if (device.printerLike) " · $printerLike" else "", device.mac),
                 color = PaperDim,
-                fontFamily = MonoFont,
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
             )
@@ -2307,9 +2328,8 @@ private fun DeviceRow(
                         modifier = Modifier.size(14.dp),
                     )
                     Text(
-                        stringResource(R.string.settings_signal_fmt, label, rssi),
+                        monoValues(stringResource(R.string.settings_signal_fmt, label, rssi), "$rssi"),
                         color = PaperDim,
-                        fontFamily = MonoFont,
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                     )
