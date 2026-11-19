@@ -809,9 +809,10 @@ fun SettingsScreen(
                             modifier = Modifier.padding(bottom = 12.dp),
                         )
                         if (grokSubscription) {
+                            // A hint like the save hint above; the fixed address is a technical value in mono.
                             Text(
-                                stringResource(R.string.settings_xai_fixed_endpoint, XAI_API_BASE),
-                                color = Amber,
+                                monoValues(stringResource(R.string.settings_xai_fixed_endpoint, XAI_API_BASE), XAI_API_BASE),
+                                color = PaperDim,
                                 fontSize = 12.sp, lineHeight = 18.sp,
                                 modifier = Modifier.padding(bottom = 12.dp),
                             )
@@ -2334,7 +2335,7 @@ private val STEP_BADGE = 24.dp
  * [text] in the default sans family, with each occurrence of the technical [values] (MAC, RSSI,
  * URL…) set in Monospace, so translated words around them stay sans (SYUI020-R03).
  */
-private fun monoValues(text: String, vararg values: String): AnnotatedString = buildAnnotatedString {
+internal fun monoValues(text: String, vararg values: String): AnnotatedString = buildAnnotatedString {
     append(text)
     for (value in values) {
         if (value.isEmpty()) continue

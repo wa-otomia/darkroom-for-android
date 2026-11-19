@@ -42,6 +42,8 @@ sealed interface XaiLoginUiState {
         val openable: Boolean,
         /** On the SystemClock.elapsedRealtime() clock. */
         val deadlineElapsedMs: Long,
+        /** The code's whole lifetime (deadline minus start), only to draw the countdown track; 0 = unknown. */
+        val lifetimeMs: Long = 0L,
     ) : XaiLoginUiState {
         override fun toString() = "AwaitingUser(***)"
     }
@@ -150,7 +152,8 @@ class XaiLoginCoordinator @Inject constructor(
             ?: return fail(gen, "device", LoginFailure.MALFORMED)
         http.logStep("device", "ok")
         val auth = parsed.auth
-        var poll = initialPollState(auth, SystemClock.elapsedRealtime())
+        val startedMs = SystemClock.elapsedRealtime()
+        var poll = initialPollState(auth, startedMs)
         publish(
             gen,
             XaiLoginUiState.AwaitingUser(
@@ -158,6 +161,7 @@ class XaiLoginCoordinator @Inject constructor(
                 verificationUri = auth.verificationUri,
                 openable = parsed.uriCheck == VerificationUriCheck.OPENABLE,
                 deadlineElapsedMs = poll.deadlineMs,
+                lifetimeMs = poll.deadlineMs - startedMs,
             ),
         )
         var step = firstPollStep(poll, SystemClock.elapsedRealtime())

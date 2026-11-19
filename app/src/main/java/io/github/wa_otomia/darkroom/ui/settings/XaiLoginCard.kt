@@ -11,15 +11,21 @@ import android.os.Build
 import android.os.PersistableBundle
 import android.os.SystemClock
 import androidx.browser.customtabs.CustomTabsIntent
-import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,12 +34,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,13 +55,19 @@ import io.github.wa_otomia.darkroom.core.checkVerificationUri
 import io.github.wa_otomia.darkroom.data.ai.XaiCredentials
 import io.github.wa_otomia.darkroom.data.ai.XaiLoginCoordinator
 import io.github.wa_otomia.darkroom.data.ai.XaiLoginUiState
-import io.github.wa_otomia.darkroom.ui.components.GhostButton
+import io.github.wa_otomia.darkroom.ui.components.AmberTrack
+import io.github.wa_otomia.darkroom.ui.components.IconCircleButton
+import io.github.wa_otomia.darkroom.ui.components.NoticeCard
 import io.github.wa_otomia.darkroom.ui.components.PaperButton
+import io.github.wa_otomia.darkroom.ui.components.StatusPill
+import io.github.wa_otomia.darkroom.ui.components.TonalButton
 import io.github.wa_otomia.darkroom.ui.theme.Amber
 import io.github.wa_otomia.darkroom.ui.theme.MonoFont
+import io.github.wa_otomia.darkroom.ui.theme.Ok
+import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
-import io.github.wa_otomia.darkroom.ui.theme.PaperHairline
+import io.github.wa_otomia.darkroom.ui.theme.Surface2
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -77,10 +94,16 @@ internal fun rememberXaiUi(): XaiUiEntryPoint {
  * [XaiLoginUiState] and the public AI state; nothing here goes into saved-instance state, so a
  * recreated screen redraws the same code and countdown from memory.
  *
- * The start button is a plain app-themed button: no xAI or Grok mark, never styled as an official
- * "Sign in with" button. Side-effect free apart from the callbacks.
+ * Drawn on the 0.2.0 design system (SYUI020) inside the Surface1 "AI image processing" fold: no
+ * card outline of its own, layers by fill (the code panel is Surface2). The experimental,
+ * responsibility and billing notice is a titled [NoticeCard] that always sits above the start
+ * button (R01). Each state has at most one [PaperButton] (its primary action); every other action
+ * is a [TonalButton], and copying the code is an [IconCircleButton]. Monospace is used only for the
+ * user code, the verification address and the remaining time.
+ *
+ * The start button is the app's own primary button: no xAI or Grok mark, never styled as an
+ * official "Sign in with" button. Side-effect free apart from the callbacks.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun XaiLoginCard(
     state: XaiLoginUiState,
@@ -98,20 +121,23 @@ internal fun XaiLoginCard(
     Column(
         modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp)
-            .border(1.dp, PaperHairline, RoundedCornerShape(2.dp))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // R01: always above the start button.
-        Note(stringResource(R.string.settings_xai_experimental_notice), Amber)
-        Note(stringResource(R.string.settings_xai_responsibility))
-        Note(stringResource(R.string.settings_xai_billing_notice))
+        // R01: always above the start button. Title Amber 8.10:1, detail PaperDim 5.16:1 on Surface1.
+        NoticeCard(
+            title = stringResource(R.string.settings_xai_experimental_notice),
+            text = stringResource(R.string.settings_xai_responsibility) + "\n\n" +
+                stringResource(R.string.settings_xai_billing_notice),
+        )
 
         when {
             state is XaiLoginUiState.Starting -> {
-                Note(stringResource(R.string.settings_xai_starting), Paper)
-                GhostButton(
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.settings_xai_starting), color = Paper, fontSize = 14.sp, lineHeight = 20.sp)
+                    AmberTrack(percent = 0, indeterminate = true, modifier = Modifier.fillMaxWidth(), height = 3.dp)
+                }
+                TonalButton(
                     text = stringResource(R.string.settings_xai_cancel_login),
                     fillMaxWidth = false,
                     onClick = onCancel,
@@ -119,17 +145,16 @@ internal fun XaiLoginCard(
             }
             state is XaiLoginUiState.AwaitingUser -> AwaitingUser(state, onCancel, onOpenUri, onCopyCode)
             signedIn -> {
-                Text(
-                    if (accountLabel.isNullOrBlank()) {
+                // The Ok dot is the "ready" mark (never text); the label is Paper 13.40:1 on Surface2.
+                StatusPill(
+                    text = if (accountLabel.isNullOrBlank()) {
                         stringResource(R.string.settings_xai_signed_in_unknown)
                     } else {
                         stringResource(R.string.settings_xai_signed_in, accountLabel)
                     },
-                    color = Paper,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
+                    dot = Ok,
                 )
-                GhostButton(
+                TonalButton(
                     text = stringResource(R.string.settings_xai_sign_out),
                     fillMaxWidth = false,
                     onClick = onSignOut,
@@ -142,8 +167,17 @@ internal fun XaiLoginCard(
                     XaiLoginUiState.Interrupted -> stringResource(R.string.settings_xai_login_interrupted)
                     else -> if (reloginRequired) stringResource(R.string.settings_xai_relogin_required) else null
                 }
-                if (status != null) Note(status, Amber)
-                if (!clientIdSaved) Note(stringResource(R.string.settings_xai_client_id_required))
+                if (status != null) {
+                    StatusLine(status, if (state == XaiLoginUiState.Cancelled) PaperDim else Amber)
+                }
+                if (!clientIdSaved) {
+                    Text(
+                        stringResource(R.string.settings_xai_client_id_required),
+                        color = PaperDim,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                    )
+                }
                 PaperButton(
                     text = stringResource(R.string.settings_xai_start_login),
                     enabled = clientIdSaved,
@@ -167,27 +201,6 @@ private fun AwaitingUser(
     val hyphen = stringResource(R.string.settings_xai_code_hyphen)
     // Read one character at a time: "W, D, J, B, hyphen, …".
     val spoken = state.userCode.map { if (it == '-') hyphen else it.toString() }.joinToString(", ")
-    Text(label, color = PaperDim, fontSize = 13.sp)
-    SelectionContainer {
-        Text(
-            state.userCode,
-            color = Paper,
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontFamily = MonoFont,
-                textDirection = TextDirection.Ltr,
-            ),
-            modifier = Modifier.semantics { contentDescription = "$label: $spoken" },
-        )
-    }
-    Note(stringResource(R.string.settings_xai_verify_at), Paper)
-    SelectionContainer {
-        Text(
-            state.verificationUri,
-            color = Paper,
-            style = TextStyle(fontFamily = MonoFont, fontSize = 14.sp, lineHeight = 20.sp, textDirection = TextDirection.Ltr),
-        )
-    }
-    if (!state.openable) Note(stringResource(R.string.settings_xai_verify_unlisted_host), Amber)
 
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     LaunchedEffect(state.deadlineElapsedMs) {
@@ -197,8 +210,76 @@ private fun AwaitingUser(
             delay(1_000)
         }
     }
-    Note(stringResource(R.string.settings_xai_time_left, formatRemaining(state.deadlineElapsedMs - now)))
-    Note(stringResource(R.string.settings_xai_only_if_you_started), Amber)
+    val remainingMs = state.deadlineElapsedMs - now
+    val remaining = formatRemaining(remainingMs)
+
+    // The code panel: a Surface2 block in the Surface1 fold (Paper 13.40:1, PaperDim 4.96:1).
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(PanelShape)
+            .background(Surface2)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(label, color = PaperDim, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            itemVerticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Large mono, kept left-to-right in RTL languages (R03).
+            SelectionContainer {
+                Text(
+                    state.userCode,
+                    color = Paper,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontFamily = MonoFont,
+                        textDirection = TextDirection.Ltr,
+                    ),
+                    modifier = Modifier.semantics { contentDescription = "$label: $spoken" },
+                )
+            }
+            IconCircleButton(
+                icon = Icons.Outlined.ContentCopy,
+                contentDescription = stringResource(R.string.settings_xai_copy_code),
+                onClick = { onCopyCode(state.userCode) },
+            )
+        }
+        Text(
+            monoValues(stringResource(R.string.settings_xai_time_left, remaining), remaining),
+            color = PaperDim,
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+        )
+        // The remaining share of the code's lifetime; the text above carries it for TalkBack.
+        Box(Modifier.fillMaxWidth().clearAndSetSemantics {}) {
+            if (state.lifetimeMs > 0L) {
+                AmberTrack(
+                    percent = ((remainingMs.coerceAtLeast(0L) * 100L + state.lifetimeMs - 1) / state.lifetimeMs).toInt(),
+                    indeterminate = false,
+                    modifier = Modifier.fillMaxWidth(),
+                    height = 3.dp,
+                )
+            } else {
+                AmberTrack(percent = 0, indeterminate = true, modifier = Modifier.fillMaxWidth(), height = 3.dp)
+            }
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(stringResource(R.string.settings_xai_verify_at), color = PaperDim, fontSize = 13.sp, lineHeight = 18.sp)
+        SelectionContainer {
+            Text(
+                state.verificationUri,
+                color = Paper,
+                style = TextStyle(fontFamily = MonoFont, fontSize = 14.sp, lineHeight = 20.sp, textDirection = TextDirection.Ltr),
+            )
+        }
+    }
+    if (!state.openable) NoticeCard(text = stringResource(R.string.settings_xai_verify_unlisted_host))
+    StatusLine(stringResource(R.string.settings_xai_only_if_you_started), Amber)
 
     FlowRow(
         Modifier.fillMaxWidth(),
@@ -212,12 +293,7 @@ private fun AwaitingUser(
                 onClick = { onOpenUri(state.verificationUri) },
             )
         }
-        GhostButton(
-            text = stringResource(R.string.settings_xai_copy_code),
-            fillMaxWidth = false,
-            onClick = { onCopyCode(state.userCode) },
-        )
-        GhostButton(
+        TonalButton(
             text = stringResource(R.string.settings_xai_cancel_login),
             fillMaxWidth = false,
             onClick = onCancel,
@@ -225,9 +301,24 @@ private fun AwaitingUser(
     }
 }
 
+/**
+ * A one-line status or caution inside the fold, without a box of its own: an 18dp icon and 14sp
+ * text in [color] (Amber 8.10:1 or PaperDim 5.16:1 on Surface1), read as one TalkBack item.
+ */
 @Composable
-private fun Note(text: String, color: androidx.compose.ui.graphics.Color = PaperDim) {
-    Text(text, color = color, fontSize = 13.sp, lineHeight = 18.sp)
+private fun StatusLine(text: String, color: Color) {
+    Row(
+        Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            Icons.Outlined.Info,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.padding(top = 1.dp, end = 10.dp).size(18.dp),
+        )
+        Text(text, color = color, fontSize = 14.sp, lineHeight = 20.sp)
+    }
 }
 
 /** Remaining time as m:ss, rounded up so a 900 s code starts at 15:00. */
