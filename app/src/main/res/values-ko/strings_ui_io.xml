@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- modernize-visual-design (io): the collapsed "more" section of the FTP card that holds the PASV range. -->
+    <string name="io_ui_more_details">자세히</string>
+</resources>

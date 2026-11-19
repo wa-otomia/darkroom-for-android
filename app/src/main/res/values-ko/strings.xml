@@ -12,9 +12,10 @@
     <string name="nav_io">전송</string>
     <string name="nav_presets">프리셋</string>
     <string name="nav_settings">설정</string>
-    <string name="gallery_inbox_live">갤러리</string>
     <string name="gallery_waiting">카메라 전송을 기다리는 중</string>
-    <string name="gallery_count">총 %1$d장</string>
+    <plurals name="gallery_count">
+        <item quantity="other">%1$d장</item>
+    </plurals>
     <string name="gallery_desc">카메라는 JPG만 지원합니다. 수신한 사진은 여기에 표시됩니다. 설정에서 수신 후 자동 인쇄를 켜면 2:3으로 자른 뒤 자동으로 인쇄합니다. AI 편집은 선택 사항입니다.</string>
     <string name="chip_grok_ok">AI 준비됨</string>
     <string name="chip_grok_off">AI 미설정</string>
@@ -141,7 +142,6 @@
     <string name="cancel_print">인쇄 취소</string>
     <string name="crop_overlay">2×3인치 · 1040×1560</string>
     <string name="preset_none">처리 안 함</string>
-    <string name="presets_eyebrow">프리셋</string>
     <string name="presets_title">AI 프리셋</string>
     <string name="presets_desc">인물 보정과 AI 크리에이티브 스타일. 갤러리와 인쇄는 마지막에 선택한 프리셋을 함께 쓰고, 수신 후 자동 보정은 설정에서 따로 고른 프리셋을 사용합니다.</string>
     <string name="default_preset">기본 프리셋</string>
@@ -149,7 +149,6 @@
     <string name="add_preset">프리셋 추가</string>
     <string name="preset_title">제목</string>
     <string name="preset_prompt">프롬프트</string>
-    <string name="settings_eyebrow">설정</string>
     <string name="settings_title">설정</string>
     <string name="settings_desc">AI API 키, Xiaomi 프린터(Bluetooth Classic SPP), FTP 계정, 수신 후 자동 인쇄.</string>
     <string name="settings_grok">AI 이미지 처리</string>
@@ -240,7 +239,7 @@
     <string name="settings_summary_ftp">%1$d · %2$s</string>
     <string name="settings_on">켜짐</string>
     <string name="settings_off">꺼짐</string>
-    <string name="badge_edited">편집</string>
+    <string name="badge_edited">편집됨</string>
     <string name="copied_field">복사 완료: %1$s</string>
     <string name="expand_section">펼치기</string>
     <string name="collapse_section">접기</string>
@@ -294,7 +293,6 @@
     <string name="ds_error_storage">파일을 읽거나 쓰지 못했습니다. 기기의 남은 저장 공간을 확인하세요.</string>
     <string name="ds_error_ftp_bind">이 FTP 포트를 열 수 없습니다. 이미 사용 중일 수 있으므로 다른 포트를 사용하세요.</string>
     <string name="copied_to_clipboard">복사됨</string>
-    <string name="io_ftp_connection">연결 정보</string>
     <string name="settings_ftp_auto_start">앱 시작 시 FTP 자동 실행</string>
     <string name="settings_keep_alive">앱 유지</string>
     <string name="settings_keep_alive_hint">FTP와 자동 인쇄가 계속되도록 앱을 백그라운드에서 유지합니다.</string>
