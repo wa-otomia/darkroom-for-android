@@ -1,5 +1,7 @@
 package io.github.wa_otomia.darkroom.ui.studio
 
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_LOCAL_FAILED
+
 /*
  * Pure state rules behind Studio's ID photo UI, kept free of Android and Compose so the JVM
  * tests can cover them.
@@ -11,6 +13,9 @@ internal data class CutoutKey(
     val maskRev: String,
     val argb: Int,
     val feather: String,
+    val featherInward: Boolean,
+    /** Mask edge shift in print px (EDID040-R14); a change freezes like a feather change. */
+    val maskOffset: Int = 0,
     val cellWidth: Int,
     val cellHeight: Int,
     val zoomStep: Int,
@@ -48,6 +53,78 @@ internal fun cutoutStart(
     val zoomMoving = (lastRequested != null && lastRequested.zoomStep != key.zoomStep) ||
         (held != null && held.copy(zoomStep = key.zoomStep) == key)
     return if (zoomMoving) CutoutStart.Debounced else CutoutStart.Now
+}
+
+/** How the preview moves from the cut-out on screen to the one the current inputs want (D3). */
+internal enum class CutoutTransition {
+    /** The cut-out on screen already matches. */
+    NONE,
+
+    /** Background, feather, inward feather or mask revision changed: freeze until the new one lands. */
+    FREEZE,
+
+    /**
+     * Only the feather scale changed (zoom step or cell size): keep the old cut-out, never freeze.
+     * The cell size only rescales the feather radius, like the zoom step.
+     */
+    ZOOM_ONLY,
+
+    /** No composite is wanted (original background or no mask): show the source at once. */
+    ORIGINAL,
+}
+
+/**
+ * [prev] is the key of the cut-out on screen (null when none), [next] the key the current inputs
+ * want (null when the background is the original or there is no mask).
+ */
+internal fun cutoutTransition(prev: CutoutKey?, next: CutoutKey?): CutoutTransition = when {
+    next == null -> CutoutTransition.ORIGINAL
+    prev == next -> CutoutTransition.NONE
+    prev != null && prev.copy(cellWidth = next.cellWidth, cellHeight = next.cellHeight, zoomStep = next.zoomStep) == next ->
+        CutoutTransition.ZOOM_ONLY
+    else -> CutoutTransition.FREEZE
+}
+
+/**
+ * Whether the bounded retries given up for [gaveUp] still settle [key]: the same key, or one that
+ * differs only in zoom step or cell size, so a pinch or size change after a give-up never brings
+ * the freeze back (EDID040-R08).
+ */
+internal fun gaveUpCovers(gaveUp: CutoutKey?, key: CutoutKey?): Boolean {
+    if (gaveUp == null || key == null) return false
+    val transition = cutoutTransition(gaveUp, key)
+    return transition == CutoutTransition.NONE || transition == CutoutTransition.ZOOM_ONLY
+}
+
+/** What the preview shows: the held cut-out or the source, and whether the controls are frozen. */
+internal data class CutoutView(val showHeld: Boolean, val frozen: Boolean)
+
+/**
+ * The preview state for [key] while [held] is the finished cut-out kept on screen (D3,
+ * EDID040-R08). A held cut-out of another source file is never shown. A freeze ends when the new
+ * cut-out lands, when this mask revision is known missing or undecodable ([failedMask]; the
+ * source is shown with the missing-mask note) or when the bounded retries for [key] are used up
+ * ([gaveUp], also after a later zoom-only change; the source is shown rather than an old colour).
+ * Without a known source size ([sizeKnown] false) no render can start, so nothing is frozen and
+ * the source is shown until the size arrives.
+ */
+internal fun cutoutView(
+    held: CutoutKey?,
+    key: CutoutKey?,
+    failedMask: CutoutKey?,
+    gaveUp: CutoutKey?,
+    sizeKnown: Boolean = true,
+): CutoutView {
+    val shown = held?.takeIf { key != null && it.file == key.file }
+    return when (cutoutTransition(shown, key)) {
+        CutoutTransition.ORIGINAL -> CutoutView(showHeld = false, frozen = false)
+        CutoutTransition.NONE, CutoutTransition.ZOOM_ONLY -> CutoutView(showHeld = true, frozen = false)
+        CutoutTransition.FREEZE -> {
+            val settled = !sizeKnown ||
+                key != null && ((failedMask != null && failedMask.sameMask(key)) || gaveUpCovers(gaveUp, key))
+            CutoutView(showHeld = shown != null && !settled, frozen = !settled)
+        }
+    }
 }
 
 /** Backoff before re-rendering a cut-out after a transient (non-mask) failure. */
@@ -91,3 +168,57 @@ internal data class PendingIdChoice(
  */
 internal fun maskErrorFor(error: String?, errorVersion: String?, currentVersion: String): String? =
     error?.takeIf { it.isNotBlank() && errorVersion == currentVersion }
+
+/** Which label the cut-out button shows (EDID040-R02). */
+internal enum class IdCutOutLabel {
+    /** No mask yet, on-device cut-out off: "AI cut out person". */
+    AI,
+
+    /** No mask yet, on-device cut-out on: "Cut out person on device". */
+    LOCAL,
+
+    /** A mask exists: "Cut out again", whichever mode. */
+    RECUT,
+}
+
+internal fun idCutOutLabel(hasMask: Boolean, local: Boolean): IdCutOutLabel = when {
+    hasMask -> IdCutOutLabel.RECUT
+    local -> IdCutOutLabel.LOCAL
+    else -> IdCutOutLabel.AI
+}
+
+/**
+ * Whether the cut-out can start (EDID040-R02/R10): an on-device cut-out needs no provider
+ * credential; an AI one needs [aiReady] (API key set, or the subscription signed in: AIPV010-R04).
+ * Any job on this photo ([busy], hidden ones included) blocks both.
+ */
+internal fun idCanCutOut(local: Boolean, aiReady: Boolean, busy: Boolean): Boolean = (local || aiReady) && !busy
+
+/**
+ * The credential hint ("set an API key" / "sign in" / "sign in again") and Settings entry show only
+ * for an AI cut-out whose credential is not ready.
+ */
+internal fun idShowNeedKey(local: Boolean, aiReady: Boolean): Boolean = !local && !aiReady
+
+/**
+ * The on-device switch is disabled while this photo has any job or the preview composite is
+ * building (EDID040-R10); the mode of a running job is frozen when it is queued anyway.
+ */
+internal fun idLocalSwitchEnabled(busy: Boolean, compositing: Boolean): Boolean = !busy && !compositing
+
+/** The signed edge shift number (EDID040-R14): "+3", "-3" or "0", ASCII for screen readers. */
+internal fun idMaskOffsetSigned(px: Int): String = when {
+    px > 0 -> "+$px"
+    px < 0 -> "-${-px}"
+    else -> "0"
+}
+
+/**
+ * True when a failure record without an image came from the on-device cut-out, so the viewer
+ * does not blame the AI for the missing image (EDID040-R11 keeps no image for such failures).
+ * The record's [local] mode decides, whatever the message (an undecodable or deleted version
+ * fails a local job without the local prefix); a record written before the mode was kept falls
+ * back to the local failure prefix.
+ */
+internal fun idFailureIsLocal(local: Boolean, message: String): Boolean =
+    local || message.trimStart().startsWith(ID_MASK_MSG_LOCAL_FAILED)

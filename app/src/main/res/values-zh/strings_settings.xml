@@ -15,7 +15,7 @@
     <string name="settings_about_summary">版本、隐私说明与开源许可</string>
     <string name="settings_reset">恢复默认设置</string>
     <string name="settings_reset_title">确认恢复默认设置？</string>
-    <string name="settings_reset_text">打印机绑定、打印默认值、收图后自动打印、FTP 账号与 Grok 配置将恢复为默认值，Grok 订阅在本设备登出，并重新生成 FTP 密码。界面语言、AI 预设与照片库不受影响。</string>
+    <string name="settings_reset_text">打印机绑定、打印默认值、收图后自动打印（含自动修图预设）、FTP 账号与 Grok 配置将恢复为默认值，Grok 订阅在本设备登出，并重新生成 FTP 密码。界面语言、AI 预设库与默认预设、照片库不受影响。</string>
     <string name="settings_reset_confirm">恢复</string>
     <string name="settings_reset_done">已恢复默认设置</string>
     <string name="settings_unsaved">存在未保存的更改</string>
@@ -120,6 +120,7 @@
     <string name="about_version">版本 %1$s（构建号 %2$d）</string>
     <string name="about_privacy_title">隐私说明</string>
     <string name="about_privacy_ai">使用 AI 图片处理功能时，所选照片会上传至设置中配置的接口，并在该服务端完成处理。Grok 订阅模式下，照片与指令发往 xAI 的固定地址 api.x.ai，而不是设置中填写的地址。不使用 AI 功能时，照片不会上传。</string>
+    <string name="about_privacy_local_cutout">证件照模式的“本地抠图”在本机用 Google ML Kit 完成，照片与抠图结果不上传。按 ML Kit 条款，ML Kit 会向 Google 发送性能与使用指标（设备型号、系统版本、应用包名与版本、安装级标识符），不含照片。</string>
     <string name="about_privacy_ftp">相机 FTP 服务运行期间会在局域网内开放监听端口。同一网络中知晓账号的人均可向本机上传照片。不使用时请停止该服务。</string>
     <string name="about_privacy_storage">API 密钥与 FTP 密码保存在本机的加密存储中，除发送至您所配置的接口外不会外传。Grok 订阅登录在浏览器中向 xAI 授权，所得令牌加密保存在本机，不参与备份与设备迁移，只发送给 xAI 的登录与图片接口。</string>
     <string name="about_privacy_local">照片、编辑结果与活动日志仅保存在本机。</string>

@@ -130,6 +130,7 @@ private val SEEDS: Map<Pair<JobKind, String>, Long> = mapOf(
     (JobKind.Ai to "uploading") to 3_000L,
     (JobKind.Ai to "processing") to 25_000L,
     (JobKind.Ai to "downloading") to 3_000L,
+    (JobKind.Ai to "segmenting") to 1_500L,
     (JobKind.Ai to "saving") to 1_000L,
     (JobKind.Import to "receiving") to 200L,
     (JobKind.Import to "reading") to 200L,

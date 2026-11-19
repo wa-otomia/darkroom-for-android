@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TalkBack action label for long-pressing a gallery photo (enters multi-select). -->
+    <string name="gallery_a11y_select_photo">選択</string>
+</resources>

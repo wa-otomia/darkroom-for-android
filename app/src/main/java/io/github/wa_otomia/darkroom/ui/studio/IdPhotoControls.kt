@@ -1,5 +1,6 @@
 package io.github.wa_otomia.darkroom.ui.studio
 
+import android.text.format.DateUtils
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -11,23 +12,31 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,37 +47,63 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import coil.size.Precision
+import coil.size.Scale
+import coil.size.Size
 import io.github.wa_otomia.darkroom.R
 import io.github.wa_otomia.darkroom.core.AiCredentialState
+import io.github.wa_otomia.darkroom.data.catalog.IdMaskFailure
+import io.github.wa_otomia.darkroom.core.ID_MASK_OFFSET_MAX_PX
 import io.github.wa_otomia.darkroom.core.ID_PHOTO_PRESETS
 import io.github.wa_otomia.darkroom.core.IdBackground
 import io.github.wa_otomia.darkroom.core.IdFeather
 import io.github.wa_otomia.darkroom.core.IdPhotoLayout
 import io.github.wa_otomia.darkroom.core.IdPhotoPreset
+import io.github.wa_otomia.darkroom.core.idMaskOffset
 import io.github.wa_otomia.darkroom.core.idPhotoLayout
 import io.github.wa_otomia.darkroom.core.idPhotoPreset
 import io.github.wa_otomia.darkroom.core.showsEdgeWarning
 import io.github.wa_otomia.darkroom.data.progress.ProgressUi
 import io.github.wa_otomia.darkroom.ui.UserErrorMessage
 import io.github.wa_otomia.darkroom.ui.components.AmberTrack
-import io.github.wa_otomia.darkroom.ui.components.GhostButton
+import io.github.wa_otomia.darkroom.ui.components.NoticeCard
 import io.github.wa_otomia.darkroom.ui.components.PaperButton
 import io.github.wa_otomia.darkroom.ui.components.SectionLabel
+import io.github.wa_otomia.darkroom.ui.components.SelectPill
+import io.github.wa_otomia.darkroom.ui.components.TonalButton
+import io.github.wa_otomia.darkroom.ui.components.darkroomSliderColors
 import io.github.wa_otomia.darkroom.ui.components.darkroomTextFieldColors
 import io.github.wa_otomia.darkroom.ui.theme.Amber
-import io.github.wa_otomia.darkroom.ui.theme.Ink
+import io.github.wa_otomia.darkroom.ui.theme.AmberSoft
+import io.github.wa_otomia.darkroom.ui.theme.FieldShape
+import io.github.wa_otomia.darkroom.ui.theme.MonoFont
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
 import io.github.wa_otomia.darkroom.ui.theme.PaperFaint
+import io.github.wa_otomia.darkroom.ui.theme.PanelShape
+import io.github.wa_otomia.darkroom.ui.theme.PhotoShape
+import io.github.wa_otomia.darkroom.ui.theme.RadiusSheet
+import io.github.wa_otomia.darkroom.ui.theme.Room
+import io.github.wa_otomia.darkroom.ui.theme.Surface1
 
 // ---------------------------------------------------------------------------------------------
 // Pure helpers (no Compose), kept here so the labels and the resource mapping stay in one place.
@@ -88,6 +123,8 @@ internal fun idSheetLabel(preset: IdPhotoPreset, layout: IdPhotoLayout): String 
 
 @StringRes
 internal fun idPresetPurposeRes(id: String): Int = when (id) {
+    "kr-visa" -> R.string.studio_id_preset_kr_visa
+    "jp-visa" -> R.string.studio_id_preset_jp_visa
     "33x48" -> R.string.studio_id_preset_33x48
     "25x35" -> R.string.studio_id_preset_25x35
     "22x32" -> R.string.studio_id_preset_22x32
@@ -172,18 +209,21 @@ private fun IdPhotoSizeDropdown(
     val selectedLayout = remember(selected) { idPhotoLayout(selected) }
     val perSheet = pluralStringResource(R.plurals.studio_id_per_sheet, selectedLayout.count, selectedLayout.count)
     ExposedDropdownMenuBox(expanded = open, onExpandedChange = { if (enabled) open = it }) {
-        TextField(
+        OutlinedTextField(
             value = "${idPresetMm(selected)} mm · $perSheet",
             onValueChange = {},
             readOnly = true,
             enabled = enabled,
-            singleLine = true,
+            // Wraps at large font sizes so the per-sheet count is not cut off.
+            singleLine = false,
+            maxLines = 3,
             label = { Text(stringResource(R.string.studio_id_size), color = PaperDim) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(open) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 4.dp)
                 .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled),
+            shape = FieldShape,
             colors = darkroomTextFieldColors(),
         )
         val menuMaxHeight = with(LocalDensity.current) {
@@ -193,16 +233,26 @@ private fun IdPhotoSizeDropdown(
             expanded = open,
             onDismissRequest = { open = false },
             modifier = Modifier.heightIn(max = menuMaxHeight),
+            shape = PanelShape,
         ) {
             ID_PHOTO_PRESETS.forEach { preset ->
                 val count = idPhotoLayout(preset).count
+                val current = preset.id == selected.id
                 DropdownMenuItem(
+                    // The current size is marked by a check and announced as selected, not by
+                    // the Amber text alone.
+                    modifier = Modifier.semantics { this.selected = current },
+                    trailingIcon = if (current) {
+                        { Icon(Icons.Outlined.Check, contentDescription = null, tint = Amber) }
+                    } else {
+                        null
+                    },
                     text = {
                         Column(Modifier.padding(vertical = 4.dp)) {
                             Text(
                                 "${idPresetMm(preset)} mm · " +
                                     pluralStringResource(R.plurals.studio_id_per_sheet, count, count),
-                                color = if (preset.id == selected.id) Amber else Paper,
+                                color = if (current) Amber else Paper,
                                 fontSize = 14.sp,
                                 lineHeight = 19.sp,
                             )
@@ -247,72 +297,110 @@ internal fun IdMaskJobRow(job: IdMaskJobUi, elsewhere: String?) {
                         stringResource(R.string.studio_id_cutting)
                     },
                     color = Paper,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Medium,
                 )
                 Text(
                     listOfNotNull(job.ui.phaseLabel.ifBlank { null }, job.ui.detail)
                         .joinToString(" · "),
                     color = PaperDim,
                     fontSize = 12.sp,
-                    lineHeight = 16.sp,
+                    lineHeight = 18.sp,
                 )
             }
-            GhostButton(
+            TonalButton(
                 stringResource(R.string.common_cancel),
                 fillMaxWidth = false,
+                modifier = Modifier.padding(start = 12.dp),
                 onClick = job.onCancel,
             )
         }
-        AmberTrack(ui = job.ui, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+        AmberTrack(ui = job.ui, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
     }
 }
 
 /**
- * Replaces the AI generate block in ID mode: what the AI does, the cut-out button and its gate,
- * the running job, the last failure, the palette and the feather selector.
- * Side-effect free: every action is a callback.
+ * Replaces the AI generate block in ID mode: what the cut-out does (AI or on this device), the
+ * "cut out on this device" switch row ([local], EDID040-R10), the cut-out button and its gate,
+ * the running job, the last failure, "view this cut-out's result" whenever [onViewCutoutResult]
+ * is set (a failure record exists for the version, EDID040-R09), the palette, the feather
+ * selector, the inward feather switch row below it (EDID040-R07) and the mask edge shift slider
+ * (EDID040-R14).
+ * [compositing] freezes the cut-out button, palette, feather and inward switch while the preview
+ * builds a new composite (EDID040-R08). Side-effect free: every action is a callback.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun IdPhotoProcessSection(
     credential: AiCredentialState,
+    local: Boolean,
+    localSwitchEnabled: Boolean,
     hasMask: Boolean,
     background: IdBackground,
     feather: IdFeather,
+    featherInward: Boolean,
+    maskOffset: Int,
+    compositing: Boolean,
     canCutOut: Boolean,
     maskJob: IdMaskJobUi?,
     maskJobElsewhere: String?,
     maskError: String?,
     onCutOut: () -> Unit,
+    onLocalChange: (Boolean) -> Unit,
     onOpenSettings: () -> Unit,
     onBackground: (IdBackground) -> Unit,
     onFeather: (IdFeather) -> Unit,
+    onFeatherInward: (Boolean) -> Unit,
+    onMaskOffset: (Int) -> Unit,
+    onViewCutoutResult: (() -> Unit)?,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.fillMaxWidth()) {
             SectionLabel(stringResource(R.string.studio_id_section))
-            StudioNote(stringResource(R.string.studio_id_explain), topPadding = 0)
-            if (credential != AiCredentialState.READY) {
-                Text(
-                    stringResource(
+            // Cloud: the whole photo is uploaded; on device: nothing is uploaded, no key needed.
+            StudioNote(
+                stringResource(if (local) R.string.studio_id_local_explain else R.string.studio_id_explain),
+                topPadding = 0,
+            )
+            // Only the setting changes; an existing mask and a running job keep their mode.
+            StudioSwitchRow(
+                label = stringResource(R.string.studio_id_local_cutout),
+                checked = local,
+                enabled = localSwitchEnabled,
+                onCheckedChange = onLocalChange,
+            )
+            // An on-device cut-out never needs a credential (EDID040-R10); an AI one needs an API key
+            // or a signed-in subscription (AIPV010-R04), and the hint names which is missing.
+            if (idShowNeedKey(local = local, aiReady = credential == AiCredentialState.READY)) {
+                NoticeCard(
+                    text = stringResource(
                         when (credential) {
                             AiCredentialState.NOT_SIGNED_IN -> R.string.studio_id_need_subscription_login
                             AiCredentialState.RELOGIN_REQUIRED -> R.string.studio_id_need_relogin
                             else -> R.string.grok_need_key
                         },
                     ),
-                    color = Amber,
                     modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+                    actions = {
+                        TonalButton(
+                            stringResource(R.string.nav_settings),
+                            fillMaxWidth = false,
+                            onClick = onOpenSettings,
+                        )
+                    },
                 )
-                TextButton(onClick = onOpenSettings) {
-                    Text(stringResource(R.string.nav_settings), color = Amber)
-                }
             }
         }
         PaperButton(
-            stringResource(if (hasMask) R.string.studio_id_recut else R.string.studio_id_cutout),
-            enabled = canCutOut,
+            stringResource(
+                when (idCutOutLabel(hasMask = hasMask, local = local)) {
+                    IdCutOutLabel.RECUT -> R.string.studio_id_recut
+                    IdCutOutLabel.LOCAL -> R.string.studio_id_cutout_local
+                    IdCutOutLabel.AI -> R.string.studio_id_cutout
+                },
+            ),
+            enabled = canCutOut && !compositing,
             onClick = onCutOut,
         )
         if (maskJob != null) {
@@ -321,14 +409,25 @@ internal fun IdPhotoProcessSection(
         if (!maskError.isNullOrBlank()) {
             UserErrorMessage(maskError)
         }
+        // Tied to the stored record, not to the on-screen error above (EDID040-R09).
+        if (onViewCutoutResult != null) {
+            TonalButton(
+                stringResource(R.string.studio_id_view_cutout_result),
+                fillMaxWidth = false,
+                onClick = onViewCutoutResult,
+            )
+        }
 
-        val paletteEnabled = hasMask && maskJob == null
+        val paletteEnabled = hasMask && maskJob == null && !compositing
         Column(Modifier.fillMaxWidth()) {
             SectionLabel(stringResource(R.string.studio_id_background))
             if (!hasMask) {
                 StudioNote(stringResource(R.string.studio_id_need_mask), topPadding = 0)
             }
-            Column(Modifier.fillMaxWidth().selectableGroup()) {
+            Column(
+                Modifier.fillMaxWidth().selectableGroup(),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
                 IdBackground.entries.forEach { option ->
                     IdBackgroundOption(
                         option = option,
@@ -346,25 +445,80 @@ internal fun IdPhotoProcessSection(
             SectionLabel(stringResource(R.string.studio_id_feather))
             FlowRow(
                 Modifier.fillMaxWidth().selectableGroup(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 IdFeather.entries.forEach { option ->
-                    IdFeatherChip(
-                        label = stringResource(idFeatherLabelRes(option)),
+                    SelectPill(
                         selected = hasMask && option == feather,
-                        enabled = featherEnabled,
+                        label = stringResource(idFeatherLabelRes(option)),
                         onClick = { onFeather(option) },
+                        enabled = featherEnabled,
                     )
                 }
             }
+            // Its own switch row below the levels, outside the radio group; no effect without a
+            // feather radius. Disabled, it still shows and announces its on/off state.
+            StudioSwitchRow(
+                label = stringResource(R.string.studio_id_feather_inward),
+                checked = featherInward,
+                enabled = featherEnabled && feather != IdFeather.NONE,
+                onCheckedChange = onFeatherInward,
+            )
+            IdMaskOffsetSlider(value = maskOffset, enabled = featherEnabled, onCommit = onMaskOffset)
         }
     }
 }
 
 /**
+ * The mask edge shift (EDID040-R14), −10..+10 print px in steps of 1. The thumb follows the drag
+ * locally and only the released value is committed, so a drag never starts a composite (and its
+ * freeze) per step. Disabled, it still shows the value; the value text is its state description.
+ */
+@Composable
+private fun IdMaskOffsetSlider(value: Int, enabled: Boolean, onCommit: (Int) -> Unit) {
+    var drag by remember { mutableStateOf<Float?>(null) }
+    val shown = drag?.let { Math.round(it) } ?: value
+    val valueText = stringResource(R.string.studio_id_mask_offset_value, idMaskOffsetSigned(shown))
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.studio_id_mask_offset),
+                color = if (enabled) Paper else PaperDim,
+                fontSize = 15.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f).padding(end = 12.dp),
+            )
+            // A pixel count: a technical value, so monospace.
+            Text(
+                valueText,
+                color = if (enabled) Amber else PaperDim,
+                fontFamily = MonoFont,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+            )
+        }
+        Slider(
+            value = drag ?: value.toFloat(),
+            onValueChange = { drag = it },
+            onValueChangeFinished = {
+                drag?.let { onCommit(idMaskOffset(Math.round(it))) }
+                drag = null
+            },
+            valueRange = -ID_MASK_OFFSET_MAX_PX.toFloat()..ID_MASK_OFFSET_MAX_PX.toFloat(),
+            steps = 2 * ID_MASK_OFFSET_MAX_PX - 1,
+            enabled = enabled,
+            colors = darkroomSliderColors(),
+            modifier = Modifier.fillMaxWidth().semantics { stateDescription = valueText },
+        )
+        StudioNote(stringResource(R.string.studio_id_mask_offset_note), topPadding = 0)
+    }
+}
+
+/**
  * One palette row: swatch, name and use. The row is one radio button for TalkBack, which reads
- * the name, the use and the selected state together (EDID040-R04).
+ * the name, the use and the selected state together (EDID040-R04). A 14dp-radius row; the
+ * selected one is filled AmberSoft with an Amber name (6.10:1 over Surface1).
  */
 @Composable
 private fun IdBackgroundOption(
@@ -374,13 +528,18 @@ private fun IdBackgroundOption(
     onClick: () -> Unit,
 ) {
     val state = stringResource(if (selected) R.string.a11y_state_selected else R.string.a11y_state_not_selected)
-    val shape = RoundedCornerShape(2.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .clip(shape)
-            .background(if (selected) Amber.copy(alpha = if (enabled) 0.18f else 0.08f) else Color.Transparent)
+            .clip(FieldShape)
+            .background(
+                when {
+                    !selected -> Color.Transparent
+                    enabled -> AmberSoft
+                    else -> AmberSoft.copy(alpha = AmberSoft.alpha / 2f)
+                },
+            )
             .selectable(
                 selected = selected,
                 enabled = enabled,
@@ -388,7 +547,7 @@ private fun IdBackgroundOption(
                 onClick = onClick,
             )
             .semantics(mergeDescendants = true) { stateDescription = state }
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IdSwatch(option, enabled = enabled, selected = selected)
@@ -396,24 +555,31 @@ private fun IdBackgroundOption(
         Column(Modifier.weight(1f)) {
             Text(
                 stringResource(idBackgroundNameRes(option)),
-                color = if (enabled) Paper else PaperDim,
+                color = if (enabled && selected) Amber else if (enabled) Paper else PaperDim,
                 fontSize = 14.sp,
-                lineHeight = 19.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
             )
             Text(
                 stringResource(idBackgroundUseRes(option)),
-                color = PaperDim,
+                // PaperDim on the selected AmberSoft fill is 4.46:1 over Surface1, under the text
+                // minimum; Paper at 62% is 5.24:1 there.
+                color = if (selected && enabled) Paper.copy(alpha = 0.62f) else PaperDim,
                 fontSize = 12.sp,
-                lineHeight = 16.sp,
+                lineHeight = 18.sp,
             )
         }
     }
 }
 
-/** Colour chip; "original" is drawn as a struck-through empty chip, never by colour alone. */
+/**
+ * Round colour chip; "original" is drawn as a struck-through empty chip, never by colour alone.
+ * The 1dp PaperFaint ring keeps dark swatches (navy) visible on the dark panel; selected, it is
+ * a 2dp Amber ring.
+ */
 @Composable
 private fun IdSwatch(option: IdBackground, enabled: Boolean, selected: Boolean) {
-    val shape = RoundedCornerShape(2.dp)
+    val shape = CircleShape
     val alpha = if (enabled) 1f else 0.45f
     Box(
         Modifier
@@ -431,29 +597,116 @@ private fun IdSwatch(option: IdBackground, enabled: Boolean, selected: Boolean) 
     }
 }
 
+/**
+ * Full-screen view of the version's last failed cut-out (EDID040-R09): the reply as received,
+ * decoded bounded (long edge at most 2048 px) and never cached, or "the AI returned no usable
+ * image" when none was kept or it does not decode; then the failure reason, its time and Close.
+ * The files live only in the app cache; nothing here uploads or logs them.
+ */
 @Composable
-private fun IdFeatherChip(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(2.dp)
-    Box(
-        modifier = Modifier
-            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .clip(shape)
-            .background(if (selected) Amber.copy(alpha = if (enabled) 0.9f else 0.4f) else Color.Transparent)
-            .then(if (selected) Modifier else Modifier.border(1.dp, PaperFaint, shape))
-            .selectable(
-                selected = selected,
-                enabled = enabled,
-                role = Role.RadioButton,
-                onClick = onClick,
-            )
-            .padding(horizontal = 14.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            color = if (selected) Ink else if (enabled) Paper else PaperDim,
-            fontSize = 13.sp,
-            lineHeight = 18.sp,
+internal fun IdCutoutResultViewer(failure: IdMaskFailure, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val file = failure.bytesFile
+    // The file is replaced in place by a later failure, so never serve it from a cache.
+    val request = remember(file, failure.at) {
+        file?.let {
+            ImageRequest.Builder(context)
+                .data(it)
+                .size(Size(CUTOUT_RESULT_MAX_EDGE, CUTOUT_RESULT_MAX_EDGE))
+                .precision(Precision.INEXACT)
+                .scale(Scale.FIT)
+                .memoryCachePolicy(CachePolicy.DISABLED)
+                .diskCachePolicy(CachePolicy.DISABLED)
+                .build()
+        }
+    }
+    var decodeFailed by remember(file, failure.at) { mutableStateOf(false) }
+    val whenText = remember(failure.at) {
+        DateUtils.formatDateTime(
+            context,
+            failure.at,
+            DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_SHOW_YEAR,
         )
     }
+    val title = stringResource(R.string.studio_id_cutout_result_title)
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        // A Surface1 panel with 28dp corners on the Room backdrop, like the other sheets and
+        // dialogs. Still fills the window, so nothing outside it can be tapped (as before).
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Room)
+                .systemBarsPadding()
+                .padding(12.dp),
+        ) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(RadiusSheet))
+                    .background(Surface1)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Paper,
+                    modifier = Modifier.semantics { heading() },
+                )
+                // The image and the reason take what is left after the title and Close.
+                Column(
+                    Modifier.weight(1f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    if (request != null && !decodeFailed) {
+                        AsyncImage(
+                            model = request,
+                            contentDescription = title,
+                            contentScale = ContentScale.Fit,
+                            onError = { decodeFailed = true },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .clip(PhotoShape)
+                                .background(Color.Black),
+                        )
+                    } else {
+                        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                            val noImage = if (idFailureIsLocal(failure.local, failure.message)) {
+                                R.string.studio_id_cutout_result_no_image_local
+                            } else {
+                                R.string.studio_id_cutout_result_no_image
+                            }
+                            Text(stringResource(noImage), color = Paper)
+                        }
+                    }
+                    // Bounded and scrollable. It shares only the space the image area gets, which is
+                    // measured after the title and Close, so a long reason at a large font scale
+                    // cannot push Close off screen.
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        if (failure.message.isNotBlank()) {
+                            UserErrorMessage(failure.message)
+                        }
+                        Text(
+                            stringResource(R.string.studio_id_cutout_result_at, whenText),
+                            color = PaperDim,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                        )
+                    }
+                }
+                TonalButton(stringResource(R.string.studio_id_failed_mask_close), onClick = onDismiss)
+            }
+        }
+    }
 }
+
+private const val CUTOUT_RESULT_MAX_EDGE = 2048

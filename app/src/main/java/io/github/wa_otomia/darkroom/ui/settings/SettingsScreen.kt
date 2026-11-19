@@ -25,6 +25,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,17 +34,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -51,15 +57,13 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BatteryChargingFull
 import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.outlined.Bolt
-import androidx.compose.material.icons.outlined.BrandingWatermark
+import androidx.compose.material.icons.automirrored.outlined.BrandingWatermark
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Print
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.SignalCellularAlt
 import androidx.compose.material.icons.outlined.Tune
@@ -77,18 +81,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -102,7 +101,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -117,6 +118,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -160,26 +165,39 @@ import io.github.wa_otomia.darkroom.data.progress.JobKind
 import io.github.wa_otomia.darkroom.data.progress.PrefsProgressStats
 import io.github.wa_otomia.darkroom.data.progress.indeterminateUi
 import io.github.wa_otomia.darkroom.ui.components.AmberTrack
+import io.github.wa_otomia.darkroom.ui.components.CardGroup
 import io.github.wa_otomia.darkroom.ui.components.DarkroomSnackbarHost
-import io.github.wa_otomia.darkroom.ui.components.GhostButton
+import io.github.wa_otomia.darkroom.ui.components.GroupDivider
+import io.github.wa_otomia.darkroom.ui.components.IconCircleButton
+import io.github.wa_otomia.darkroom.ui.components.IconTile
 import io.github.wa_otomia.darkroom.ui.components.InlineConfirm
+import io.github.wa_otomia.darkroom.ui.components.ListRow
+import io.github.wa_otomia.darkroom.ui.components.ListRowChevron
+import io.github.wa_otomia.darkroom.ui.components.ListRowPadding
+import io.github.wa_otomia.darkroom.ui.components.NoticeCard
+import io.github.wa_otomia.darkroom.ui.components.PageTitle
 import io.github.wa_otomia.darkroom.ui.components.PaperButton
 import io.github.wa_otomia.darkroom.ui.components.PresetDropdown
-import io.github.wa_otomia.darkroom.ui.components.ScreenHeader
 import io.github.wa_otomia.darkroom.ui.components.SectionLabel
+import io.github.wa_otomia.darkroom.ui.components.SegmentedPills
+import io.github.wa_otomia.darkroom.ui.components.TonalButton
+import io.github.wa_otomia.darkroom.ui.components.darkroomSliderColors
+import io.github.wa_otomia.darkroom.ui.components.darkroomSwitchColors
 import io.github.wa_otomia.darkroom.ui.components.darkroomTextFieldColors
 import io.github.wa_otomia.darkroom.ui.components.rememberInlineConfirmState
+import io.github.wa_otomia.darkroom.ui.navigation.LocalBottomBarClearance
 import io.github.wa_otomia.darkroom.ui.theme.Amber
+import io.github.wa_otomia.darkroom.ui.theme.AmberSoft
 import io.github.wa_otomia.darkroom.ui.theme.Danger
-import io.github.wa_otomia.darkroom.ui.theme.Ink
+import io.github.wa_otomia.darkroom.ui.theme.FieldShape
 import io.github.wa_otomia.darkroom.ui.theme.MonoFont
+import io.github.wa_otomia.darkroom.ui.theme.PanelShape
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
-import io.github.wa_otomia.darkroom.ui.theme.PaperDisabled
 import io.github.wa_otomia.darkroom.ui.theme.PaperFaint
-import io.github.wa_otomia.darkroom.ui.theme.PaperHairline
 import io.github.wa_otomia.darkroom.ui.theme.Room
-import io.github.wa_otomia.darkroom.ui.theme.SurfaceLow
+import io.github.wa_otomia.darkroom.ui.theme.Surface2
+import io.github.wa_otomia.darkroom.ui.theme.Surface3
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -195,6 +213,17 @@ import kotlin.math.roundToInt
 
 private const val FOLD_MS = 240
 private const val HIGHLIGHT_MS = 1600L
+
+/** Vertical gap between the grouped cards of the page. */
+private val GROUP_GAP = 20.dp
+
+/**
+ * Deep-link keys per group, matching the `highlighted == …` checks of each fold, so the group card
+ * that holds the targeted fold gets the Amber edge while the fold row itself turns AmberSoft.
+ */
+private val SETUP_SECTIONS = setOf("grok", "ai", "printer", "ftp")
+private val PRINTING_SECTIONS = setOf("printing", "autoprint", "watermark")
+private val APP_SECTIONS = setOf("language", "keepalive", "keep_alive")
 
 /** Permission gate state for the Bluetooth scan button. */
 private const val PERM_OK = 0
@@ -230,6 +259,7 @@ fun SettingsScreen(
     val watermark by settings.watermark.collectAsState()
     val photos by catalog.photos.collectAsState(initial = emptyList())
     val presets by settings.presets.collectAsState()
+    val autoEditPresetId by settings.autoEditPreset.collectAsState()
     val logs by activityLog.entries.collectAsState()
     val ftpListening by FtpForegroundService.listening.collectAsState()
     val scope = rememberCoroutineScope()
@@ -361,6 +391,7 @@ fun SettingsScreen(
     val xaiCodeCopied = stringResource(R.string.settings_xai_code_copied)
     val xaiBrowserUnavailable = stringResource(R.string.settings_xai_browser_unavailable)
     val needPresetText = stringResource(R.string.settings_automation_need_preset)
+    val presetMissingText = stringResource(R.string.error_preset_missing)
     val needWatermarkText = stringResource(R.string.settings_automation_need_watermark)
 
     val btPerms = if (Build.VERSION.SDK_INT >= 31) {
@@ -592,7 +623,7 @@ fun SettingsScreen(
     }
 
     val printerBound = cfg.printerMac.isNotBlank()
-    val autoHasPreset = presets.lastSelectedId != AI_PRESET_NONE
+    val autoHasPreset = autoEditPresetId != AI_PRESET_NONE
     val autoAiReady = ai.credentialReady
     val autoParts = buildList {
         if (cfg.autoEdit) add(stringResource(R.string.chip_automation_edit))
@@ -608,6 +639,10 @@ fun SettingsScreen(
         if (watermark.sns.enabled) add(stringResource(R.string.settings_watermark_sns))
         if (watermark.date.enabled) add(stringResource(R.string.settings_watermark_date))
     }
+    // Accessible names of the two otherwise identical "Size" sliders, e.g. "SNS watermark Size".
+    val sizeText = stringResource(R.string.settings_watermark_size)
+    val snsSizeLabel = "${stringResource(R.string.settings_watermark_sns)} $sizeText"
+    val dateSizeLabel = "${stringResource(R.string.settings_watermark_date)} $sizeText"
     val watermarkSummary = if (watermarkParts.isEmpty()) {
         stringResource(R.string.settings_off)
     } else {
@@ -654,10 +689,14 @@ fun SettingsScreen(
         else -> stringResource(R.string.settings_lang_system)
     }
 
+    // The floating nav bar draws over the bottom of this tab: the snackbar is lifted above it and
+    // the scroll content ends with a spacer of the same height, so the last row can scroll clear.
+    val bottomClearance = LocalBottomBarClearance.current
+
     Scaffold(
         containerColor = Room,
         contentWindowInsets = WindowInsets(0),
-        snackbarHost = { DarkroomSnackbarHost(snackbar) },
+        snackbarHost = { DarkroomSnackbarHost(snackbar, Modifier.padding(bottom = bottomClearance)) },
     ) { padding ->
         Box(
             Modifier
@@ -669,435 +708,281 @@ fun SettingsScreen(
                 Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState)
-                    .padding(20.dp),
+                    .padding(horizontal = 20.dp),
             ) {
-                ScreenHeader(
-                    eyebrow = stringResource(R.string.settings_eyebrow),
+                PageTitle(
                     title = stringResource(R.string.settings_title),
-                )
-                Text(
-                    stringResource(R.string.settings_desc),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = PaperDim,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
+                    modifier = Modifier.padding(top = 12.dp, bottom = 16.dp),
                 )
 
-                SectionLabel(stringResource(R.string.settings_group_setup))
-
-                Fold(
-                    title = stringResource(R.string.settings_grok),
-                    summary = grokSummary,
-                    icon = Icons.Outlined.AutoAwesome,
-                    open = openGrok,
-                    highlighted = highlighted == "grok" || highlighted == "ai",
-                    onToggle = { openGrok = !openGrok },
-                    onTop = { sectionTops["grok"] = it },
+                FoldGroup(
+                    label = stringResource(R.string.settings_group_setup),
+                    highlighted = highlighted in SETUP_SECTIONS,
                 ) {
-                    fun setCurrentDraft(next: AiDraft) {
-                        if (formProvider == AiProvider.GROK) grokDraft = next else openaiDraft = next
-                    }
-                    val draft = currentDraft
-                    val formKeySet = storedForm?.keySet == true
-                    val qualities = if (formProvider == AiProvider.GROK) listOf("low", "medium") else listOf("low", "medium", "high")
-                    val cached = ai.cachedModels[formProvider].orEmpty()
-                    val modelChoices = (cached + draft.model + if (formProvider == AiProvider.GROK) GROK_MODELS else emptyList())
-                        .filter { it.isNotBlank() }
-                        .distinct()
+                    Fold(
+                        title = stringResource(R.string.settings_grok),
+                        summary = grokSummary,
+                        icon = Icons.Outlined.AutoAwesome,
+                        open = openGrok,
+                        highlighted = highlighted == "grok" || highlighted == "ai",
+                        onToggle = { openGrok = !openGrok },
+                        onTop = { sectionTops["grok"] = it },
+                    ) {
+                        fun setCurrentDraft(next: AiDraft) {
+                            if (formProvider == AiProvider.GROK) grokDraft = next else openaiDraft = next
+                        }
+                        val draft = currentDraft
+                        val formKeySet = storedForm?.keySet == true
+                        val qualities = if (formProvider == AiProvider.GROK) listOf("low", "medium") else listOf("low", "medium", "high")
+                        val cached = ai.cachedModels[formProvider].orEmpty()
+                        val modelChoices = (cached + draft.model + if (formProvider == AiProvider.GROK) GROK_MODELS else emptyList())
+                            .filter { it.isNotBlank() }
+                            .distinct()
 
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                        listOf(AiProvider.GROK, AiProvider.OPENAI).forEachIndexed { index, provider ->
-                            SegmentedButton(
-                                selected = formProvider == provider,
-                                onClick = {
-                                    formProviderId = provider.id
-                                    settings.setActiveProvider(provider)
-                                    probeResult = null
-                                    modelRefreshFailed = false
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index, 2),
-                                colors = darkroomSegmentedColors(),
-                            ) {
-                                Text(
-                                    stringResource(
-                                        if (provider == AiProvider.GROK) {
-                                            R.string.settings_provider_grok
-                                        } else {
-                                            R.string.settings_provider_openai
-                                        },
-                                    ),
-                                )
-                            }
-                        }
-                    }
-                    if (formProvider == AiProvider.GROK) {
-                        val currentMode = storedForm?.authMode ?: AiAuthMode.API_KEY
-                        Text(
-                            stringResource(R.string.settings_ai_auth_mode),
-                            color = PaperDim,
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        )
-                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                            listOf(AiAuthMode.API_KEY, AiAuthMode.SUBSCRIPTION).forEachIndexed { index, mode ->
-                                SegmentedButton(
-                                    selected = currentMode == mode,
-                                    onClick = {
-                                        if (currentMode != mode) {
-                                            // Switching away cancels a pending sign-in (AIPV050-R06);
-                                            // the API key and stored tokens are both kept.
-                                            if (mode == AiAuthMode.API_KEY) xaiLogin.cancel()
-                                            settings.setGrokAuthMode(mode)
-                                            probeResult = null
-                                            modelRefreshFailed = false
-                                        }
+                        val providers = listOf(AiProvider.GROK, AiProvider.OPENAI)
+                        SegmentedPills(
+                            options = providers.map { provider ->
+                                stringResource(
+                                    if (provider == AiProvider.GROK) {
+                                        R.string.settings_provider_grok
+                                    } else {
+                                        R.string.settings_provider_openai
                                     },
-                                    shape = SegmentedButtonDefaults.itemShape(index, 2),
-                                    colors = darkroomSegmentedColors(),
-                                ) {
-                                    Text(
-                                        stringResource(
-                                            if (mode == AiAuthMode.API_KEY) {
-                                                R.string.settings_ai_auth_api_key
-                                            } else {
-                                                R.string.settings_ai_auth_subscription
-                                            },
-                                        ),
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        Text(
-                            stringResource(R.string.settings_ai_openai_no_subscription),
-                            color = PaperDim,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(bottom = 8.dp),
+                                )
+                            },
+                            selectedIndex = providers.indexOf(formProvider),
+                            onSelect = { index ->
+                                val provider = providers[index]
+                                formProviderId = provider.id
+                                settings.setActiveProvider(provider)
+                                probeResult = null
+                                modelRefreshFailed = false
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                         )
-                    }
-                    Text(
-                        stringResource(R.string.settings_grok_save_hint),
-                        color = PaperDim,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(bottom = 12.dp),
-                    )
-                    if (grokSubscription) {
+                        if (formProvider == AiProvider.GROK) {
+                            val currentMode = storedForm?.authMode ?: AiAuthMode.API_KEY
+                            val authModes = listOf(AiAuthMode.API_KEY, AiAuthMode.SUBSCRIPTION)
+                            Text(
+                                stringResource(R.string.settings_ai_auth_mode),
+                                color = PaperDim,
+                                fontSize = 14.sp,
+                                lineHeight = 20.sp,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            )
+                            SegmentedPills(
+                                options = authModes.map { mode ->
+                                    stringResource(
+                                        if (mode == AiAuthMode.API_KEY) {
+                                            R.string.settings_ai_auth_api_key
+                                        } else {
+                                            R.string.settings_ai_auth_subscription
+                                        },
+                                    )
+                                },
+                                selectedIndex = authModes.indexOf(currentMode),
+                                onSelect = { index ->
+                                    val mode = authModes[index]
+                                    if (currentMode != mode) {
+                                        // Switching away cancels a pending sign-in (AIPV050-R06);
+                                        // the API key and stored tokens are both kept.
+                                        if (mode == AiAuthMode.API_KEY) xaiLogin.cancel()
+                                        settings.setGrokAuthMode(mode)
+                                        probeResult = null
+                                        modelRefreshFailed = false
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                            )
+                        } else {
+                            Text(
+                                stringResource(R.string.settings_ai_openai_no_subscription),
+                                color = PaperDim,
+                                fontSize = 12.sp, lineHeight = 18.sp,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            )
+                        }
                         Text(
-                            stringResource(R.string.settings_xai_fixed_endpoint, XAI_API_BASE),
-                            color = Amber,
-                            fontSize = 12.sp,
+                            stringResource(R.string.settings_grok_save_hint),
+                            color = PaperDim,
+                            fontSize = 12.sp, lineHeight = 18.sp,
                             modifier = Modifier.padding(bottom = 12.dp),
                         )
-                        SettingsField(
-                            label = stringResource(R.string.settings_xai_client_id),
-                            value = grokClientIdDraft,
-                            supporting = when {
-                                grokSignedIn -> stringResource(R.string.settings_xai_client_id_locked)
-                                grokSigningIn -> stringResource(R.string.settings_xai_client_id_locked_login)
-                                else -> null
-                            },
-                            enabled = !grokSignedIn && !grokSigningIn,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Ascii,
-                                autoCorrectEnabled = false,
-                                imeAction = ImeAction.Done,
-                            ),
-                            onValueChange = { grokClientIdDraft = it },
-                        )
-                        XaiLoginCard(
-                            state = xaiLoginState,
-                            clientIdSaved = storedForm?.clientId.orEmpty().isNotBlank(),
-                            signedIn = grokSignedIn,
-                            accountLabel = storedForm?.accountLabel,
-                            reloginRequired = storedForm?.credential == AiCredentialState.RELOGIN_REQUIRED,
-                            onStart = {
-                                probeResult = null
-                                // The attempt uses the saved client ID; drop an unsaved edit.
-                                grokClientIdDraft = storedForm?.clientId.orEmpty()
-                                xaiLogin.start()
-                            },
-                            onCancel = { xaiLogin.cancel() },
-                            onSignOut = {
-                                scope.launch {
-                                    withContext(NonCancellable) { xaiCredentials.signOut() }
-                                    xaiLogin.acknowledge()
+                        if (grokSubscription) {
+                            Text(
+                                stringResource(R.string.settings_xai_fixed_endpoint, XAI_API_BASE),
+                                color = Amber,
+                                fontSize = 12.sp, lineHeight = 18.sp,
+                                modifier = Modifier.padding(bottom = 12.dp),
+                            )
+                            SettingsField(
+                                label = stringResource(R.string.settings_xai_client_id),
+                                value = grokClientIdDraft,
+                                supporting = when {
+                                    grokSignedIn -> stringResource(R.string.settings_xai_client_id_locked)
+                                    grokSigningIn -> stringResource(R.string.settings_xai_client_id_locked_login)
+                                    else -> null
+                                },
+                                enabled = !grokSignedIn && !grokSigningIn,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Ascii,
+                                    autoCorrectEnabled = false,
+                                    imeAction = ImeAction.Done,
+                                ),
+                                onValueChange = { grokClientIdDraft = it },
+                            )
+                            XaiLoginCard(
+                                state = xaiLoginState,
+                                clientIdSaved = storedForm?.clientId.orEmpty().isNotBlank(),
+                                signedIn = grokSignedIn,
+                                accountLabel = storedForm?.accountLabel,
+                                reloginRequired = storedForm?.credential == AiCredentialState.RELOGIN_REQUIRED,
+                                onStart = {
                                     probeResult = null
-                                    snackbar.showSnackbar(xaiSignedOut)
-                                }
-                            },
-                            onOpenUri = { uri ->
-                                if (!openXaiVerificationPage(context, uri)) {
-                                    scope.launch { snackbar.showSnackbar(xaiBrowserUnavailable) }
-                                }
-                            },
-                            onCopyCode = { code ->
-                                if (copyXaiUserCode(context, code)) {
-                                    scope.launch { snackbar.showSnackbar(xaiCodeCopied) }
-                                }
-                            },
-                        )
-                    }
-                    SettingsField(
-                        label = stringResource(R.string.grok_url),
-                        value = draft.url,
-                        supporting = if (normalizedGrokUrl != draft.url.trim()) {
-                            stringResource(R.string.settings_grok_url_preview, normalizedGrokUrl)
-                        } else {
-                            null
-                        },
-                        enabled = !grokSubscription,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
-                        onValueChange = {
-                            setCurrentDraft(draft.copy(url = it))
-                            probeResult = null
-                        },
-                    )
-                    SettingsField(
-                        label = stringResource(R.string.grok_key),
-                        value = draft.key,
-                        placeholder = stringResource(
-                            if (formProvider == AiProvider.GROK) {
-                                R.string.grok_key_placeholder
-                            } else {
-                                R.string.settings_ai_key_placeholder_openai
-                            },
-                        ),
-                        supporting = if (formKeySet) {
-                            stringResource(R.string.settings_grok_key_present)
-                        } else {
-                            stringResource(
-                                if (formProvider == AiProvider.GROK) {
-                                    R.string.settings_grok_key_absent
-                                } else {
-                                    R.string.settings_ai_key_absent_openai
+                                    // The attempt uses the saved client ID; drop an unsaved edit.
+                                    grokClientIdDraft = storedForm?.clientId.orEmpty()
+                                    xaiLogin.start()
+                                },
+                                onCancel = { xaiLogin.cancel() },
+                                onSignOut = {
+                                    scope.launch {
+                                        withContext(NonCancellable) { xaiCredentials.signOut() }
+                                        xaiLogin.acknowledge()
+                                        probeResult = null
+                                        snackbar.showSnackbar(xaiSignedOut)
+                                    }
+                                },
+                                onOpenUri = { uri ->
+                                    if (!openXaiVerificationPage(context, uri)) {
+                                        scope.launch { snackbar.showSnackbar(xaiBrowserUnavailable) }
+                                    }
+                                },
+                                onCopyCode = { code ->
+                                    if (copyXaiUserCode(context, code)) {
+                                        scope.launch { snackbar.showSnackbar(xaiCodeCopied) }
+                                    }
                                 },
                             )
-                        },
-                        secret = true,
-                        enabled = !grokSubscription,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                        onValueChange = {
-                            setCurrentDraft(draft.copy(key = it))
-                            probeResult = null
-                        },
-                    )
-                    if (formKeySet) {
-                        GhostButton(
-                            text = stringResource(R.string.settings_grok_key_clear),
+                        }
+                        SettingsField(
+                            label = stringResource(R.string.grok_url),
+                            value = draft.url,
+                            supporting = if (normalizedGrokUrl != draft.url.trim()) {
+                                stringResource(R.string.settings_grok_url_preview, normalizedGrokUrl)
+                            } else {
+                                null
+                            },
                             enabled = !grokSubscription,
-                            fillMaxWidth = false,
-                            onClick = { showClearKey = true },
-                        )
-                    }
-
-                    Text(
-                        stringResource(R.string.grok_model),
-                        color = PaperDim,
-                        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
-                    )
-                    ExposedDropdownMenuBox(
-                        expanded = modelMenuOpen,
-                        onExpandedChange = { modelMenuOpen = it },
-                    ) {
-                        androidx.compose.material3.TextField(
-                            value = draft.model,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
                             onValueChange = {
-                                setCurrentDraft(draft.copy(model = it))
+                                setCurrentDraft(draft.copy(url = it))
                                 probeResult = null
                             },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(modelMenuOpen) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(MenuAnchorType.PrimaryEditable, true),
-                            colors = darkroomTextFieldColors(),
-                            textStyle = androidx.compose.ui.text.TextStyle(fontFamily = MonoFont),
                         )
-                        ExposedDropdownMenu(
-                            expanded = modelMenuOpen,
-                            onDismissRequest = { modelMenuOpen = false },
-                        ) {
-                            modelChoices.forEach { model ->
-                                DropdownMenuItem(
-                                    text = { Text(model, color = Paper, fontFamily = MonoFont) },
-                                    onClick = {
-                                        setCurrentDraft(draft.copy(model = model))
-                                        modelMenuOpen = false
+                        SettingsField(
+                            label = stringResource(R.string.grok_key),
+                            value = draft.key,
+                            placeholder = stringResource(
+                                if (formProvider == AiProvider.GROK) {
+                                    R.string.grok_key_placeholder
+                                } else {
+                                    R.string.settings_ai_key_placeholder_openai
+                                },
+                            ),
+                            supporting = if (formKeySet) {
+                                stringResource(R.string.settings_grok_key_present)
+                            } else {
+                                stringResource(
+                                    if (formProvider == AiProvider.GROK) {
+                                        R.string.settings_grok_key_absent
+                                    } else {
+                                        R.string.settings_ai_key_absent_openai
                                     },
                                 )
-                            }
+                            },
+                            secret = true,
+                            enabled = !grokSubscription,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                            onValueChange = {
+                                setCurrentDraft(draft.copy(key = it))
+                                probeResult = null
+                            },
+                        )
+                        if (formKeySet) {
+                            TonalButton(
+                                text = stringResource(R.string.settings_grok_key_clear),
+                                enabled = !grokSubscription,
+                                fillMaxWidth = false,
+                                onClick = { showClearKey = true },
+                            )
                         }
-                    }
-                    Row(
-                        Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        GhostButton(
-                            text = stringResource(R.string.settings_ai_refresh_models),
-                            enabled = (if (grokSubscription) grokSignedIn else draft.key.isNotBlank() || formKeySet) &&
-                                probeJob == null,
-                            fillMaxWidth = false,
-                        ) {
-                            probeUsedSavedKey = draft.key.isBlank()
-                            probeSubscription = grokSubscription
-                            probeTarget = if (grokSubscription) {
-                                XAI_API_BASE
-                            } else {
-                                normalizeAiBaseUrl(draft.url, formProvider.defaultBaseUrl)
-                            }
-                            probeResult = null
-                            probeJob = scope.launch {
-                                val started = System.currentTimeMillis()
-                                try {
-                                    val result = grokClient.listModels(formProvider, draft.url, draft.key)
-                                    probeResult = result
-                                    modelRefreshFailed = result !is AiProbe.Ok
-                                } finally {
-                                    progressStats.recordDuration(
-                                        JobKind.Probe,
-                                        "probing",
-                                        System.currentTimeMillis() - started,
-                                    )
-                                    probeJob = null
-                                }
-                            }
-                        }
-                    }
-                    if (modelRefreshFailed) {
+
                         Text(
-                            stringResource(R.string.settings_ai_model_manual),
+                            stringResource(R.string.grok_model),
                             color = PaperDim,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(bottom = 8.dp),
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
                         )
-                    }
-
-                    Text(
-                        stringResource(R.string.settings_ai_quality),
-                        color = PaperDim,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-                    )
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                        qualities.forEachIndexed { index, quality ->
-                            SegmentedButton(
-                                selected = draft.quality == quality,
-                                onClick = { setCurrentDraft(draft.copy(quality = quality)) },
-                                shape = SegmentedButtonDefaults.itemShape(index, qualities.size),
-                                colors = darkroomSegmentedColors(),
-                            ) { Text(quality) }
-                        }
-                    }
-
-                    if (formProvider == AiProvider.GROK) {
-                        Text(
-                            stringResource(R.string.grok_resolution),
-                            color = PaperDim,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-                        )
-                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                            listOf("1k", "2k").forEachIndexed { index, res ->
-                                SegmentedButton(
-                                    selected = draft.resolution == res,
-                                    onClick = { setCurrentDraft(draft.copy(resolution = res)) },
-                                    shape = SegmentedButtonDefaults.itemShape(index, 2),
-                                    colors = darkroomSegmentedColors(),
-                                ) { Text(res) }
-                            }
-                        }
-                    }
-
-                    val saveGrok: () -> Unit = {
-                        val typed = draft.url.trim()
-                        settings.updateProvider(
-                            formProvider,
-                            draft.key.ifBlank { null },
-                            draft.url,
-                            draft.model,
-                            if (formProvider == AiProvider.GROK) draft.resolution else null,
-                            draft.quality,
-                        )
-                        if (formProvider == AiProvider.GROK && grokClientIdDraft.trim() != settings.grokClientId()) {
-                            // Refused (and the field read-only) while signed in or signing in.
-                            settings.setGrokClientId(grokClientIdDraft)
-                        }
-                        val saved = settings.readAi().byProvider.getValue(formProvider)
-                        val next = AiDraft(url = saved.baseUrl, model = saved.model, resolution = saved.resolution, quality = saved.quality)
-                        setCurrentDraft(next)
-                        if (formProvider == AiProvider.GROK) grokClientIdDraft = settings.grokClientId()
-                        grokConfirmText = if (saved.baseUrl != typed) {
-                            context.getString(R.string.settings_grok_url_saved, saved.baseUrl)
-                        } else {
-                            grokSaved
-                        }
-                        probeResult = null
-                        scope.launch { grokConfirm.show() }
-                    }
-                    if (grokDirty) {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ExposedDropdownMenuBox(
+                            expanded = modelMenuOpen,
+                            onExpandedChange = { modelMenuOpen = it },
                         ) {
-                            Box(Modifier.weight(1f)) {
-                                PaperButton(text = stringResource(R.string.save_grok), onClick = saveGrok)
-                            }
-                            Box(Modifier.weight(1f)) {
-                                GhostButton(text = stringResource(R.string.settings_discard)) {
-                                    storedForm?.let {
-                                        setCurrentDraft(
-                                            AiDraft(
-                                                url = it.baseUrl,
-                                                model = it.model,
-                                                resolution = it.resolution,
-                                                quality = it.quality,
-                                            ),
-                                        )
-                                        if (formProvider == AiProvider.GROK) grokClientIdDraft = it.clientId
-                                    }
+                            OutlinedTextField(
+                                value = draft.model,
+                                onValueChange = {
+                                    setCurrentDraft(draft.copy(model = it))
                                     probeResult = null
+                                },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(modelMenuOpen) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(MenuAnchorType.PrimaryEditable, true),
+                                shape = FieldShape,
+                                colors = darkroomTextFieldColors(),
+                                textStyle = androidx.compose.ui.text.TextStyle(fontFamily = MonoFont),
+                            )
+                            ExposedDropdownMenu(
+                                expanded = modelMenuOpen,
+                                onDismissRequest = { modelMenuOpen = false },
+                                shape = PanelShape,
+                            ) {
+                                modelChoices.forEach { model ->
+                                    DropdownMenuItem(
+                                        text = { Text(model, color = Paper, fontFamily = MonoFont) },
+                                        onClick = {
+                                            setCurrentDraft(draft.copy(model = model))
+                                            modelMenuOpen = false
+                                        },
+                                    )
                                 }
                             }
                         }
-                        Text(
-                            stringResource(R.string.settings_unsaved),
-                            color = Amber,
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp,
-                            modifier = Modifier.padding(top = 8.dp),
-                        )
-                    } else {
-                        PaperButton(
-                            text = stringResource(R.string.save_grok),
-                            enabled = false,
-                            fillMaxWidth = false,
-                            onClick = saveGrok,
-                        )
-                    }
-                    InlineConfirm(grokConfirm, grokConfirmText, Modifier.padding(top = 8.dp))
-
-                    Row(
-                        Modifier.fillMaxWidth().padding(top = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (probeJob == null) {
-                            GhostButton(
-                                text = stringResource(R.string.settings_grok_test),
-                                // Subscription mode: testing while signed out answers "not signed in"
-                                // offline and never falls back to the key field (AIPV020-R04).
-                                enabled = grokSubscription || draft.key.isNotBlank() || formKeySet,
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TonalButton(
+                                text = stringResource(R.string.settings_ai_refresh_models),
+                                enabled = (if (grokSubscription) grokSignedIn else draft.key.isNotBlank() || formKeySet) &&
+                                    probeJob == null,
                                 fillMaxWidth = false,
                             ) {
+                                probeUsedSavedKey = draft.key.isBlank()
                                 probeSubscription = grokSubscription
                                 probeTarget = if (grokSubscription) {
                                     XAI_API_BASE
                                 } else {
                                     normalizeAiBaseUrl(draft.url, formProvider.defaultBaseUrl)
                                 }
-                                probeUsedSavedKey = draft.key.isBlank()
                                 probeResult = null
                                 probeJob = scope.launch {
                                     val started = System.currentTimeMillis()
                                     try {
-                                        probeResult = grokClient.listModels(formProvider, draft.url, draft.key)
-                                        modelRefreshFailed = probeResult !is AiProbe.Ok
+                                        val result = grokClient.listModels(formProvider, draft.url, draft.key)
+                                        probeResult = result
+                                        modelRefreshFailed = result !is AiProbe.Ok
                                     } finally {
                                         progressStats.recordDuration(
                                             JobKind.Probe,
@@ -1108,963 +993,960 @@ fun SettingsScreen(
                                     }
                                 }
                             }
-                        } else {
-                            GhostButton(
-                                text = stringResource(R.string.common_cancel),
-                                fillMaxWidth = false,
-                                onClick = { probeJob?.cancel() },
+                        }
+                        if (modelRefreshFailed) {
+                            Text(
+                                stringResource(R.string.settings_ai_model_manual),
+                                color = PaperDim,
+                                fontSize = 12.sp, lineHeight = 18.sp,
+                                modifier = Modifier.padding(bottom = 8.dp),
                             )
                         }
-                    }
-                    if (probeJob != null) {
-                        TimedWaitBar(
-                            label = stringResource(R.string.settings_grok_test_running),
-                            modifier = Modifier.padding(top = 8.dp),
+
+                        Text(
+                            stringResource(R.string.settings_ai_quality),
+                            color = PaperDim,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                         )
-                    }
-                    probeResult?.let { probe ->
-                        val modelMissing = probe is AiProbe.Ok &&
-                            probe.models.isNotEmpty() &&
-                            draft.model !in probe.models
-                        val text = if (modelMissing) {
-                            stringResource(R.string.settings_grok_test_model_missing, draft.model)
-                        } else {
-                            when (probe) {
-                                is AiProbe.Ok -> stringResource(R.string.settings_grok_test_ok, probe.elapsedMs)
-                                is AiProbe.Unauthorized -> if (probeSubscription) {
-                                    stringResource(R.string.settings_xai_probe_rejected, probe.status)
-                                } else {
-                                    stringResource(R.string.settings_grok_test_auth, probe.status)
-                                }
-                                is AiProbe.NotFound -> stringResource(R.string.settings_grok_test_notfound)
-                                is AiProbe.HttpError -> stringResource(R.string.settings_grok_test_http, probe.status)
-                                is AiProbe.Unreachable -> stringResource(R.string.settings_grok_test_unreachable)
-                                is AiProbe.Timeout -> stringResource(R.string.settings_grok_test_timeout)
-                                is AiProbe.NoKey -> stringResource(R.string.settings_grok_test_nokey)
-                                is AiProbe.InvalidUrl -> stringResource(R.string.settings_grok_test_badurl)
-                                is AiProbe.NotSignedIn -> stringResource(R.string.settings_xai_probe_not_signed_in)
-                            }
+                        SegmentedPills(
+                            options = qualities,
+                            selectedIndex = qualities.indexOf(draft.quality),
+                            onSelect = { index -> setCurrentDraft(draft.copy(quality = qualities[index])) },
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        )
+
+                        if (formProvider == AiProvider.GROK) {
+                            Text(
+                                stringResource(R.string.grok_resolution),
+                                color = PaperDim,
+                                fontSize = 14.sp,
+                                lineHeight = 20.sp,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                            )
+                            val resolutions = listOf("1k", "2k")
+                            SegmentedPills(
+                                options = resolutions,
+                                selectedIndex = resolutions.indexOf(draft.resolution),
+                                onSelect = { index -> setCurrentDraft(draft.copy(resolution = resolutions[index])) },
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                            )
                         }
-                        val passed = probe is AiProbe.Ok && !modelMissing
-                        val keySource = stringResource(
-                            if (probeSubscription) {
-                                R.string.settings_xai_probe_credential
-                            } else if (probeUsedSavedKey) {
-                                R.string.settings_grok_test_key_saved
+
+                        val saveGrok: () -> Unit = {
+                            val typed = draft.url.trim()
+                            settings.updateProvider(
+                                formProvider,
+                                draft.key.ifBlank { null },
+                                draft.url,
+                                draft.model,
+                                if (formProvider == AiProvider.GROK) draft.resolution else null,
+                                draft.quality,
+                            )
+                            if (formProvider == AiProvider.GROK && grokClientIdDraft.trim() != settings.grokClientId()) {
+                                // Refused (and the field read-only) while signed in or signing in.
+                                settings.setGrokClientId(grokClientIdDraft)
+                            }
+                            val saved = settings.readAi().byProvider.getValue(formProvider)
+                            val next = AiDraft(url = saved.baseUrl, model = saved.model, resolution = saved.resolution, quality = saved.quality)
+                            setCurrentDraft(next)
+                            if (formProvider == AiProvider.GROK) grokClientIdDraft = settings.grokClientId()
+                            grokConfirmText = if (saved.baseUrl != typed) {
+                                context.getString(R.string.settings_grok_url_saved, saved.baseUrl)
                             } else {
-                                R.string.settings_grok_test_key_draft
-                            },
-                        )
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(top = 10.dp)
-                                .border(1.dp, if (passed) PaperHairline else Amber, RoundedCornerShape(2.dp))
-                                .padding(12.dp)
-                                .semantics { liveRegion = LiveRegionMode.Polite },
-                        ) {
-                            Text(text, color = if (passed) Paper else Amber, fontSize = 13.sp, lineHeight = 18.sp)
-                            if (probeSubscription && probe is AiProbe.Ok) {
-                                Text(
-                                    stringResource(R.string.settings_xai_probe_unverified_images),
-                                    color = PaperDim,
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp,
-                                    modifier = Modifier.padding(top = 6.dp),
-                                )
+                                grokSaved
+                            }
+                            probeResult = null
+                            scope.launch { grokConfirm.show() }
+                        }
+                        if (grokDirty) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Box(Modifier.weight(1f)) {
+                                    PaperButton(text = stringResource(R.string.save_grok), onClick = saveGrok)
+                                }
+                                Box(Modifier.weight(1f)) {
+                                    TonalButton(text = stringResource(R.string.settings_discard)) {
+                                        storedForm?.let {
+                                            setCurrentDraft(
+                                                AiDraft(
+                                                    url = it.baseUrl,
+                                                    model = it.model,
+                                                    resolution = it.resolution,
+                                                    quality = it.quality,
+                                                ),
+                                            )
+                                            if (formProvider == AiProvider.GROK) grokClientIdDraft = it.clientId
+                                        }
+                                        probeResult = null
+                                    }
+                                }
                             }
                             Text(
-                                stringResource(R.string.settings_grok_test_target, probeTarget, keySource),
-                                color = PaperDim,
-                                fontFamily = MonoFont,
+                                stringResource(R.string.settings_unsaved),
+                                color = Amber,
                                 fontSize = 12.sp,
                                 lineHeight = 16.sp,
-                                modifier = Modifier.padding(top = 6.dp),
+                                modifier = Modifier.padding(top = 8.dp),
                             )
-                        }
-                    }
-                }
-
-                Fold(
-                    title = stringResource(R.string.settings_printer),
-                    summary = printerSummary,
-                    icon = Icons.Outlined.Print,
-                    open = openPrinter,
-                    highlighted = highlighted == "printer",
-                    onToggle = { openPrinter = !openPrinter },
-                    onTop = { sectionTops["printer"] = it },
-                ) {
-                    Text(
-                        if (!printerBound) stringResource(R.string.chip_printer_off) else "${cfg.printerName} ${cfg.printerMac}",
-                        fontFamily = MonoFont,
-                        color = Paper,
-                    )
-                    if (printerBound) {
-                        GhostButton(
-                            text = stringResource(R.string.unbind_printer),
-                            fillMaxWidth = false,
-                        ) {
-                            // No confirmation message: the line above turns into "not bound" and
-                            // the section summary follows it, which says it better than a snackbar.
-                            settings.updateSettings { copy(printerMac = "", printerName = "", autoPrint = false) }
-                        }
-                    }
-
-                    if (!btEnabled) {
-                        Notice(stringResource(R.string.settings_bt_off)) {
-                            GhostButton(
-                                text = stringResource(R.string.settings_bt_open),
+                        } else {
+                            PaperButton(
+                                text = stringResource(R.string.save_grok),
+                                enabled = false,
                                 fillMaxWidth = false,
-                                onClick = { openIntent(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) },
+                                onClick = saveGrok,
                             )
                         }
-                    }
-                    if (permState != PERM_OK) {
-                        Notice(
-                            if (permState == PERM_BLOCKED) {
-                                stringResource(R.string.settings_perm_denied_permanent)
-                            } else {
-                                stringResource(R.string.settings_perm_denied)
-                            },
+                        InlineConfirm(grokConfirm, grokConfirmText, Modifier.padding(top = 8.dp))
+
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (permState == PERM_DENIED) {
-                                GhostButton(
-                                    text = stringResource(R.string.settings_perm_retry),
+                            if (probeJob == null) {
+                                TonalButton(
+                                    text = stringResource(R.string.settings_grok_test),
+                                    // Subscription mode: testing while signed out answers "not signed in"
+                                    // offline and never falls back to the key field (AIPV020-R04).
+                                    enabled = grokSubscription || draft.key.isNotBlank() || formKeySet,
+                                    fillMaxWidth = false,
+                                ) {
+                                    probeSubscription = grokSubscription
+                                    probeTarget = if (grokSubscription) {
+                                        XAI_API_BASE
+                                    } else {
+                                        normalizeAiBaseUrl(draft.url, formProvider.defaultBaseUrl)
+                                    }
+                                    probeUsedSavedKey = draft.key.isBlank()
+                                    probeResult = null
+                                    probeJob = scope.launch {
+                                        val started = System.currentTimeMillis()
+                                        try {
+                                            probeResult = grokClient.listModels(formProvider, draft.url, draft.key)
+                                            modelRefreshFailed = probeResult !is AiProbe.Ok
+                                        } finally {
+                                            progressStats.recordDuration(
+                                                JobKind.Probe,
+                                                "probing",
+                                                System.currentTimeMillis() - started,
+                                            )
+                                            probeJob = null
+                                        }
+                                    }
+                                }
+                            } else {
+                                TonalButton(
+                                    text = stringResource(R.string.common_cancel),
+                                    fillMaxWidth = false,
+                                    onClick = { probeJob?.cancel() },
+                                )
+                            }
+                        }
+                        if (probeJob != null) {
+                            TimedWaitBar(
+                                label = stringResource(R.string.settings_grok_test_running),
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+                        probeResult?.let { probe ->
+                            val modelMissing = probe is AiProbe.Ok &&
+                                probe.models.isNotEmpty() &&
+                                draft.model !in probe.models
+                            val text = if (modelMissing) {
+                                stringResource(R.string.settings_grok_test_model_missing, draft.model)
+                            } else {
+                                when (probe) {
+                                    is AiProbe.Ok -> stringResource(R.string.settings_grok_test_ok, probe.elapsedMs)
+                                    is AiProbe.Unauthorized -> if (probeSubscription) {
+                                        stringResource(R.string.settings_xai_probe_rejected, probe.status)
+                                    } else {
+                                        stringResource(R.string.settings_grok_test_auth, probe.status)
+                                    }
+                                    is AiProbe.NotFound -> stringResource(R.string.settings_grok_test_notfound)
+                                    is AiProbe.HttpError -> stringResource(R.string.settings_grok_test_http, probe.status)
+                                    is AiProbe.Unreachable -> stringResource(R.string.settings_grok_test_unreachable)
+                                    is AiProbe.Timeout -> stringResource(R.string.settings_grok_test_timeout)
+                                    is AiProbe.NoKey -> stringResource(R.string.settings_grok_test_nokey)
+                                    is AiProbe.InvalidUrl -> stringResource(R.string.settings_grok_test_badurl)
+                                    is AiProbe.NotSignedIn -> stringResource(R.string.settings_xai_probe_not_signed_in)
+                                }
+                            }
+                            val passed = probe is AiProbe.Ok && !modelMissing
+                            val keySource = stringResource(
+                                if (probeSubscription) {
+                                    R.string.settings_xai_probe_credential
+                                } else if (probeUsedSavedKey) {
+                                    R.string.settings_grok_test_key_saved
+                                } else {
+                                    R.string.settings_grok_test_key_draft
+                                },
+                            )
+                            // A Surface2 block in the card; a failed check adds the 50% Amber warning
+                            // edge. Paper 13.40:1, Amber 7.38:1, PaperDim 4.96:1 on Surface2.
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 10.dp)
+                                    .clip(PanelShape)
+                                    .background(Surface2)
+                                    .then(
+                                        if (passed) {
+                                            Modifier
+                                        } else {
+                                            Modifier.border(1.dp, Amber.copy(alpha = 0.5f), PanelShape)
+                                        },
+                                    )
+                                    .padding(12.dp)
+                                    .semantics { liveRegion = LiveRegionMode.Polite },
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                Icon(
+                                    if (passed) Icons.Outlined.CheckCircle else Icons.Outlined.Info,
+                                    contentDescription = null,
+                                    tint = if (passed) Paper else Amber,
+                                    modifier = Modifier.padding(top = 1.dp, end = 10.dp).size(18.dp),
+                                )
+                                Column(Modifier.weight(1f)) {
+                                    Text(text, color = if (passed) Paper else Amber, fontSize = 13.sp, lineHeight = 18.sp)
+                                    if (probeSubscription && probe is AiProbe.Ok) {
+                                        Text(
+                                            stringResource(R.string.settings_xai_probe_unverified_images),
+                                            color = PaperDim,
+                                            fontSize = 12.sp,
+                                            lineHeight = 16.sp,
+                                            modifier = Modifier.padding(top = 6.dp),
+                                        )
+                                    }
+                                    Text(
+                                        monoValues(
+                                            stringResource(R.string.settings_grok_test_target, probeTarget, keySource),
+                                            probeTarget,
+                                        ),
+                                        color = PaperDim,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp,
+                                        modifier = Modifier.padding(top = 6.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    GroupDivider()
+                    Fold(
+                        title = stringResource(R.string.settings_printer),
+                        summary = printerSummary,
+                        icon = Icons.Outlined.Print,
+                        open = openPrinter,
+                        highlighted = highlighted == "printer",
+                        onToggle = { openPrinter = !openPrinter },
+                        onTop = { sectionTops["printer"] = it },
+                    ) {
+                        // Sans text; only the MAC address is a technical value in mono.
+                        Text(
+                            if (!printerBound) {
+                                AnnotatedString(stringResource(R.string.chip_printer_off))
+                            } else {
+                                monoValues("${cfg.printerName} ${cfg.printerMac}", cfg.printerMac)
+                            },
+                            color = Paper,
+                        )
+                        if (printerBound) {
+                            TonalButton(
+                                text = stringResource(R.string.unbind_printer),
+                                fillMaxWidth = false,
+                            ) {
+                                // No confirmation message: the line above turns into "not bound" and
+                                // the section summary follows it, which says it better than a snackbar.
+                                settings.updateSettings { copy(printerMac = "", printerName = "", autoPrint = false) }
+                            }
+                        }
+
+                        if (!btEnabled) {
+                            Notice(stringResource(R.string.settings_bt_off)) {
+                                TonalButton(
+                                    text = stringResource(R.string.settings_bt_open),
+                                    fillMaxWidth = false,
+                                    onClick = { openIntent(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) },
+                                )
+                            }
+                        }
+                        if (permState != PERM_OK) {
+                            Notice(
+                                if (permState == PERM_BLOCKED) {
+                                    stringResource(R.string.settings_perm_denied_permanent)
+                                } else {
+                                    stringResource(R.string.settings_perm_denied)
+                                },
+                            ) {
+                                if (permState == PERM_DENIED) {
+                                    TonalButton(
+                                        text = stringResource(R.string.settings_perm_retry),
+                                        fillMaxWidth = false,
+                                        onClick = { permLauncher.launch(btPerms) },
+                                    )
+                                } else {
+                                    TonalButton(
+                                        text = stringResource(R.string.settings_app_settings),
+                                        fillMaxWidth = false,
+                                        onClick = {
+                                            openIntent(
+                                                Intent(
+                                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                                    Uri.fromParts("package", context.packageName, null),
+                                                ),
+                                            )
+                                        },
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            if (scanJob == null) {
+                                TonalButton(
+                                    text = stringResource(R.string.scan_nearby),
+                                    enabled = btEnabled,
                                     fillMaxWidth = false,
                                     onClick = { permLauncher.launch(btPerms) },
                                 )
                             } else {
-                                GhostButton(
-                                    text = stringResource(R.string.settings_app_settings),
+                                TonalButton(
+                                    text = stringResource(R.string.settings_scan_stop),
                                     fillMaxWidth = false,
-                                    onClick = {
-                                        openIntent(
-                                            Intent(
-                                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                                Uri.fromParts("package", context.packageName, null),
-                                            ),
-                                        )
-                                    },
+                                    onClick = { scanJob?.cancel() },
                                 )
                             }
                         }
-                    }
-
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        if (scanJob == null) {
-                            GhostButton(
-                                text = stringResource(R.string.scan_nearby),
-                                enabled = btEnabled,
-                                fillMaxWidth = false,
-                                onClick = { permLauncher.launch(btPerms) },
-                            )
-                        } else {
-                            GhostButton(
-                                text = stringResource(R.string.settings_scan_stop),
-                                fillMaxWidth = false,
-                                onClick = { scanJob?.cancel() },
+                        if (scanJob != null) {
+                            TimedWaitBar(
+                                label = stringResource(R.string.phase_bt_scan),
+                                modifier = Modifier.padding(bottom = 8.dp),
                             )
                         }
+
+                        val paired = devices.filter { it.bonded }
+                        val discovered = devices.filter { !it.bonded }
+                        if (devices.isEmpty()) {
+                            Text(stringResource(R.string.settings_devices_empty), color = PaperDim, fontSize = 13.sp, lineHeight = 18.sp)
+                        }
+                        if (paired.isNotEmpty()) {
+                            Text(
+                                stringResource(R.string.settings_devices_paired),
+                                color = PaperDim,
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
+                            )
+                            paired.forEach { device ->
+                                DeviceRow(
+                                    device = device,
+                                    bound = device.mac == cfg.printerMac,
+                                    pairing = pairingMac == device.mac,
+                                    enabled = pairingMac.isEmpty(),
+                                ) { bindDevice(device) }
+                            }
+                        }
+                        if (discovered.isNotEmpty()) {
+                            Text(
+                                stringResource(R.string.settings_devices_found),
+                                color = PaperDim,
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
+                            )
+                            discovered.forEach { device ->
+                                DeviceRow(
+                                    device = device,
+                                    bound = device.mac == cfg.printerMac,
+                                    pairing = pairingMac == device.mac,
+                                    enabled = pairingMac.isEmpty(),
+                                ) { bindDevice(device) }
+                            }
+                        }
                     }
-                    if (scanJob != null) {
-                        TimedWaitBar(
-                            label = stringResource(R.string.phase_bt_scan),
+                    GroupDivider()
+                    Fold(
+                        title = stringResource(R.string.settings_ftp),
+                        summary = ftpSummary,
+                        icon = Icons.Outlined.WifiTethering,
+                        open = openFtp,
+                        highlighted = highlighted == "ftp",
+                        onToggle = { openFtp = !openFtp },
+                        onTop = { sectionTops["ftp"] = it },
+                    ) {
+                        if (localNetworkMissing) {
+                            NoticeCard(
+                                text = stringResource(R.string.ftp_local_network_title),
+                                modifier = Modifier.padding(bottom = 12.dp),
+                            )
+                        }
+                        SettingsField(
+                            label = stringResource(R.string.ftp_user),
+                            value = ftpUser,
+                            supporting = stringResource(R.string.settings_ftp_user_hint),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            onValueChange = { ftpUser = it },
+                        )
+                        SettingsField(
+                            label = stringResource(R.string.ftp_password),
+                            value = ftpPassword,
+                            placeholder = "••••••••",
+                            supporting = if (passwordError != null && (passwordBlurred || ftpSubmitted)) {
+                                passwordError
+                            } else {
+                                stringResource(R.string.settings_ftp_password_hint)
+                            },
+                            isError = passwordError != null && (passwordBlurred || ftpSubmitted),
+                            secret = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
+                            onBlur = { passwordBlurred = true },
+                            onValueChange = { ftpPassword = it },
+                        )
+                        SettingsField(
+                            label = stringResource(R.string.ftp_port),
+                            value = ftpPort,
+                            supporting = when {
+                                portError != null && (portBlurred || ftpSubmitted) -> portError
+                                portValue != null && portValue < 1024 -> stringResource(R.string.ftp_port21_hint)
+                                else -> null
+                            },
+                            isError = portError != null && (portBlurred || ftpSubmitted),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                            onBlur = { portBlurred = true },
+                            onValueChange = { ftpPort = it },
+                        )
+                        Text(
+                            stringResource(R.string.settings_ftp_pasv_desc),
+                            color = PaperDim,
+                            fontSize = 12.sp, lineHeight = 18.sp,
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
-                    }
-
-                    val paired = devices.filter { it.bonded }
-                    val discovered = devices.filter { !it.bonded }
-                    if (devices.isEmpty()) {
-                        Text(stringResource(R.string.settings_devices_empty), color = PaperDim, fontSize = 13.sp)
-                    }
-                    if (paired.isNotEmpty()) {
-                        Text(
-                            stringResource(R.string.settings_devices_paired),
-                            color = PaperDim,
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp,
-                            fontFamily = MonoFont,
-                            modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
+                        SettingsField(
+                            label = stringResource(R.string.settings_ftp_pasv_min),
+                            value = pasvMin,
+                            supporting = if (pasvMinError != null && (pasvMinBlurred || ftpSubmitted)) pasvMinError else null,
+                            isError = pasvMinError != null && (pasvMinBlurred || ftpSubmitted),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                            onBlur = { pasvMinBlurred = true },
+                            onValueChange = { pasvMin = it },
                         )
-                        paired.forEach { device ->
-                            DeviceRow(
-                                device = device,
-                                bound = device.mac == cfg.printerMac,
-                                pairing = pairingMac == device.mac,
-                                enabled = pairingMac.isEmpty(),
-                            ) { bindDevice(device) }
-                        }
-                    }
-                    if (discovered.isNotEmpty()) {
-                        Text(
-                            stringResource(R.string.settings_devices_found),
-                            color = PaperDim,
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp,
-                            fontFamily = MonoFont,
-                            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
+                        SettingsField(
+                            label = stringResource(R.string.settings_ftp_pasv_max),
+                            value = pasvMax,
+                            supporting = if (pasvMaxError != null && (pasvMaxBlurred || ftpSubmitted)) pasvMaxError else null,
+                            isError = pasvMaxError != null && (pasvMaxBlurred || ftpSubmitted),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                            onBlur = { pasvMaxBlurred = true },
+                            onValueChange = { pasvMax = it },
                         )
-                        discovered.forEach { device ->
-                            DeviceRow(
-                                device = device,
-                                bound = device.mac == cfg.printerMac,
-                                pairing = pairingMac == device.mac,
-                                enabled = pairingMac.isEmpty(),
-                            ) { bindDevice(device) }
-                        }
-                    }
-                }
-
-                Fold(
-                    title = stringResource(R.string.settings_ftp),
-                    summary = ftpSummary,
-                    icon = Icons.Outlined.WifiTethering,
-                    open = openFtp,
-                    highlighted = highlighted == "ftp",
-                    onToggle = { openFtp = !openFtp },
-                    onTop = { sectionTops["ftp"] = it },
-                ) {
-                    if (localNetworkMissing) {
-                        Text(
-                            stringResource(R.string.ftp_local_network_title),
-                            color = Amber,
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(bottom = 12.dp),
-                        )
-                    }
-                    SettingsField(
-                        label = stringResource(R.string.ftp_user),
-                        value = ftpUser,
-                        supporting = stringResource(R.string.settings_ftp_user_hint),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                        onValueChange = { ftpUser = it },
-                    )
-                    SettingsField(
-                        label = stringResource(R.string.ftp_password),
-                        value = ftpPassword,
-                        placeholder = "••••••••",
-                        supporting = if (passwordError != null && (passwordBlurred || ftpSubmitted)) {
-                            passwordError
-                        } else {
-                            stringResource(R.string.settings_ftp_password_hint)
-                        },
-                        isError = passwordError != null && (passwordBlurred || ftpSubmitted),
-                        secret = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
-                        onBlur = { passwordBlurred = true },
-                        onValueChange = { ftpPassword = it },
-                    )
-                    SettingsField(
-                        label = stringResource(R.string.ftp_port),
-                        value = ftpPort,
-                        supporting = when {
-                            portError != null && (portBlurred || ftpSubmitted) -> portError
-                            portValue != null && portValue < 1024 -> stringResource(R.string.ftp_port21_hint)
-                            else -> null
-                        },
-                        isError = portError != null && (portBlurred || ftpSubmitted),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                        onBlur = { portBlurred = true },
-                        onValueChange = { ftpPort = it },
-                    )
-                    Text(
-                        stringResource(R.string.settings_ftp_pasv_desc),
-                        color = PaperDim,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    SettingsField(
-                        label = stringResource(R.string.settings_ftp_pasv_min),
-                        value = pasvMin,
-                        supporting = if (pasvMinError != null && (pasvMinBlurred || ftpSubmitted)) pasvMinError else null,
-                        isError = pasvMinError != null && (pasvMinBlurred || ftpSubmitted),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                        onBlur = { pasvMinBlurred = true },
-                        onValueChange = { pasvMin = it },
-                    )
-                    SettingsField(
-                        label = stringResource(R.string.settings_ftp_pasv_max),
-                        value = pasvMax,
-                        supporting = if (pasvMaxError != null && (pasvMaxBlurred || ftpSubmitted)) pasvMaxError else null,
-                        isError = pasvMaxError != null && (pasvMaxBlurred || ftpSubmitted),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                        onBlur = { pasvMaxBlurred = true },
-                        onValueChange = { pasvMax = it },
-                    )
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .toggleable(
-                                value = cfg.ftpAutoStart,
-                                role = Role.Switch,
-                                onValueChange = { on -> settings.updateSettings { copy(ftpAutoStart = on) } },
-                            )
-                            .semantics(mergeDescendants = true) {},
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            stringResource(R.string.settings_ftp_auto_start),
-                            color = Paper,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Switch(
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_ftp_auto_start),
                             checked = cfg.ftpAutoStart,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(checkedTrackColor = Amber),
+                            onCheckedChange = { on -> settings.updateSettings { copy(ftpAutoStart = on) } },
                         )
-                    }
-                    PaperButton(text = stringResource(R.string.common_save), fillMaxWidth = false) {
-                        ftpSubmitted = true
-                        if (!ftpInvalid) {
-                            if (ftpListening) showFtpRestart = true else commitFtp(false)
+                        PaperButton(text = stringResource(R.string.common_save), fillMaxWidth = false) {
+                            ftpSubmitted = true
+                            if (!ftpInvalid) {
+                                if (ftpListening) showFtpRestart = true else commitFtp(false)
+                            }
                         }
+                        InlineConfirm(ftpConfirm, ftpConfirmText, Modifier.padding(top = 8.dp))
                     }
-                    InlineConfirm(ftpConfirm, ftpConfirmText, Modifier.padding(top = 8.dp))
                 }
 
-                SectionLabel(stringResource(R.string.settings_group_printing))
-
-                Fold(
-                    title = stringResource(R.string.settings_printing),
-                    summary = printingSummary,
-                    icon = Icons.Outlined.Tune,
-                    open = openPrinting,
-                    highlighted = highlighted == "printing",
-                    onToggle = { openPrinting = !openPrinting },
-                    onTop = { sectionTops["printing"] = it },
+                Spacer(Modifier.height(GROUP_GAP))
+                FoldGroup(
+                    label = stringResource(R.string.settings_group_printing),
+                    highlighted = highlighted in PRINTING_SECTIONS,
                 ) {
-                    Text(stringResource(R.string.settings_default_copies), color = Paper)
-                    Text(
-                        stringResource(R.string.settings_default_copies_desc),
-                        color = PaperDim,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
-                    CopiesStepper(cfg.defaultCopies) { next ->
-                        settings.updateSettings { copy(defaultCopies = next) }
-                    }
-                    Text(
-                        stringResource(R.string.print_fit),
-                        color = PaperDim,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-                    )
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    Fold(
+                        title = stringResource(R.string.settings_printing),
+                        summary = printingSummary,
+                        icon = Icons.Outlined.Tune,
+                        open = openPrinting,
+                        highlighted = highlighted == "printing",
+                        onToggle = { openPrinting = !openPrinting },
+                        onTop = { sectionTops["printing"] = it },
+                    ) {
+                        Text(stringResource(R.string.settings_default_copies), color = Paper)
+                        Text(
+                            stringResource(R.string.settings_default_copies_desc),
+                            color = PaperDim,
+                            fontSize = 12.sp, lineHeight = 18.sp,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                        CopiesStepper(cfg.defaultCopies) { next ->
+                            settings.updateSettings { copy(defaultCopies = next) }
+                        }
+                        Text(
+                            stringResource(R.string.print_fit),
+                            color = PaperDim,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                        )
                         val fits = listOf(
                             PrintFit.COVER to stringResource(R.string.print_fit_cover),
                             PrintFit.CONTAIN to stringResource(R.string.print_fit_contain),
                         )
-                        fits.forEachIndexed { index, (fit, label) ->
-                            SegmentedButton(
-                                selected = cfg.printFit == fit,
-                                onClick = { settings.updateSettings { copy(printFit = fit) } },
-                                shape = SegmentedButtonDefaults.itemShape(index, fits.size),
-                                colors = darkroomSegmentedColors(),
-                            ) { Text(label) }
-                        }
+                        SegmentedPills(
+                            options = fits.map { it.second },
+                            selectedIndex = fits.indexOfFirst { it.first == cfg.printFit },
+                            onSelect = { index ->
+                                val fit = fits[index].first
+                                settings.updateSettings { copy(printFit = fit) }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
-                }
-
-                Fold(
-                    title = stringResource(R.string.settings_automation),
-                    summary = autoSummary,
-                    icon = Icons.Outlined.Bolt,
-                    open = openAutoPrint,
-                    highlighted = highlighted == "autoprint",
-                    onToggle = { openAutoPrint = !openAutoPrint },
-                    onTop = { sectionTops["autoprint"] = it },
-                ) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .toggleable(
-                                value = cfg.autoEdit,
-                                role = Role.Switch,
-                                onValueChange = { on -> settings.updateSettings { copy(autoEdit = on) } },
-                            )
-                            .semantics(mergeDescendants = true) {},
-                        verticalAlignment = Alignment.CenterVertically,
+                    GroupDivider()
+                    Fold(
+                        title = stringResource(R.string.settings_automation),
+                        summary = autoSummary,
+                        icon = Icons.Outlined.Bolt,
+                        open = openAutoPrint,
+                        highlighted = highlighted == "autoprint",
+                        onToggle = { openAutoPrint = !openAutoPrint },
+                        onTop = { sectionTops["autoprint"] = it },
                     ) {
-                        Text("①", color = Amber, fontFamily = MonoFont, modifier = Modifier.padding(end = 10.dp))
-                        Text(stringResource(R.string.settings_automation_step_edit), color = Paper, modifier = Modifier.weight(1f))
-                        Switch(
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_automation_step_edit),
                             checked = cfg.autoEdit,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(checkedTrackColor = Amber),
+                            onCheckedChange = { on -> settings.updateSettings { copy(autoEdit = on) } },
+                            leading = { StepBadge(1) },
                         )
-                    }
-                    PresetDropdown(
-                        value = presets.lastSelectedId,
-                        presets = presets.presets,
-                        label = stringResource(R.string.settings_automation_preset),
-                    ) { settings.setLastPreset(it) }
-                    if (cfg.autoEdit && (!autoAiReady || !autoHasPreset)) {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp, bottom = 4.dp)
-                                .border(1.dp, Amber.copy(alpha = 0.7f), RoundedCornerShape(2.dp))
-                                .padding(12.dp),
-                        ) {
-                            Text(stringResource(R.string.settings_automation_blocked_edit), color = Amber, fontSize = 13.sp)
-                            if (!autoAiReady) {
-                                Text(
-                                    needKeyText,
-                                    color = Paper,
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.padding(top = 6.dp),
-                                )
-                                TextButton(onClick = { revealSection("grok") }) {
-                                    Text(stringResource(R.string.settings_goto_ai), color = Amber)
+                        // The automation preset only; the Studio and library default is not touched (AUTG040-R01).
+                        PresetDropdown(
+                            value = autoEditPresetId,
+                            presets = presets.presets,
+                            label = stringResource(R.string.settings_automation_preset),
+                        ) { id ->
+                            runCatching { settings.setAutoEditPreset(id) }
+                                .onFailure { scope.launch { snackbar.showSnackbar(presetMissingText) } }
+                        }
+                        Text(
+                            stringResource(R.string.settings_automation_preset_hint),
+                            color = PaperDim,
+                            fontSize = 12.sp, lineHeight = 18.sp,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
+                        if (cfg.autoEdit && (!autoAiReady || !autoHasPreset)) {
+                            BlockedNotice(
+                                title = stringResource(R.string.settings_automation_blocked_edit),
+                                details = listOfNotNull(
+                                    needKeyText.takeIf { !autoAiReady },
+                                    needPresetText.takeIf { !autoHasPreset },
+                                ),
+                                gotoLabel = if (!autoAiReady) stringResource(R.string.settings_goto_ai) else null,
+                                onGoto = { revealSection("grok") },
+                            )
+                        }
+                        StepConnector()
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_automation_step_watermark),
+                            checked = cfg.autoWatermark,
+                            onCheckedChange = { on -> settings.updateSettings { copy(autoWatermark = on) } },
+                            leading = { StepBadge(2) },
+                        )
+                        if (!cfg.autoPrint) {
+                            Text(
+                                stringResource(R.string.settings_automation_watermark_print_only),
+                                color = PaperDim,
+                                fontSize = 13.sp, lineHeight = 18.sp,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+                            )
+                        }
+                        if (!watermark.isConfigured()) {
+                            BlockedNotice(
+                                title = stringResource(R.string.settings_automation_blocked_watermark),
+                                details = listOf(needWatermarkText),
+                                gotoLabel = stringResource(R.string.settings_goto_watermark),
+                                onGoto = { revealSection("watermark") },
+                            )
+                        }
+                        StepConnector()
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_automation_step_print),
+                            checked = cfg.autoPrint,
+                            onCheckedChange = { on ->
+                                when {
+                                    !on -> settings.updateSettings { copy(autoPrint = false) }
+                                    printerBound -> settings.updateSettings { copy(autoPrint = true) }
+                                    else -> scope.launch { snackbar.showSnackbar(needPrinterText) }
                                 }
-                            }
-                            if (!autoHasPreset) {
-                                Text(
-                                    needPresetText,
-                                    color = Paper,
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.padding(top = 6.dp),
-                                )
-                            }
+                            },
+                            leading = { StepBadge(3) },
+                        )
+                        if (!printerBound) {
+                            BlockedNotice(
+                                title = stringResource(R.string.settings_automation_blocked_print),
+                                details = listOf(needPrinterText),
+                                gotoLabel = stringResource(R.string.settings_goto_printer),
+                                onGoto = { revealSection("printer") },
+                            )
                         }
                     }
-                    Text("│", color = PaperDim, fontFamily = MonoFont, modifier = Modifier.padding(start = 2.dp, top = 2.dp, bottom = 2.dp))
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .toggleable(
-                                value = cfg.autoWatermark,
-                                role = Role.Switch,
-                                onValueChange = { on -> settings.updateSettings { copy(autoWatermark = on) } },
-                            )
-                            .semantics(mergeDescendants = true) {},
-                        verticalAlignment = Alignment.CenterVertically,
+                    GroupDivider()
+                    Fold(
+                        title = stringResource(R.string.settings_watermark),
+                        summary = watermarkSummary,
+                        icon = Icons.AutoMirrored.Outlined.BrandingWatermark,
+                        open = openWatermark,
+                        highlighted = highlighted == "watermark",
+                        onToggle = { openWatermark = !openWatermark },
+                        onTop = { sectionTops["watermark"] = it },
                     ) {
-                        Text("②", color = Amber, fontFamily = MonoFont, modifier = Modifier.padding(end = 10.dp))
-                        Text(stringResource(R.string.settings_automation_step_watermark), color = Paper, modifier = Modifier.weight(1f))
-                        Switch(
-                            checked = cfg.autoWatermark,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(checkedTrackColor = Amber),
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_watermark_sns),
+                            checked = watermark.sns.enabled,
+                            onCheckedChange = { on ->
+                                settings.updateWatermark { copy(sns = sns.copy(enabled = on)) }
+                            },
                         )
-                    }
-                    if (!cfg.autoPrint) {
+                        // Logos only, each named by its label for TalkBack; "none" has no logo and shows
+                        // its label instead.
+                        val logos = SnsLogo.entries
+                        SegmentedPills(
+                            options = logos.map { stringResource(snsLogoLabel(it)) },
+                            selectedIndex = logos.indexOf(watermark.sns.logo),
+                            onSelect = { index ->
+                                val logo = logos[index]
+                                settings.updateWatermark { copy(sns = sns.copy(logo = logo)) }
+                            },
+                            icons = logos.map { logo ->
+                                WatermarkRenderer.snsLogoRes(logo)?.let { res -> painterResource(res) }
+                            },
+                            iconOnly = true,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        )
+                        SettingsField(
+                            label = stringResource(R.string.settings_watermark_handle),
+                            value = watermark.sns.handle,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            onValueChange = { next ->
+                                settings.updateWatermark { copy(sns = sns.copy(handle = next)) }
+                            },
+                        )
                         Text(
-                            stringResource(R.string.settings_automation_watermark_print_only),
+                            stringResource(R.string.settings_watermark_size),
                             color = PaperDim,
-                            fontSize = 13.sp,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
+                        Slider(
+                            value = watermark.sns.scale,
+                            onValueChange = { next ->
+                                settings.updateWatermark { withSnsScale(next) }
+                            },
+                            modifier = Modifier.semantics { contentDescription = snsSizeLabel },
+                            valueRange = WATERMARK_SCALE_MIN..WATERMARK_SCALE_MAX,
+                            colors = darkroomSliderColors(),
+                        )
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_watermark_date),
+                            checked = watermark.date.enabled,
+                            onCheckedChange = { on ->
+                                settings.updateWatermark { copy(date = date.copy(enabled = on)) }
+                            },
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_watermark_include_time),
+                            checked = watermark.date.includeTime,
+                            onCheckedChange = { on ->
+                                settings.updateWatermark { copy(date = date.copy(includeTime = on)) }
+                            },
+                        )
+                        Text(
+                            stringResource(R.string.settings_watermark_size),
+                            color = PaperDim,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
                             modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
                         )
-                    }
-                    if (!watermark.isConfigured()) {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp, bottom = 4.dp)
-                                .border(1.dp, Amber.copy(alpha = 0.7f), RoundedCornerShape(2.dp))
-                                .padding(12.dp),
-                        ) {
-                            Text(stringResource(R.string.settings_automation_blocked_watermark), color = Amber, fontSize = 13.sp)
-                            Text(
-                                needWatermarkText,
-                                color = Paper,
-                                fontSize = 13.sp,
-                                modifier = Modifier.padding(top = 6.dp),
-                            )
-                            TextButton(onClick = { revealSection("watermark") }) {
-                                Text(stringResource(R.string.settings_goto_watermark), color = Amber)
-                            }
-                        }
-                    }
-                    Text("│", color = PaperDim, fontFamily = MonoFont, modifier = Modifier.padding(start = 2.dp, top = 2.dp, bottom = 2.dp))
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .toggleable(
-                                value = cfg.autoPrint,
-                                role = Role.Switch,
-                                onValueChange = { on ->
-                                    when {
-                                        !on -> settings.updateSettings { copy(autoPrint = false) }
-                                        printerBound -> settings.updateSettings { copy(autoPrint = true) }
-                                        else -> scope.launch { snackbar.showSnackbar(needPrinterText) }
-                                    }
-                                },
-                            )
-                            .semantics(mergeDescendants = true) {},
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("③", color = Amber, fontFamily = MonoFont, modifier = Modifier.padding(end = 10.dp))
-                        Text(stringResource(R.string.settings_automation_step_print), color = Paper, modifier = Modifier.weight(1f))
-                        Switch(
-                            checked = cfg.autoPrint,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(checkedTrackColor = Amber),
+                        Slider(
+                            value = watermark.date.scale,
+                            onValueChange = { next ->
+                                settings.updateWatermark { withDateScale(next) }
+                            },
+                            modifier = Modifier.semantics { contentDescription = dateSizeLabel },
+                            valueRange = WATERMARK_SCALE_MIN..WATERMARK_SCALE_MAX,
+                            colors = darkroomSliderColors(),
                         )
-                    }
-                    if (!printerBound) {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp, bottom = 4.dp)
-                                .border(1.dp, Amber.copy(alpha = 0.7f), RoundedCornerShape(2.dp))
-                                .padding(12.dp),
-                        ) {
-                            Text(stringResource(R.string.settings_automation_blocked_print), color = Amber, fontSize = 13.sp)
-                            Text(
-                                needPrinterText,
-                                color = Paper,
-                                fontSize = 13.sp,
-                                modifier = Modifier.padding(top = 6.dp),
-                            )
-                            TextButton(onClick = { revealSection("printer") }) {
-                                Text(stringResource(R.string.settings_goto_printer), color = Amber)
-                            }
-                        }
-                    }
-                }
-
-                Fold(
-                    title = stringResource(R.string.settings_watermark),
-                    summary = watermarkSummary,
-                    icon = Icons.Outlined.BrandingWatermark,
-                    open = openWatermark,
-                    highlighted = highlighted == "watermark",
-                    onToggle = { openWatermark = !openWatermark },
-                    onTop = { sectionTops["watermark"] = it },
-                ) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .toggleable(
-                                value = watermark.sns.enabled,
-                                role = Role.Switch,
-                                onValueChange = { on ->
-                                    settings.updateWatermark { copy(sns = sns.copy(enabled = on)) }
-                                },
-                            )
-                            .semantics(mergeDescendants = true) {},
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(stringResource(R.string.settings_watermark_sns), color = Paper, modifier = Modifier.weight(1f))
-                        Switch(
-                            checked = watermark.sns.enabled,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(checkedTrackColor = Amber),
-                        )
-                    }
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                        SnsLogo.entries.forEachIndexed { index, logo ->
-                            SegmentedButton(
-                                selected = watermark.sns.logo == logo,
-                                onClick = { settings.updateWatermark { copy(sns = sns.copy(logo = logo)) } },
-                                shape = SegmentedButtonDefaults.itemShape(index, SnsLogo.entries.size),
-                                colors = darkroomSegmentedColors(),
-                                icon = {},
-                            ) {
-                                val res = WatermarkRenderer.snsLogoRes(logo)
-                                if (res != null) {
-                                    Icon(
-                                        painter = painterResource(res),
-                                        contentDescription = stringResource(snsLogoLabel(logo)),
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                } else {
-                                    Text(
-                                        stringResource(snsLogoLabel(logo)),
-                                        maxLines = 1,
-                                        style = MaterialTheme.typography.labelMedium,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    SettingsField(
-                        label = stringResource(R.string.settings_watermark_handle),
-                        value = watermark.sns.handle,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        onValueChange = { next ->
-                            settings.updateWatermark { copy(sns = sns.copy(handle = next)) }
-                        },
-                    )
-                    Text(
-                        stringResource(R.string.settings_watermark_size),
-                        color = PaperDim,
-                        modifier = Modifier.padding(bottom = 4.dp),
-                    )
-                    Slider(
-                        value = watermark.sns.scale,
-                        onValueChange = { next ->
-                            settings.updateWatermark { withSnsScale(next) }
-                        },
-                        valueRange = WATERMARK_SCALE_MIN..WATERMARK_SCALE_MAX,
-                        colors = SliderDefaults.colors(thumbColor = Amber, activeTrackColor = Amber),
-                    )
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .padding(top = 8.dp)
-                            .toggleable(
-                                value = watermark.date.enabled,
-                                role = Role.Switch,
-                                onValueChange = { on ->
-                                    settings.updateWatermark { copy(date = date.copy(enabled = on)) }
-                                },
-                            )
-                            .semantics(mergeDescendants = true) {},
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(stringResource(R.string.settings_watermark_date), color = Paper, modifier = Modifier.weight(1f))
-                        Switch(
-                            checked = watermark.date.enabled,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(checkedTrackColor = Amber),
-                        )
-                    }
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .toggleable(
-                                value = watermark.date.includeTime,
-                                role = Role.Switch,
-                                onValueChange = { on ->
-                                    settings.updateWatermark { copy(date = date.copy(includeTime = on)) }
-                                },
-                            )
-                            .semantics(mergeDescendants = true) {},
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(stringResource(R.string.settings_watermark_include_time), color = Paper, modifier = Modifier.weight(1f))
-                        Switch(
-                            checked = watermark.date.includeTime,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(checkedTrackColor = Amber),
-                        )
-                    }
-                    Text(
-                        stringResource(R.string.settings_watermark_size),
-                        color = PaperDim,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
-                    )
-                    Slider(
-                        value = watermark.date.scale,
-                        onValueChange = { next ->
-                            settings.updateWatermark { withDateScale(next) }
-                        },
-                        valueRange = WATERMARK_SCALE_MIN..WATERMARK_SCALE_MAX,
-                        colors = SliderDefaults.colors(thumbColor = Amber, activeTrackColor = Amber),
-                    )
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .toggleable(
-                                value = watermark.syncScale,
-                                role = Role.Switch,
-                                onValueChange = { on ->
-                                    settings.updateWatermark { copy(syncScale = on) }
-                                },
-                            )
-                            .semantics(mergeDescendants = true) {},
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            stringResource(R.string.settings_watermark_sync_size),
-                            color = Paper,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Switch(
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_watermark_sync_size),
                             checked = watermark.syncScale,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(checkedTrackColor = Amber),
+                            onCheckedChange = { on ->
+                                settings.updateWatermark { copy(syncScale = on) }
+                            },
                         )
-                    }
-                    Text(
-                        stringResource(R.string.settings_watermark_orientation_hint),
-                        color = PaperDim,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
-                    )
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        listOf(false, true).forEachIndexed { index, landscape ->
-                            SegmentedButton(
-                                selected = watermarkPreviewLandscape == landscape,
-                                onClick = { watermarkPreviewLandscape = landscape },
-                                shape = SegmentedButtonDefaults.itemShape(index, 2),
-                                colors = darkroomSegmentedColors(),
-                                icon = {},
-                            ) {
-                                Text(
-                                    stringResource(
-                                        if (landscape) R.string.studio_frame_landscape else R.string.studio_frame_portrait,
-                                    ),
-                                    maxLines = 1,
+                        Text(
+                            stringResource(R.string.settings_watermark_orientation_hint),
+                            color = PaperDim,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
+                        )
+                        val orientations = listOf(false, true)
+                        SegmentedPills(
+                            options = orientations.map { landscape ->
+                                stringResource(
+                                    if (landscape) R.string.studio_frame_landscape else R.string.studio_frame_portrait,
                                 )
-                            }
-                        }
-                    }
-                    WatermarkPreviewEditor(
-                        settings = watermark,
-                        photoFile = watermarkPhotoFile,
-                        dateText = watermarkDateText,
-                        landscape = watermarkPreviewLandscape,
-                        onAnchorChange = { id, landscape, anchor ->
-                            settings.updateWatermark {
-                                when (id) {
-                                    "sns" -> copy(sns = sns.withAnchor(landscape, anchor))
-                                    "date" -> copy(date = date.withAnchor(landscape, anchor))
-                                    else -> this
+                            },
+                            selectedIndex = orientations.indexOf(watermarkPreviewLandscape),
+                            onSelect = { index -> watermarkPreviewLandscape = orientations[index] },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        WatermarkPreviewEditor(
+                            settings = watermark,
+                            photoFile = watermarkPhotoFile,
+                            dateText = watermarkDateText,
+                            landscape = watermarkPreviewLandscape,
+                            onAnchorChange = { id, landscape, anchor ->
+                                settings.updateWatermark {
+                                    when (id) {
+                                        "sns" -> copy(sns = sns.withAnchor(landscape, anchor))
+                                        "date" -> copy(date = date.withAnchor(landscape, anchor))
+                                        else -> this
+                                    }
                                 }
-                            }
-                        },
-                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-                    )
-                    GhostButton(text = stringResource(R.string.settings_watermark_reset)) {
-                        settings.updateWatermark { withDefaultAnchors() }
+                            },
+                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                        )
+                        TonalButton(text = stringResource(R.string.settings_watermark_reset)) {
+                            settings.updateWatermark { withDefaultAnchors() }
+                        }
                     }
                 }
 
-                SectionLabel(stringResource(R.string.settings_group_diagnostics))
-
-                Fold(
-                    title = stringResource(R.string.recent_activity),
-                    summary = activitySummary,
-                    icon = Icons.Outlined.History,
-                    open = openActivity,
+                Spacer(Modifier.height(GROUP_GAP))
+                FoldGroup(
+                    label = stringResource(R.string.settings_group_diagnostics),
                     highlighted = highlighted == "activity",
-                    onToggle = { openActivity = !openActivity },
-                    onTop = { sectionTops["activity"] = it },
                 ) {
-                    if (logs.isEmpty()) {
-                        Text(stringResource(R.string.activity_empty), color = PaperDim)
-                    } else {
-                        // Half the row each rather than hugging their labels: three ghost buttons
-                        // never fit on one 360dp line, and at a 2x font scale even two would
-                        // overflow if they sized themselves to their text.
-                        Row(
-                            Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Box(Modifier.weight(1f)) {
-                                GhostButton(text = stringResource(R.string.settings_log_copy)) {
-                                    val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    manager.setPrimaryClip(ClipData.newPlainText(logShareTitle, buildLogReport(logs)))
-                                    scope.launch { snackbar.showSnackbar(logCopied) }
-                                }
-                            }
-                            Box(Modifier.weight(1f)) {
-                                GhostButton(text = stringResource(R.string.settings_log_share)) {
-                                    val send = Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(Intent.EXTRA_SUBJECT, logShareTitle)
-                                        putExtra(Intent.EXTRA_TEXT, buildLogReport(logs))
+                    Fold(
+                        title = stringResource(R.string.recent_activity),
+                        summary = activitySummary,
+                        icon = Icons.Outlined.History,
+                        open = openActivity,
+                        highlighted = highlighted == "activity",
+                        onToggle = { openActivity = !openActivity },
+                        onTop = { sectionTops["activity"] = it },
+                    ) {
+                        if (logs.isEmpty()) {
+                            Text(stringResource(R.string.activity_empty), color = PaperDim)
+                        } else {
+                            // Half the row each rather than hugging their labels: three ghost buttons
+                            // never fit on one 360dp line, and at a 2x font scale even two would
+                            // overflow if they sized themselves to their text.
+                            Row(
+                                Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Box(Modifier.weight(1f)) {
+                                    TonalButton(text = stringResource(R.string.settings_log_copy)) {
+                                        val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        manager.setPrimaryClip(ClipData.newPlainText(logShareTitle, buildLogReport(logs)))
+                                        scope.launch { snackbar.showSnackbar(logCopied) }
                                     }
-                                    openIntent(Intent.createChooser(send, logShareTitle))
+                                }
+                                Box(Modifier.weight(1f)) {
+                                    TonalButton(text = stringResource(R.string.settings_log_share)) {
+                                        val send = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_SUBJECT, logShareTitle)
+                                            putExtra(Intent.EXTRA_TEXT, buildLogReport(logs))
+                                        }
+                                        openIntent(Intent.createChooser(send, logShareTitle))
+                                    }
                                 }
                             }
-                        }
-                        Row(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
-                            GhostButton(
-                                text = stringResource(R.string.settings_log_clear),
-                                fillMaxWidth = false,
-                                onClick = { showClearLog = true },
-                            )
-                        }
-                    }
-                    val expandLabel = stringResource(R.string.settings_log_expand)
-                    logs.take(20).forEach { entry ->
-                        val failed = entry.status == "error" || !entry.error.isNullOrBlank()
-                        val hasDetail = !entry.error.isNullOrBlank()
-                        val open = expandedLog == entry.id
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .then(
-                                    if (hasDetail) {
-                                        Modifier.clickable(
-                                            onClickLabel = expandLabel,
-                                            role = Role.Button,
-                                            onClick = { expandedLog = if (open) "" else entry.id },
-                                        )
-                                    } else {
-                                        Modifier
-                                    },
+                            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+                                TonalButton(
+                                    text = stringResource(R.string.settings_log_clear),
+                                    fillMaxWidth = false,
+                                    onClick = { showClearLog = true },
                                 )
-                                .semantics(mergeDescendants = true) {}
-                                .padding(vertical = 3.dp),
-                        ) {
-                            Text(
-                                "${formatLogTime(entry.at, timeFormatter)}  ${logKindLabel(entry.kind)}  ${entry.message}",
-                                color = if (failed) Danger else PaperDim,
-                                fontFamily = MonoFont,
-                                fontSize = 12.sp,
-                                lineHeight = 16.sp,
-                            )
-                            if (open) {
-                                // The raw exception text, deliberately not run through
-                                // UserErrorMessage: this row exists to be copied into a bug report,
-                                // and a friendly rewrite is the one thing that is no use there.
+                            }
+                        }
+                        val expandLabel = stringResource(R.string.settings_log_expand)
+                        logs.take(20).forEach { entry ->
+                            val failed = entry.status == "error" || !entry.error.isNullOrBlank()
+                            val hasDetail = !entry.error.isNullOrBlank()
+                            val open = expandedLog == entry.id
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .then(
+                                        if (hasDetail) {
+                                            Modifier.clickable(
+                                                onClickLabel = expandLabel,
+                                                role = Role.Button,
+                                                onClick = { expandedLog = if (open) "" else entry.id },
+                                            )
+                                        } else {
+                                            Modifier
+                                        },
+                                    )
+                                    .semantics(mergeDescendants = true) {}
+                                    // A tappable entry keeps the 48dp touch target.
+                                    .then(if (hasDetail) Modifier.heightIn(min = 48.dp) else Modifier)
+                                    .padding(vertical = 3.dp),
+                                verticalArrangement = Arrangement.Center,
+                            ) {
                                 Text(
-                                    entry.error.orEmpty(),
-                                    color = Danger,
+                                    "${formatLogTime(entry.at, timeFormatter)}  ${logKindLabel(entry.kind)}  ${entry.message}",
+                                    color = if (failed) Danger else PaperDim,
                                     fontFamily = MonoFont,
                                     fontSize = 12.sp,
                                     lineHeight = 16.sp,
-                                    modifier = Modifier.padding(top = 2.dp, start = 8.dp),
                                 )
-                            }
-                        }
-                    }
-                }
-
-                SectionLabel(stringResource(R.string.settings_group_app))
-
-                Fold(
-                    title = stringResource(R.string.settings_language),
-                    summary = languageSummary,
-                    icon = Icons.Outlined.Language,
-                    open = openLanguage,
-                    highlighted = highlighted == "language",
-                    onToggle = { openLanguage = !openLanguage },
-                    onTop = { sectionTops["language"] = it },
-                ) {
-                    if (Build.VERSION.SDK_INT >= 33) {
-                        Text(
-                            stringResource(R.string.settings_language_desc),
-                            color = PaperDim,
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp,
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        )
-                        val choices = listOf(
-                            "" to stringResource(R.string.settings_lang_system),
-                            "zh" to stringResource(R.string.settings_lang_zh),
-                            "en" to stringResource(R.string.settings_lang_en),
-                            "ja" to stringResource(R.string.settings_lang_ja),
-                            "ko" to stringResource(R.string.settings_lang_ko),
-                        )
-                        Column(Modifier.fillMaxWidth().selectableGroup()) {
-                            choices.forEach { (tag, label) ->
-                                Row(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(min = 48.dp)
-                                        .selectable(
-                                            selected = localeTag == tag,
-                                            role = Role.RadioButton,
-                                            onClick = { if (localeTag != tag) applyLocale(tag) },
-                                        )
-                                        .semantics(mergeDescendants = true) {},
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    RadioButton(
-                                        selected = localeTag == tag,
-                                        onClick = null,
-                                        colors = RadioButtonDefaults.colors(selectedColor = Amber),
+                                if (open) {
+                                    // The raw exception text, deliberately not run through
+                                    // UserErrorMessage: this row exists to be copied into a bug report,
+                                    // and a friendly rewrite is the one thing that is no use there.
+                                    Text(
+                                        entry.error.orEmpty(),
+                                        color = Danger,
+                                        fontFamily = MonoFont,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp,
+                                        modifier = Modifier.padding(top = 2.dp, start = 8.dp),
                                     )
-                                    Text(label, color = Paper)
                                 }
                             }
                         }
-                    } else {
-                        // Per-app locales are a platform feature from API 33 on. The only backport
-                        // is AppCompat's, and it applies the locale through the delegates
-                        // registered by AppCompatActivity, which this pure-Compose app does not
-                        // use. Offering the picker here would set a preference that never takes
-                        // effect, so the fold explains the situation instead.
-                        Text(
-                            stringResource(R.string.settings_language_unsupported),
-                            color = PaperDim,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                        )
                     }
                 }
 
-                Fold(
-                    title = stringResource(R.string.settings_keep_alive),
-                    summary = if (cfg.keepAlive) {
-                        stringResource(R.string.settings_on)
-                    } else {
-                        stringResource(R.string.settings_off)
-                    },
-                    icon = Icons.Outlined.BatteryChargingFull,
-                    open = openKeepAlive,
-                    highlighted = highlighted == "keepalive" || highlighted == "keep_alive",
-                    onToggle = { openKeepAlive = !openKeepAlive },
-                    onTop = { sectionTops["keepalive"] = it },
+                Spacer(Modifier.height(GROUP_GAP))
+                FoldGroup(
+                    label = stringResource(R.string.settings_group_app),
+                    highlighted = highlighted in APP_SECTIONS,
                 ) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .toggleable(
-                                value = cfg.keepAlive,
-                                role = Role.Switch,
-                                onValueChange = { setKeepAlive(it) },
-                            )
-                            .semantics(mergeDescendants = true) {},
-                        verticalAlignment = Alignment.CenterVertically,
+                    Fold(
+                        title = stringResource(R.string.settings_language),
+                        summary = languageSummary,
+                        icon = Icons.Outlined.Language,
+                        open = openLanguage,
+                        highlighted = highlighted == "language",
+                        onToggle = { openLanguage = !openLanguage },
+                        onTop = { sectionTops["language"] = it },
                     ) {
-                        Text(
-                            stringResource(R.string.settings_keep_alive),
-                            color = Paper,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Switch(
-                            checked = cfg.keepAlive,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(checkedTrackColor = Amber),
-                        )
+                        if (Build.VERSION.SDK_INT >= 33) {
+                            Text(
+                                stringResource(R.string.settings_language_desc),
+                                color = PaperDim,
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            )
+                            val choices = listOf(
+                                "" to stringResource(R.string.settings_lang_system),
+                                "zh" to stringResource(R.string.settings_lang_zh),
+                                "en" to stringResource(R.string.settings_lang_en),
+                                "ja" to stringResource(R.string.settings_lang_ja),
+                                "ko" to stringResource(R.string.settings_lang_ko),
+                            )
+                            Column(Modifier.fillMaxWidth().selectableGroup()) {
+                                choices.forEach { (tag, label) ->
+                                    Row(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 48.dp)
+                                            .selectable(
+                                                selected = localeTag == tag,
+                                                role = Role.RadioButton,
+                                                onClick = { if (localeTag != tag) applyLocale(tag) },
+                                            )
+                                            .semantics(mergeDescendants = true) {},
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        RadioButton(
+                                            selected = localeTag == tag,
+                                            onClick = null,
+                                            colors = RadioButtonDefaults.colors(selectedColor = Amber, unselectedColor = PaperDim),
+                                        )
+                                        Text(label, color = Paper)
+                                    }
+                                }
+                            }
+                        } else {
+                            // Per-app locales are a platform feature from API 33 on. The only backport
+                            // is AppCompat's, and it applies the locale through the delegates
+                            // registered by AppCompatActivity, which this pure-Compose app does not
+                            // use. Offering the picker here would set a preference that never takes
+                            // effect, so the fold explains the situation instead.
+                            Text(
+                                stringResource(R.string.settings_language_unsupported),
+                                color = PaperDim,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                            )
+                        }
                     }
-                    Text(
-                        stringResource(R.string.settings_keep_alive_hint),
-                        color = PaperDim,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 14.dp)
-                        .border(1.dp, PaperFaint, RoundedCornerShape(2.dp))
-                        .heightIn(min = 48.dp)
-                        .clickable(role = Role.Button, onClick = onAbout)
-                        .semantics(mergeDescendants = true) {}
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Outlined.Info, contentDescription = null, tint = PaperDim, modifier = Modifier.size(20.dp))
-                    Column(Modifier.weight(1f).padding(start = 12.dp, end = 8.dp)) {
-                        Text(stringResource(R.string.settings_about), color = Amber)
+                    GroupDivider()
+                    Fold(
+                        title = stringResource(R.string.settings_keep_alive),
+                        summary = if (cfg.keepAlive) {
+                            stringResource(R.string.settings_on)
+                        } else {
+                            stringResource(R.string.settings_off)
+                        },
+                        icon = Icons.Outlined.BatteryChargingFull,
+                        open = openKeepAlive,
+                        highlighted = highlighted == "keepalive" || highlighted == "keep_alive",
+                        onToggle = { openKeepAlive = !openKeepAlive },
+                        onTop = { sectionTops["keepalive"] = it },
+                    ) {
+                        SettingsSwitchRow(
+                            label = stringResource(R.string.settings_keep_alive),
+                            checked = cfg.keepAlive,
+                            onCheckedChange = { setKeepAlive(it) },
+                        )
                         Text(
-                            stringResource(R.string.settings_about_summary),
+                            stringResource(R.string.settings_keep_alive_hint),
                             color = PaperDim,
                             fontSize = 12.sp,
-                            modifier = Modifier.padding(top = 2.dp),
+                            lineHeight = 16.sp,
+                            modifier = Modifier.padding(top = 4.dp),
                         )
                     }
-                    Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = PaperDim)
+                    GroupDivider()
+                    // The about page is a detail screen, not a fold: a forward chevron, no expand state.
+                    ListRow(
+                        title = stringResource(R.string.settings_about),
+                        supporting = stringResource(R.string.settings_about_summary),
+                        leadingIcon = Icons.Outlined.Info,
+                        onClick = onAbout,
+                    ) { ListRowChevron() }
                 }
 
-                GhostButton(
+                TonalButton(
                     text = stringResource(R.string.settings_reset),
+                    modifier = Modifier.padding(top = GROUP_GAP),
                     onClick = { showReset = true },
                 )
+
+                // What this page is for, as small print at the end rather than above the groups.
+                Text(
+                    stringResource(R.string.settings_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PaperDim,
+                    modifier = Modifier.padding(top = 16.dp, start = 4.dp, end = 4.dp),
+                )
+                Spacer(Modifier.height(bottomClearance + 16.dp))
             }
         }
     }
@@ -2196,11 +2078,6 @@ private fun currentLocaleTag(context: Context): String {
         .substringBefore('-')
 }
 
-/**
- * The active segment is a Paper fill, so its label and check mark have to be
- * Ink, which measures 14.85:1 there. Paper on the Room fill of an inactive
- * segment measures 15.67:1.
- */
 private fun snsLogoLabel(logo: SnsLogo): Int = when (logo) {
     SnsLogo.INSTAGRAM -> R.string.settings_watermark_logo_instagram
     SnsLogo.X -> R.string.settings_watermark_logo_x
@@ -2209,23 +2086,40 @@ private fun snsLogoLabel(logo: SnsLogo): Int = when (logo) {
     SnsLogo.NONE -> R.string.settings_watermark_logo_none
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * One settings group: a [SectionLabel] over a [CardGroup] whose rows are [Fold]s. While a deep link
+ * targets one of its folds ([highlighted]) the card gets a 1dp Amber edge (8.10:1 on Room) that
+ * fades in and out over [FOLD_MS], together with the AmberSoft fill of the row itself.
+ */
 @Composable
-private fun darkroomSegmentedColors() = SegmentedButtonDefaults.colors(
-    activeContainerColor = Paper,
-    activeContentColor = Ink,
-    activeBorderColor = PaperFaint,
-    inactiveContainerColor = Room,
-    inactiveContentColor = Paper,
-    inactiveBorderColor = PaperFaint,
-    disabledActiveContainerColor = PaperDisabled,
-    disabledActiveContentColor = Ink,
-    disabledActiveBorderColor = PaperHairline,
-    disabledInactiveContainerColor = Room,
-    disabledInactiveContentColor = PaperDim,
-    disabledInactiveBorderColor = PaperHairline,
-)
+private fun FoldGroup(
+    label: String,
+    highlighted: Boolean,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val edge by animateColorAsState(
+        targetValue = if (highlighted) Amber else Color.Transparent,
+        animationSpec = tween(FOLD_MS),
+        label = "foldGroupEdge",
+    )
+    SectionLabel(label)
+    CardGroup(
+        border = if (edge.alpha > 0f) BorderStroke(1.dp, edge) else null,
+        content = content,
+    )
+}
 
+/**
+ * A collapsible row of a [FoldGroup]: icon tile, title, a sans summary of the current values (like
+ * the shared ListRow's supporting text) and
+ * an expand arrow; the body expands in place underneath, inside the same card.
+ *
+ * Drawn here rather than with the shared ListRow because the header needs the expand/collapse
+ * click label, the expanded state description and the [FOLD_MS] arrow timing of the body animation.
+ * Title Paper 14.70:1 and summary PaperDim 5.16:1 on Surface1. On the AmberSoft highlight
+ * (composited over Surface1) Paper stays above 11:1, but PaperDim would drop to 4.46:1, so the
+ * summary turns Paper at 62% (5.24:1) while the row is highlighted.
+ */
 @Composable
 private fun Fold(
     title: String,
@@ -2241,10 +2135,15 @@ private fun Fold(
     val collapseLabel = stringResource(R.string.collapse_section)
     val expandedState = stringResource(R.string.settings_expanded)
     val collapsedState = stringResource(R.string.settings_collapsed)
-    val borderColor by animateColorAsState(
-        targetValue = if (highlighted) Amber else PaperFaint,
+    val rowFill by animateColorAsState(
+        targetValue = if (highlighted) AmberSoft else Color.Transparent,
         animationSpec = tween(FOLD_MS),
-        label = "foldBorder",
+        label = "foldHighlight",
+    )
+    val summaryColor by animateColorAsState(
+        targetValue = if (highlighted) Paper.copy(alpha = 0.62f) else PaperDim,
+        animationSpec = tween(FOLD_MS),
+        label = "foldSummary",
     )
     val arrow by animateFloatAsState(
         targetValue = if (open) 180f else 0f,
@@ -2254,14 +2153,13 @@ private fun Fold(
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(bottom = 14.dp)
-            .onGloballyPositioned { onTop(it.positionInRoot().y) }
-            .border(1.dp, borderColor, RoundedCornerShape(2.dp)),
+            .onGloballyPositioned { onTop(it.positionInRoot().y) },
     ) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 48.dp)
+                .background(rowFill)
+                .heightIn(min = 56.dp)
                 .clickable(
                     onClickLabel = if (open) collapseLabel else expandLabel,
                     role = Role.Button,
@@ -2270,32 +2168,35 @@ private fun Fold(
                 .semantics(mergeDescendants = true) {
                     stateDescription = if (open) expandedState else collapsedState
                 }
-                .padding(14.dp),
+                .padding(horizontal = ListRowPadding, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = if (open) Amber else PaperDim,
-                modifier = Modifier.size(20.dp),
-            )
-            Column(Modifier.weight(1f).padding(start = 12.dp, end = 8.dp)) {
-                Text(title, color = Amber)
+            IconTile(icon)
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    color = Paper,
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                )
                 if (summary.isNotBlank()) {
                     Text(
                         summary,
-                        color = PaperDim,
-                        fontSize = 12.sp,
-                        fontFamily = MonoFont,
+                        color = summaryColor,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
                         modifier = Modifier.padding(top = 2.dp),
                     )
                 }
             }
+            // PaperFaint on Surface1 3.32:1 (non-text); the row carries the state for TalkBack.
             Icon(
                 Icons.Outlined.ExpandMore,
                 contentDescription = null,
-                tint = PaperDim,
-                modifier = Modifier.rotate(arrow),
+                tint = PaperFaint,
+                modifier = Modifier.size(20.dp).rotate(arrow),
             )
         }
         AnimatedVisibility(
@@ -2304,24 +2205,144 @@ private fun Fold(
             exit = shrinkVertically(tween(FOLD_MS)) + fadeOut(tween(FOLD_MS)),
         ) {
             Column(
-                Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
+                // Lined up with the header's icon tile edge (ListRowPadding).
+                Modifier.padding(start = ListRowPadding, end = ListRowPadding, top = 4.dp, bottom = 16.dp),
                 content = content,
             )
         }
     }
 }
 
+/** A notice with one follow-up action, e.g. "Bluetooth is off" + "Open Bluetooth settings". */
 @Composable
 private fun Notice(text: String, action: @Composable () -> Unit) {
-    Column(
+    NoticeCard(
+        text = text,
+        modifier = Modifier.padding(top = 8.dp),
+        actions = { action() },
+    )
+}
+
+/**
+ * Notice for an automation step that cannot run yet: the shared titled [NoticeCard] — the Amber
+ * [title] (14sp Medium, 8.10:1 on Surface1) is the message and [details] (what is missing, one per
+ * line) are the PaperDim detail below it. [gotoLabel], when given, is a [TonalButton] that calls
+ * [onGoto] to reveal the settings section that fixes it; without it the notice is one TalkBack item.
+ */
+@Composable
+private fun BlockedNotice(
+    title: String,
+    details: List<String>,
+    gotoLabel: String? = null,
+    onGoto: () -> Unit = {},
+) {
+    NoticeCard(
+        title = title,
+        text = details.joinToString("\n"),
+        modifier = Modifier.padding(vertical = 4.dp),
+        actions = gotoLabel?.let { label -> { TonalButton(label, fillMaxWidth = false, onClick = onGoto) } },
+    )
+}
+
+/**
+ * Number badge of an automation step: a 24dp [Surface3] circle with an Amber digit (6.52:1).
+ * The badge is a minimum size, not a fixed one, so at a large font scale it grows into a pill
+ * instead of clipping the digit. The digit stays in the merged switch row, so TalkBack still reads
+ * the step's position.
+ */
+@Composable
+private fun StepBadge(number: Int) {
+    Box(
+        Modifier
+            .padding(end = 12.dp)
+            .defaultMinSize(minWidth = STEP_BADGE, minHeight = STEP_BADGE)
+            .clip(CircleShape)
+            .background(Surface3)
+            .padding(horizontal = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            "$number",
+            color = Amber,
+            fontSize = 12.sp,
+            lineHeight = 12.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+/**
+ * One on/off row of a settings fold: the whole row is a `toggleable` with `Role.Switch` and merged
+ * semantics, so TalkBack reads label, "switch" and the state once. The label is drawn like a list
+ * row title (15sp Medium Paper, 14.70:1 on Surface1, matching the Studio switch rows) and keeps
+ * 12dp clear of the switch when it wraps. [leading] (the automation [StepBadge]) sits before it.
+ */
+@Composable
+private fun SettingsSwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    leading: (@Composable () -> Unit)? = null,
+) {
+    Row(
         Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp)
-            .border(1.dp, Amber.copy(alpha = 0.7f), RoundedCornerShape(2.dp))
-            .padding(12.dp),
+            .heightIn(min = 48.dp)
+            .then(modifier)
+            .toggleable(
+                value = checked,
+                role = Role.Switch,
+                onValueChange = onCheckedChange,
+            )
+            .semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text, color = Amber, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
-        action()
+        leading?.invoke()
+        Text(
+            label,
+            color = Paper,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f).padding(end = 12.dp),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = null,
+            colors = darkroomSwitchColors(),
+        )
+    }
+}
+
+/** Connector between two automation steps, centred under the [StepBadge]s. Decorative. */
+@Composable
+private fun StepConnector() {
+    Box(
+        Modifier
+            .padding(start = (STEP_BADGE - 2.dp) / 2, top = 2.dp, bottom = 2.dp)
+            .width(2.dp)
+            .height(14.dp)
+            .clip(CircleShape)
+            .background(Surface3),
+    )
+}
+
+private val STEP_BADGE = 24.dp
+
+/**
+ * [text] in the default sans family, with each occurrence of the technical [values] (MAC, RSSI,
+ * URL…) set in Monospace, so translated words around them stay sans (SYUI020-R03).
+ */
+private fun monoValues(text: String, vararg values: String): AnnotatedString = buildAnnotatedString {
+    append(text)
+    for (value in values) {
+        if (value.isEmpty()) continue
+        var at = text.indexOf(value)
+        while (at >= 0) {
+            addStyle(SpanStyle(fontFamily = MonoFont), at, at + value.length)
+            at = text.indexOf(value, at + value.length)
+        }
     }
 }
 
@@ -2335,11 +2356,15 @@ private fun DeviceRow(
 ) {
     val bindLabel = stringResource(R.string.settings_device_bind)
     val printerLike = stringResource(R.string.printer_like)
+    // A Surface2 block inside the Surface1 card (PaperDim 4.96:1, Paper 13.40:1); the bound device
+    // adds the 1dp Amber "selected" edge next to its check mark.
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .border(1.dp, if (bound) Amber else PaperFaint, RoundedCornerShape(2.dp))
+            .padding(vertical = 4.dp)
+            .clip(FieldShape)
+            .background(Surface2)
+            .then(if (bound) Modifier.border(1.dp, Amber, FieldShape) else Modifier)
             .heightIn(min = 56.dp)
             .clickable(
                 enabled = enabled && !bound,
@@ -2348,17 +2373,21 @@ private fun DeviceRow(
                 onClick = onClick,
             )
             .semantics(mergeDescendants = true) {}
-            .padding(10.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon(Icons.Outlined.Bluetooth, contentDescription = null, tint = PaperDim, modifier = Modifier.size(18.dp))
+        Icon(
+            Icons.Outlined.Bluetooth,
+            contentDescription = null,
+            tint = if (bound) Amber else PaperDim,
+            modifier = Modifier.size(18.dp),
+        )
         Column(Modifier.weight(1f)) {
             Text(device.name, color = Paper)
             Text(
-                device.mac + if (device.printerLike) " · $printerLike" else "",
+                monoValues(device.mac + if (device.printerLike) " · $printerLike" else "", device.mac),
                 color = PaperDim,
-                fontFamily = MonoFont,
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
             )
@@ -2380,9 +2409,8 @@ private fun DeviceRow(
                         modifier = Modifier.size(14.dp),
                     )
                     Text(
-                        stringResource(R.string.settings_signal_fmt, label, rssi),
+                        monoValues(stringResource(R.string.settings_signal_fmt, label, rssi), "$rssi"),
                         color = PaperDim,
-                        fontFamily = MonoFont,
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                     )
@@ -2392,7 +2420,7 @@ private fun DeviceRow(
         when {
             pairing -> {
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(stringResource(R.string.settings_device_pairing), color = Amber, fontSize = 12.sp)
+                    Text(stringResource(R.string.settings_device_pairing), color = Amber, fontSize = 12.sp, lineHeight = 18.sp)
                     TimedWaitBar(
                         label = "",
                         modifier = Modifier.padding(top = 6.dp).fillMaxWidth(0.35f),
@@ -2401,16 +2429,11 @@ private fun DeviceRow(
             }
             bound -> {
                 Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = Amber, modifier = Modifier.size(18.dp))
-                Text(stringResource(R.string.settings_device_bound), color = Amber, fontSize = 12.sp)
+                Text(stringResource(R.string.settings_device_bound), color = Amber, fontSize = 12.sp, lineHeight = 18.sp)
             }
             else -> {
-                Text(bindLabel, color = if (enabled) Paper else PaperDim, fontSize = 12.sp)
-                Icon(
-                    Icons.Outlined.ChevronRight,
-                    contentDescription = null,
-                    tint = PaperDim,
-                    modifier = Modifier.size(18.dp),
-                )
+                Text(bindLabel, color = if (enabled) Paper else PaperDim, fontSize = 12.sp, lineHeight = 18.sp)
+                ListRowChevron(modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -2424,38 +2447,26 @@ private fun CopiesStepper(copies: Int, onChange: (Int) -> Unit) {
         Modifier.fillMaxWidth().padding(top = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Icons rather than "−" / "+" glyphs: IconButton is a fixed 48dp box, so at a 2x font
+        // Icons rather than "−" / "+" glyphs: the button is a fixed 48dp box, so at a 2x font
         // scale a 20sp glyph is clipped inside it, while a dp-sized icon is not.
-        IconButton(
+        IconCircleButton(
+            icon = Icons.Outlined.Remove,
+            contentDescription = fewer,
             enabled = copies > 1,
             onClick = { onChange(copies - 1) },
-            modifier = Modifier.semantics { contentDescription = fewer },
-        ) {
-            Icon(
-                Icons.Outlined.Remove,
-                contentDescription = null,
-                tint = if (copies > 1) Paper else PaperDim,
-                modifier = Modifier.size(20.dp),
-            )
-        }
+        )
         Text(
             "$copies",
             color = Paper,
             fontFamily = MonoFont,
             modifier = Modifier.padding(horizontal = 12.dp),
         )
-        IconButton(
+        IconCircleButton(
+            icon = Icons.Outlined.Add,
+            contentDescription = more,
             enabled = copies < 9,
             onClick = { onChange(copies + 1) },
-            modifier = Modifier.semantics { contentDescription = more },
-        ) {
-            Icon(
-                Icons.Outlined.Add,
-                contentDescription = null,
-                tint = if (copies < 9) Paper else PaperDim,
-                modifier = Modifier.size(20.dp),
-            )
-        }
+        )
     }
 }
 
@@ -2476,7 +2487,7 @@ private fun SettingsField(
     var secretVisible by remember { mutableStateOf(false) }
     var wasFocused by remember { mutableStateOf(false) }
     val supportingSlot: @Composable (() -> Unit)? = if (supporting != null) {
-        { Text(supporting, color = if (isError) Danger else PaperDim, fontSize = 12.sp) }
+        { Text(supporting, color = if (isError) Danger else PaperDim, fontSize = 12.sp, lineHeight = 16.sp) }
     } else {
         null
     }
@@ -2500,9 +2511,10 @@ private fun SettingsField(
             label,
             color = if (isError) Danger else PaperDim,
             fontSize = 14.sp,
+            lineHeight = 20.sp,
             modifier = Modifier.padding(bottom = 6.dp),
         )
-        TextField(
+        OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier
@@ -2527,21 +2539,27 @@ private fun SettingsField(
             },
             keyboardOptions = keyboardOptions,
             trailingIcon = secretToggle,
+            shape = FieldShape,
             colors = settingsFieldColors(),
         )
     }
 }
 
+/**
+ * The shared field look (outlined, [Surface2] fill, PaperFaint at rest, Amber focused, Danger on
+ * error) with every role this form relies on spelled out, including the supporting text that
+ * carries the validation messages. Paper on Surface2 13.40:1, PaperDim 4.96:1, Danger 9.73:1.
+ */
 @Composable
 private fun settingsFieldColors(): TextFieldColors = TextFieldDefaults.colors(
     focusedTextColor = Paper,
     unfocusedTextColor = Paper,
     disabledTextColor = PaperDim,
     errorTextColor = Paper,
-    focusedContainerColor = SurfaceLow,
-    unfocusedContainerColor = SurfaceLow,
-    disabledContainerColor = SurfaceLow,
-    errorContainerColor = SurfaceLow,
+    focusedContainerColor = Surface2,
+    unfocusedContainerColor = Surface2,
+    disabledContainerColor = Surface2,
+    errorContainerColor = Surface2,
     cursorColor = Amber,
     errorCursorColor = Danger,
     focusedIndicatorColor = Amber,
@@ -2607,7 +2625,7 @@ private fun TimedWaitBar(label: String, modifier: Modifier = Modifier) {
             stringResource(R.string.progress_elapsed_fmt, elapsed),
             color = PaperDim,
             fontFamily = MonoFont,
-            fontSize = 12.sp,
+            fontSize = 12.sp, lineHeight = 18.sp,
             modifier = Modifier.padding(top = 4.dp),
         )
     }

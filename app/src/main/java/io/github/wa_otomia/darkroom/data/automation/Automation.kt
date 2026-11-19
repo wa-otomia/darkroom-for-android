@@ -20,7 +20,8 @@ class Automation @Inject constructor(
 ) {
     fun onIngested(photoId: String, origin: String) {
         val app = settings.readSettings()
-        val presetId = settings.readPresets().lastSelectedId
+        // The automation preset, not the Studio default (AUTG010-R02, AUTG040-R02).
+        val presetId = settings.readAutoEditPreset()
         val aiState = settings.aiCredentialState()
         val aiConfigured = aiState == AiCredentialState.READY
         val watermarkConfigured = settings.readWatermark().isConfigured()
@@ -49,7 +50,7 @@ class Automation @Inject constructor(
                 if (app.autoWatermark) {
                     activityLog.record("automation", "$origin skipped $SKIP_WATERMARK_NO_PRINT")
                 }
-                aiJobs.enqueueEdit(photoId, "original", presetId, "")
+                aiJobs.enqueueEdit(photoId, "original", presetId, "", rememberPreset = false)
             }
             plan.print -> printQueue.enqueue(
                 photoId = photoId,

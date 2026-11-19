@@ -18,11 +18,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.wa_otomia.darkroom.R
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_ASPECT
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_BACKGROUND_KEPT
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_LOCAL_FAILED
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_MISSING
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NEED_KEY
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NOT_BINARY
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NO_BACKGROUND
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NO_PERSON
+import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_SHADED
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_UNDECODABLE
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_NOT_SIGNED_IN
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_RELOGIN
@@ -92,6 +95,10 @@ private val RULES: List<Rule> = listOf(
     Rule(R.string.id_error_mask_not_binary, ID_MASK_MSG_NOT_BINARY),
     Rule(R.string.id_error_mask_no_person, ID_MASK_MSG_NO_PERSON),
     Rule(R.string.id_error_mask_no_background, ID_MASK_MSG_NO_BACKGROUND),
+    Rule(R.string.id_error_mask_background_kept, ID_MASK_MSG_BACKGROUND_KEPT),
+    Rule(R.string.id_error_mask_shaded, ID_MASK_MSG_SHADED),
+    // data/imaging/LocalSelfieSegmenter.kt, data/jobs/AiJobs.kt: "本地抠图失败：<exception class>".
+    Rule(R.string.id_error_mask_local_failed, ID_MASK_MSG_LOCAL_FAILED),
     Rule(R.string.id_error_mask_undecodable, ID_MASK_MSG_UNDECODABLE),
     Rule(R.string.id_error_mask_need_key, ID_MASK_MSG_NEED_KEY),
     Rule(R.string.id_error_mask_version_gone, ID_MASK_MSG_VERSION_GONE),

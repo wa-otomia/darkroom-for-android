@@ -16,34 +16,38 @@ import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.WifiOff
@@ -67,13 +71,23 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
@@ -93,22 +107,33 @@ import io.github.wa_otomia.darkroom.data.transfer.FtpSessionInfo
 import io.github.wa_otomia.darkroom.data.transfer.IncomingTransfer
 import io.github.wa_otomia.darkroom.data.transfer.TransferState
 import io.github.wa_otomia.darkroom.ui.components.AmberProgressBar
+import io.github.wa_otomia.darkroom.ui.components.CardGroup
+import io.github.wa_otomia.darkroom.ui.components.DarkroomCard
 import io.github.wa_otomia.darkroom.ui.components.DarkroomSnackbarHost
-import io.github.wa_otomia.darkroom.ui.components.GhostButton
+import io.github.wa_otomia.darkroom.ui.components.GroupDivider
 import io.github.wa_otomia.darkroom.ui.components.InlineConfirm
+import io.github.wa_otomia.darkroom.ui.components.ListRow
+import io.github.wa_otomia.darkroom.ui.components.ListRowChevron
+import io.github.wa_otomia.darkroom.ui.components.ListRowPadding
+import io.github.wa_otomia.darkroom.ui.components.ListRowTextIndent
+import io.github.wa_otomia.darkroom.ui.components.NoticeCard
+import io.github.wa_otomia.darkroom.ui.components.PageTitle
 import io.github.wa_otomia.darkroom.ui.components.PaperButton
-import io.github.wa_otomia.darkroom.ui.components.ScreenHeader
 import io.github.wa_otomia.darkroom.ui.components.SectionLabel
+import io.github.wa_otomia.darkroom.ui.components.StatusPill
+import io.github.wa_otomia.darkroom.ui.components.TonalButton
+import io.github.wa_otomia.darkroom.ui.components.cardGlowBrush
 import io.github.wa_otomia.darkroom.ui.components.rememberInlineConfirmState
 import io.github.wa_otomia.darkroom.ui.jobFieldKey
 import io.github.wa_otomia.darkroom.ui.localizedUserError
+import io.github.wa_otomia.darkroom.ui.navigation.LocalBottomBarClearance
 import io.github.wa_otomia.darkroom.ui.transferProgressUi
 import io.github.wa_otomia.darkroom.ui.theme.Amber
+import io.github.wa_otomia.darkroom.ui.theme.AmberSoft
 import io.github.wa_otomia.darkroom.ui.theme.MonoFont
 import io.github.wa_otomia.darkroom.ui.theme.Paper
 import io.github.wa_otomia.darkroom.ui.theme.PaperDim
-import io.github.wa_otomia.darkroom.ui.theme.PaperHairline
-import io.github.wa_otomia.darkroom.ui.theme.SurfaceLow
+import io.github.wa_otomia.darkroom.ui.theme.Surface2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -118,6 +143,7 @@ import kotlinx.coroutines.withContext
 private const val START_TIMEOUT_MS = 8_000L
 private const val HOST_POLL_MS = 5_000L
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun IoScreen(
     settings: AppSettings,
@@ -301,57 +327,59 @@ fun IoScreen(
         }
     }
 
+    // Top-level tab: the floating nav bar overlays the bottom of this screen, so the scroll
+    // content ends with this clearance and the snackbar is lifted above the bar.
+    val clearance = LocalBottomBarClearance.current
     Scaffold(
         // containerColor/contentColor default to background/onBackground, i.e. Room/Paper.
         contentWindowInsets = WindowInsets(0),
-        snackbarHost = { DarkroomSnackbarHost(snackbar) },
+        snackbarHost = { DarkroomSnackbarHost(snackbar, Modifier.padding(bottom = clearance)) },
     ) { padding ->
         Column(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(20.dp),
+                .padding(horizontal = 20.dp),
         ) {
-            ScreenHeader(
-                eyebrow = stringResource(R.string.io_eyebrow),
+            PageTitle(
                 title = stringResource(R.string.io_title),
+                modifier = Modifier.padding(top = 12.dp, bottom = 12.dp),
             )
-            Text(stringResource(R.string.io_desc), style = MaterialTheme.typography.bodyMedium, color = PaperDim, modifier = Modifier.padding(top = 8.dp, bottom = 20.dp))
 
-            PrintQueueRow(jobs = printJobs, onOpen = onOpenPrintQueue)
-            Spacer(Modifier.height(24.dp))
-
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .background(SurfaceLow)
-                    // The card is a container, not a control, so its frame stays a hairline.
-                    .border(1.dp, PaperHairline, RoundedCornerShape(2.dp))
-                    .padding(20.dp),
+            SectionLabel(stringResource(R.string.io_eyebrow))
+            // FTP hero card: status and the values to type into the camera, all visible while
+            // listening without expanding anything (IMNW010-R03). Only PASV sits under "more".
+            DarkroomCard(
+                brush = cardGlowBrush(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(
-                        Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(if (listening || starting) Amber else PaperDim),
-                    )
-                    Text(
-                        when {
-                            portBlocked -> stringResource(R.string.ftp_port_unavailable)
-                            waitingForWifi -> stringResource(R.string.ftp_waiting)
-                            listening -> stringResource(R.string.ftp_on)
-                            starting -> stringResource(R.string.ftp_starting)
-                            else -> stringResource(R.string.ftp_off)
-                        },
-                        color = if (listening || starting) Amber else PaperDim,
-                        fontFamily = MonoFont,
-                        modifier = Modifier.padding(start = 8.dp).weight(1f),
-                    )
+                val active = listening || starting
+                // FlowRow, not Row: at large font scales the button wraps under the pill instead
+                // of squeezing the status text into mid-word breaks.
+                FlowRow(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.padding(end = 12.dp)) {
+                        StatusPill(
+                            text = when {
+                                portBlocked -> stringResource(R.string.ftp_port_unavailable)
+                                waitingForWifi -> stringResource(R.string.ftp_waiting)
+                                listening -> stringResource(R.string.ftp_on)
+                                starting -> stringResource(R.string.ftp_starting)
+                                else -> stringResource(R.string.ftp_off)
+                            },
+                            // Amber on AmberSoft 5.46–6.69:1; PaperDim on Surface2 4.96:1.
+                            dot = if (active) Amber else PaperDim,
+                            container = if (active) AmberSoft else Surface2,
+                            contentColor = if (active) Amber else PaperDim,
+                        )
+                    }
                     when {
-                        listening -> GhostButton(stringResource(R.string.ftp_stop), fillMaxWidth = false) {
+                        listening -> TonalButton(stringResource(R.string.ftp_stop), fillMaxWidth = false) {
                             FtpForegroundService.stop(context)
                         }
                         starting -> Row(verticalAlignment = Alignment.CenterVertically) {
@@ -366,7 +394,10 @@ fun IoScreen(
                         else -> PaperButton(stringResource(R.string.ftp_start), fillMaxWidth = false) { onStartClicked() }
                     }
                 }
-                ConnectionFold(open = ftpInfoOpen, onToggle = { ftpInfoOpen = !ftpInfoOpen }) {
+
+                // No in-card heading: the "Camera FTP" section label above already names the card
+                // (and is the TalkBack heading), and the host field label leads the values.
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     HostRows(
                         // While running, show what is actually bound; otherwise (or when the
                         // port is blocked) the Wi-Fi addresses that would be used.
@@ -375,16 +406,22 @@ fun IoScreen(
                         confirmedLabel = confirmedLabel,
                         onRefresh = { refreshHosts() },
                     ) { label, ip -> copy(label, ip) }
-                    Credential(
-                        label = stringResource(R.string.ftp_port),
-                        value = showPort.toString(),
-                        confirmedLabel = confirmedLabel,
-                    ) { copy(it, showPort.toString()) }
-                    Credential(
-                        label = stringResource(R.string.ftp_user),
-                        value = showUser,
-                        confirmedLabel = confirmedLabel,
-                    ) { copy(it, showUser) }
+                    FlowRow(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Credential(
+                            label = stringResource(R.string.ftp_port),
+                            value = showPort.toString(),
+                            confirmedLabel = confirmedLabel,
+                        ) { copy(it, showPort.toString()) }
+                        Credential(
+                            label = stringResource(R.string.ftp_user),
+                            value = showUser,
+                            confirmedLabel = confirmedLabel,
+                        ) { copy(it, showUser) }
+                    }
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             LabelWithConfirm(passwordLabel, confirmedLabel == passwordLabel)
@@ -392,7 +429,8 @@ fun IoScreen(
                                 if (passwordVisible) showPassword else "••••••••",
                                 color = Paper,
                                 fontFamily = MonoFont,
-                                fontSize = 20.sp,
+                                fontSize = 18.sp,
+                                lineHeight = 24.sp,
                             )
                         }
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -415,11 +453,18 @@ fun IoScreen(
                             )
                         }
                     }
-                    Spacer(Modifier.height(14.dp))
+                }
+
+                ConnectionFold(
+                    title = stringResource(R.string.io_ui_more_details),
+                    open = ftpInfoOpen,
+                    onToggle = { ftpInfoOpen = !ftpInfoOpen },
+                ) {
                     Credential(
                         label = stringResource(R.string.ftp_pasv),
                         value = "$showPasvMin–$showPasvMax",
                         confirmedLabel = confirmedLabel,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     ) { copy(it, "$showPasvMin-$showPasvMax") }
                 }
             }
@@ -436,13 +481,28 @@ fun IoScreen(
                 NotificationBlockedNotice { openNotificationSettings(context) }
             }
             if (showPort < 1024) {
-                Text(stringResource(R.string.ftp_port21_hint), color = Amber, modifier = Modifier.padding(top = 12.dp))
+                NoticeCard(
+                    text = stringResource(R.string.ftp_port21_hint),
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
+            // The setup instructions, moved from the page header to small print under the card.
+            Text(
+                stringResource(R.string.io_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = PaperDim,
+                modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 12.dp),
+            )
+
+            Spacer(Modifier.height(24.dp))
+            CardGroup {
+                PrintQueueRow(jobs = printJobs, onOpen = onOpenPrintQueue)
+                GroupDivider()
+                SessionsBlock(sessions = sessions, transfers = transfers)
             }
             Spacer(Modifier.height(24.dp))
-            SessionsBlock(sessions = sessions, transfers = transfers)
-            Spacer(Modifier.height(24.dp))
             TransfersBlock(transfers = transfers, onDismiss = onDismissTransfer)
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(clearance + 16.dp))
         }
     }
     if (startFailed) {
@@ -470,27 +530,33 @@ private fun SessionsBlock(sessions: List<FtpSessionInfo>, transfers: List<Incomi
         }
     }
     val byId = remember(transfers) { transfers.associateBy { it.id } }
-    SectionLabel(stringResource(R.string.io_sessions))
+    // Group row inside the print-queue/sessions CardGroup; it stays a heading for TalkBack.
+    ListRow(
+        title = stringResource(R.string.io_sessions),
+        supporting = if (sessions.isEmpty()) stringResource(R.string.io_sessions_empty) else null,
+        leadingIcon = Icons.Outlined.PhotoCamera,
+        modifier = Modifier.semantics { heading() },
+    )
     if (sessions.isEmpty()) {
-        Text(stringResource(R.string.io_sessions_empty), color = PaperDim, fontSize = 13.sp)
         return
     }
     sessions.forEach { session ->
         val current = session.currentTransferId?.let { byId[it] }
+        GroupDivider()
+        // One session per row, text aligned with the group row's title above it.
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp)
-                .border(1.dp, PaperHairline, RoundedCornerShape(2.dp))
-                .padding(14.dp),
+                .semantics(mergeDescendants = true) {}
+                .padding(start = ListRowTextIndent, end = ListRowPadding, top = 10.dp, bottom = 12.dp),
         ) {
-            Text(session.remote, color = Paper, fontFamily = MonoFont, fontSize = 16.sp)
+            Text(session.remote, color = Paper, fontFamily = MonoFont, fontSize = 15.sp, lineHeight = 20.sp)
             Text(
                 sessionSubtitle(session, now),
                 color = PaperDim,
-                fontFamily = MonoFont,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(top = 4.dp),
+                lineHeight = 16.sp,
+                modifier = Modifier.padding(top = 2.dp),
             )
             val sessionFile = current?.filename ?: session.currentFilename
             if (!sessionFile.isNullOrBlank()) {
@@ -498,7 +564,8 @@ private fun SessionsBlock(sessions: List<FtpSessionInfo>, transfers: List<Incomi
                     stringResource(R.string.io_session_file, sessionFile),
                     color = Amber,
                     fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 6.dp),
+                    lineHeight = 18.sp,
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
         }
@@ -506,11 +573,18 @@ private fun SessionsBlock(sessions: List<FtpSessionInfo>, transfers: List<Incomi
 }
 
 @Composable
-private fun sessionSubtitle(session: FtpSessionInfo, nowMs: Long): String {
+private fun sessionSubtitle(session: FtpSessionInfo, nowMs: Long): AnnotatedString {
     val user = session.user.ifBlank { stringResource(R.string.io_session_anonymous) }
     val auth = if (session.authed) user else stringResource(R.string.io_session_signing_in)
     val elapsed = formatSessionElapsed(session.connectedAt, nowMs)
-    return if (elapsed.isEmpty()) auth else "$auth · $elapsed"
+    // Sans for the (localised) sign-in state; Mono only for the ticking elapsed time.
+    return buildAnnotatedString {
+        append(auth)
+        if (elapsed.isNotEmpty()) {
+            append(" · ")
+            withStyle(SpanStyle(fontFamily = MonoFont)) { append(elapsed) }
+        }
+    }
 }
 
 @Composable
@@ -518,7 +592,13 @@ private fun TransfersBlock(transfers: List<IncomingTransfer>, onDismiss: (String
     val visible = transfers.filter { it.state != TransferState.Done }
     SectionLabel(stringResource(R.string.io_transfers))
     if (visible.isEmpty()) {
-        Text(stringResource(R.string.io_transfers_empty), color = PaperDim, fontSize = 13.sp)
+        Text(
+            stringResource(R.string.io_transfers_empty),
+            color = PaperDim,
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+            modifier = Modifier.padding(start = 4.dp),
+        )
         return
     }
     visible.forEach { transfer ->
@@ -535,26 +615,37 @@ private fun TransferRow(transfer: IncomingTransfer, onDismiss: (String) -> Unit)
     } else {
         null
     }
-    AmberProgressBar(
-        title = transfer.filename,
-        ui = transferProgressUi(transfer),
-        extra = {
-            if (failed) {
-                if (!errorText.isNullOrBlank()) {
-                    Text(errorText, color = Amber, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-                }
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    GhostButton(stringResource(R.string.io_transfer_dismiss), fillMaxWidth = false) {
-                        onDismiss(transfer.id)
+    DarkroomCard {
+        AmberProgressBar(
+            title = transfer.filename,
+            ui = transferProgressUi(transfer),
+            framed = false,
+            extra = {
+                if (failed) {
+                    if (!errorText.isNullOrBlank()) {
+                        Text(
+                            errorText,
+                            color = Amber,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        TonalButton(stringResource(R.string.io_transfer_dismiss), fillMaxWidth = false) {
+                            onDismiss(transfer.id)
+                        }
                     }
                 }
-            }
-        },
-    )
+            },
+        )
+    }
 }
 
+/** The "more" section of the FTP card (PASV range), collapsed by default. */
 @Composable
 private fun ConnectionFold(
+    title: String,
     open: Boolean,
     onToggle: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
@@ -563,11 +654,12 @@ private fun ConnectionFold(
     val collapseLabel = stringResource(R.string.collapse_section)
     val expandedState = stringResource(R.string.settings_expanded)
     val collapsedState = stringResource(R.string.settings_collapsed)
-    val arrow by animateFloatAsState(targetValue = if (open) 180f else 0f, label = "ftpInfoArrow")
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier
                 .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .clickable(
                     onClickLabel = if (open) collapseLabel else expandLabel,
                     role = Role.Button,
@@ -578,18 +670,17 @@ private fun ConnectionFold(
                 }
                 .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                stringResource(R.string.io_ftp_connection),
+                title,
                 color = Amber,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
                 modifier = Modifier.weight(1f),
             )
-            Icon(
-                Icons.Outlined.ExpandMore,
-                contentDescription = null,
-                tint = PaperDim,
-                modifier = Modifier.rotate(arrow),
-            )
+            ListRowChevron(expanded = open)
         }
         AnimatedVisibility(
             visible = open,
@@ -611,23 +702,13 @@ private fun PrintQueueRow(jobs: List<PrintJob>, onOpen: () -> Unit) {
         queued > 0 -> stringResource(R.string.io_print_queue_queued, queued)
         else -> stringResource(R.string.io_print_queue_idle)
     }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .border(1.dp, PaperHairline, RoundedCornerShape(2.dp))
-            .clickable(onClick = onOpen)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    ListRow(
+        title = stringResource(R.string.io_print_queue),
+        supporting = status,
+        leadingIcon = Icons.Outlined.Print,
+        onClick = onOpen,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.io_print_queue), color = Paper)
-            Text(status, color = PaperDim, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
-        }
-        Icon(
-            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-            contentDescription = null,
-            tint = PaperDim,
-        )
+        ListRowChevron()
     }
 }
 
@@ -641,83 +722,179 @@ private fun HostRows(
 ) {
     val hostLabel = stringResource(R.string.ftp_host)
     val visible = hosts
-    if (visible.isEmpty()) {
-        Column(Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
-            SectionLabel(hostLabel)
-            Text(
-                stringResource(R.string.lib_io_no_host_title),
-                color = Amber,
-                fontFamily = MonoFont,
-                fontSize = 16.sp,
-            )
-            Text(
-                stringResource(R.string.lib_io_no_host_desc),
-                color = PaperDim,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
-            )
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (visible.isEmpty()) {
+            Column(Modifier.fillMaxWidth()) {
+                FieldLabel(hostLabel)
+                Text(
+                    stringResource(R.string.lib_io_no_host_title),
+                    color = Amber,
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Text(
+                    stringResource(R.string.lib_io_no_host_desc),
+                    color = PaperDim,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        } else {
+            visible.forEach { target ->
+                // "Host · wlan0": the interface name tells Wi-Fi from hotspot or Wi-Fi Direct.
+                val label = "$hostLabel · ${target.iface}"
+                val copyLabel = stringResource(R.string.lib_io_copy_field, label)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(onClickLabel = copyLabel) { onCopy(label, target.ip) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        LabelWithConfirm(label, confirmedLabel == label)
+                        HostAddress(target.ip)
+                    }
+                    IconButton(onClick = { onCopy(label, target.ip) }) {
+                        Icon(Icons.Outlined.ContentCopy, contentDescription = copyLabel, tint = PaperDim)
+                    }
+                }
+            }
         }
-    } else {
-        visible.forEach { target ->
-            val label = "$hostLabel · ${target.iface}"
-            Credential(label, target.ip, confirmedLabel) { onCopy(label, target.ip) }
-        }
-    }
-    Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        GhostButton(
-            stringResource(R.string.lib_io_refresh_hosts),
-            enabled = !refreshing,
-            fillMaxWidth = false,
-            onClick = onRefresh,
-        )
-        if (refreshing) {
-            CircularProgressIndicator(
-                modifier = Modifier.padding(start = 12.dp).size(16.dp),
-                color = Amber,
-                strokeWidth = 2.dp,
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            TonalButton(
+                stringResource(R.string.lib_io_refresh_hosts),
+                enabled = !refreshing,
+                fillMaxWidth = false,
+                icon = Icons.Outlined.Refresh,
+                onClick = onRefresh,
             )
+            if (refreshing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.padding(start = 12.dp).size(16.dp),
+                    color = Amber,
+                    strokeWidth = 2.dp,
+                )
+            }
         }
     }
 }
 
+/**
+ * The host address to type into the camera, Mono SemiBold Paper. One line that shrinks to fit
+ * (24sp down to 12sp): an IP has no break opportunity, and a split "192.168.1.2 / 4" invites a
+ * mistyped address. If even 12sp does not fit (200% font on a narrow screen), it wraps at 12sp
+ * instead: a one-line value would be cut off silently and could read as a valid but wrong address.
+ */
+@Composable
+private fun HostAddress(ip: String) {
+    val style = TextStyle(
+        color = Paper,
+        fontFamily = MonoFont,
+        fontSize = 24.sp,
+        lineHeight = 30.sp,
+        fontWeight = FontWeight.SemiBold,
+    )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val measurer = rememberTextMeasurer()
+        val density = LocalDensity.current
+        val maxPx = constraints.maxWidth
+        val fitsAtFloor = remember(ip, maxPx, density) {
+            measurer.measure(
+                ip,
+                style = style.copy(fontSize = IP_MIN_SIZE),
+                softWrap = false,
+                maxLines = 1,
+            ).size.width <= maxPx
+        }
+        if (fitsAtFloor) {
+            BasicText(
+                ip,
+                style = style,
+                maxLines = 1,
+                autoSize = TextAutoSize.StepBased(minFontSize = IP_MIN_SIZE, maxFontSize = 24.sp),
+            )
+        } else {
+            BasicText(ip, style = style.copy(fontSize = IP_MIN_SIZE, lineHeight = 16.sp))
+        }
+    }
+}
+
+private val IP_MIN_SIZE = 12.sp
+
+/**
+ * One copyable connection value: label (with the "copied" marker) over a Mono value, plus a copy
+ * button. The whole cell copies too. Sized to its content so port and user share a line; the
+ * value column yields width first so the copy button is never squeezed out.
+ */
 @Composable
 private fun Credential(
     label: String,
     value: String,
     confirmedLabel: String?,
+    modifier: Modifier = Modifier,
     onCopy: (String) -> Unit,
 ) {
     val copyLabel = stringResource(R.string.lib_io_copy_field, label)
     Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClickLabel = copyLabel) { onCopy(label) },
+        modifier.clickable(onClickLabel = copyLabel) { onCopy(label) },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
-            LabelWithConfirm(label, confirmedLabel == label)
-            Text(value, color = Paper, fontFamily = MonoFont, fontSize = 20.sp)
+        Column(Modifier.weight(1f, fill = false)) {
+            // The cell is content-sized, so the marker's slot is always reserved: showing
+            // "Copied" must not widen the cell and reflow port/user in the FlowRow.
+            LabelWithConfirm(label, confirmedLabel == label, reserveSpace = true)
+            Text(value, color = Paper, fontFamily = MonoFont, fontSize = 18.sp, lineHeight = 24.sp)
         }
         IconButton(onClick = { onCopy(label) }) {
             Icon(Icons.Outlined.ContentCopy, contentDescription = copyLabel, tint = PaperDim)
         }
     }
-    Spacer(Modifier.height(14.dp))
+}
+
+/** 12sp Medium PaperDim field label (5.16:1 on Surface1, 4.79:1 on the CardGlow corner). */
+@Composable
+private fun FieldLabel(text: String) {
+    Text(
+        text,
+        color = PaperDim,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        fontWeight = FontWeight.Medium,
+    )
 }
 
 /**
  * Field label with room for the "copied" marker beside it. Putting the marker on the label line
  * keeps the value from being reflowed or ellipsised when the confirmation appears.
+ *
+ * With [reserveSpace], an invisible copy of the marker (InlineConfirm's 16dp icon, 6dp gap and
+ * 12sp/16 text) holds its width at all times, so a content-sized parent never changes size.
  */
 @Composable
-private fun LabelWithConfirm(label: String, confirmed: Boolean) {
+private fun LabelWithConfirm(label: String, confirmed: Boolean, reserveSpace: Boolean = false) {
+    val copied = stringResource(R.string.common_copied)
     Row(verticalAlignment = Alignment.CenterVertically) {
-        SectionLabel(label)
-        InlineConfirm(
-            visible = confirmed,
-            text = stringResource(R.string.common_copied),
-            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp),
-        )
+        FieldLabel(label)
+        Box(Modifier.padding(start = 8.dp), contentAlignment = Alignment.CenterStart) {
+            if (reserveSpace) {
+                Row(
+                    Modifier.alpha(0f).clearAndSetSemantics { },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Spacer(Modifier.size(16.dp))
+                    Text(
+                        copied,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+            }
+            InlineConfirm(visible = confirmed, text = copied)
+        }
     }
 }
 
@@ -727,41 +904,20 @@ private fun LocalNetworkBlockedNotice(
     onGrant: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp)
-            .border(1.dp, PaperHairline, RoundedCornerShape(2.dp))
-            .padding(16.dp),
+    NoticeCard(
+        title = stringResource(R.string.ftp_local_network_title),
+        text = stringResource(R.string.ftp_local_network_desc),
+        icon = Icons.Outlined.WifiOff,
+        modifier = Modifier.padding(top = 12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Outlined.WifiOff,
-                contentDescription = null,
-                tint = Amber,
-                modifier = Modifier.size(18.dp),
-            )
-            Text(
-                stringResource(R.string.ftp_local_network_title),
-                color = Amber,
-                modifier = Modifier.padding(start = 8.dp),
-            )
-        }
-        Text(
-            stringResource(R.string.ftp_local_network_desc),
-            color = PaperDim,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
-        )
         if (!permanentlyBlocked) {
-            GhostButton(
+            TonalButton(
                 stringResource(R.string.ftp_local_network_grant),
                 fillMaxWidth = false,
                 onClick = onGrant,
             )
-            Spacer(Modifier.height(8.dp))
         }
-        GhostButton(
+        TonalButton(
             stringResource(R.string.lib_io_open_settings),
             fillMaxWidth = false,
             onClick = onOpenSettings,
@@ -771,33 +927,13 @@ private fun LocalNetworkBlockedNotice(
 
 @Composable
 private fun NotificationBlockedNotice(onOpenSettings: () -> Unit) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp)
-            .border(1.dp, PaperHairline, RoundedCornerShape(2.dp))
-            .padding(16.dp),
+    NoticeCard(
+        title = stringResource(R.string.lib_io_notif_blocked_title),
+        text = stringResource(R.string.lib_io_notif_blocked_desc),
+        icon = Icons.Outlined.NotificationsOff,
+        modifier = Modifier.padding(top = 12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Outlined.NotificationsOff,
-                contentDescription = null,
-                tint = Amber,
-                modifier = Modifier.size(18.dp),
-            )
-            Text(
-                stringResource(R.string.lib_io_notif_blocked_title),
-                color = Amber,
-                modifier = Modifier.padding(start = 8.dp),
-            )
-        }
-        Text(
-            stringResource(R.string.lib_io_notif_blocked_desc),
-            color = PaperDim,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
-        )
-        GhostButton(
+        TonalButton(
             stringResource(R.string.lib_io_open_settings),
             fillMaxWidth = false,
             onClick = onOpenSettings,
