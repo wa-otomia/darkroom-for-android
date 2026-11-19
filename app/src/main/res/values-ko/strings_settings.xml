@@ -134,11 +134,11 @@
     <string name="settings_ai_auth_api_key">API 키</string>
     <string name="settings_ai_auth_subscription">구독 로그인(실험적)</string>
     <string name="settings_ai_openai_no_subscription">OpenAI는 구독 로그인을 지원하지 않습니다. API 키를 사용하세요.</string>
-    <string name="settings_xai_fixed_endpoint">구독 모드에서는 항상 %1$s로 요청을 보냅니다. 아래의 API URL과 API 키는 사용되지 않습니다.</string>
+    <string name="settings_xai_fixed_endpoint">구독 모드에서는 항상 %1$s로 요청을 보냅니다. 사용자 지정 API URL과 API 키는 사용되지 않으며, 저장된 API 키는 API 키 방식을 위해 그대로 유지됩니다.</string>
     <string name="settings_xai_experimental_notice">실험적 기능이며 언제든지 작동하지 않을 수 있습니다. Grok을 사용하는 일반적인 방법은 여전히 API 키입니다.</string>
     <string name="settings_xai_responsibility">입력한 client ID를 사용할 권한이 있는지 확인하고 xAI 약관을 준수할 책임은 사용자에게 있습니다. 이 앱은 client ID를 포함하거나 제시하지 않습니다. 인증 페이지에 표시되는 앱 이름은 해당 client ID를 등록한 쪽이 정합니다.</string>
     <string name="settings_xai_billing_notice">사용 가능한 구독 등급과 사용량이 구독 한도에 포함되는지는 xAI가 결정합니다. 요청이 거부될 수 있으며, 구독 사용 한도를 초과한 부분은 xAI 선불 잔액에서 차감될 수 있습니다.</string>
-    <string name="settings_xai_client_id">Client ID</string>
+    <string name="settings_xai_client_id">클라이언트 ID</string>
     <string name="settings_xai_client_id_required">로그인하기 전에 client ID를 입력하고 AI 설정을 저장하세요.</string>
     <string name="settings_xai_client_id_locked">client ID를 변경하려면 먼저 로그아웃하세요.</string>
     <string name="settings_xai_client_id_locked_login">client ID를 변경하려면 먼저 로그인을 취소하세요.</string>
@@ -150,6 +150,9 @@
     <string name="settings_xai_verify_unlisted_host">이 주소는 앱이 인식하는 xAI 주소 목록에 없으므로 자동으로 열지 않습니다. 주소를 꼼꼼히 확인한 뒤 직접 여세요.</string>
     <string name="settings_xai_only_if_you_started">방금 본인이 직접 이 로그인을 시작한 경우에만 승인하세요.</string>
     <string name="settings_xai_open_login_page">로그인 페이지 열기</string>
+    <string name="settings_xai_save_hint">모델, 해상도, 품질, 클라이언트 ID는 저장 시 함께 적용됩니다.</string>
+    <string name="settings_xai_notice_details">자세히</string>
+    <string name="settings_xai_copy_address">주소 복사</string>
     <string name="settings_xai_copy_code">코드 복사</string>
     <string name="settings_xai_code_copied">코드를 복사했습니다</string>
     <string name="settings_xai_browser_unavailable">브라우저를 열 수 없습니다. 위 주소를 직접 열고 코드를 입력하세요.</string>

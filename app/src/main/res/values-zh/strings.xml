@@ -19,8 +19,8 @@
     <string name="gallery_desc">相机仅支持 JPG 格式，照片接收后会显示在这里。在设置中开启「收图后自动打印」，即可自动裁切为 2:3 并打印。AI 修图为可选项。</string>
     <string name="chip_grok_ok">AI 已就绪</string>
     <string name="chip_grok_off">AI 未配置</string>
-    <string name="chip_grok_not_signed_in">订阅未登录</string>
-    <string name="chip_grok_relogin">订阅需要重新登录</string>
+    <string name="chip_grok_not_signed_in">AI 订阅未登录</string>
+    <string name="chip_grok_relogin">AI 订阅需重新登录</string>
     <string name="chip_printer_ok">打印机已就绪</string>
     <string name="chip_printer_off">打印机未绑定</string>
     <string name="chip_autoprint">收图后自动打印</string>

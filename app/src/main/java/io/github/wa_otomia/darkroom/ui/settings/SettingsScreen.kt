@@ -389,6 +389,7 @@ fun SettingsScreen(
     }
     val xaiSignedOut = stringResource(R.string.settings_xai_signed_out_local)
     val xaiCodeCopied = stringResource(R.string.settings_xai_code_copied)
+    val xaiAddressCopied = stringResource(R.string.common_copied)
     val xaiBrowserUnavailable = stringResource(R.string.settings_xai_browser_unavailable)
     val needPresetText = stringResource(R.string.settings_automation_need_preset)
     val presetMissingText = stringResource(R.string.error_preset_missing)
@@ -802,14 +803,18 @@ fun SettingsScreen(
                                 modifier = Modifier.padding(bottom = 8.dp),
                             )
                         }
+                        // Subscription mode: the save commits the client ID, not an API URL or key.
                         Text(
-                            stringResource(R.string.settings_grok_save_hint),
+                            stringResource(
+                                if (grokSubscription) R.string.settings_xai_save_hint else R.string.settings_grok_save_hint,
+                            ),
                             color = PaperDim,
                             fontSize = 12.sp, lineHeight = 18.sp,
                             modifier = Modifier.padding(bottom = 12.dp),
                         )
                         if (grokSubscription) {
                             // A hint like the save hint above; the fixed address is a technical value in mono.
+                            // The API URL and key fields are not shown in this mode (the saved key is kept).
                             Text(
                                 monoValues(stringResource(R.string.settings_xai_fixed_endpoint, XAI_API_BASE), XAI_API_BASE),
                                 color = PaperDim,
@@ -822,6 +827,8 @@ fun SettingsScreen(
                                 supporting = when {
                                     grokSignedIn -> stringResource(R.string.settings_xai_client_id_locked)
                                     grokSigningIn -> stringResource(R.string.settings_xai_client_id_locked_login)
+                                    // Why "Start sign-in" is disabled (AIPV050-R01), next to the field.
+                                    storedForm?.clientId.isNullOrBlank() -> stringResource(R.string.settings_xai_client_id_required)
                                     else -> null
                                 },
                                 enabled = !grokSignedIn && !grokSigningIn,
@@ -863,59 +870,64 @@ fun SettingsScreen(
                                         scope.launch { snackbar.showSnackbar(xaiCodeCopied) }
                                     }
                                 },
-                            )
-                        }
-                        SettingsField(
-                            label = stringResource(R.string.grok_url),
-                            value = draft.url,
-                            supporting = if (normalizedGrokUrl != draft.url.trim()) {
-                                stringResource(R.string.settings_grok_url_preview, normalizedGrokUrl)
-                            } else {
-                                null
-                            },
-                            enabled = !grokSubscription,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
-                            onValueChange = {
-                                setCurrentDraft(draft.copy(url = it))
-                                probeResult = null
-                            },
-                        )
-                        SettingsField(
-                            label = stringResource(R.string.grok_key),
-                            value = draft.key,
-                            placeholder = stringResource(
-                                if (formProvider == AiProvider.GROK) {
-                                    R.string.grok_key_placeholder
-                                } else {
-                                    R.string.settings_ai_key_placeholder_openai
+                                onCopyUri = { uri ->
+                                    if (copyXaiVerificationUri(context, uri)) {
+                                        scope.launch { snackbar.showSnackbar(xaiAddressCopied) }
+                                    }
                                 },
-                            ),
-                            supporting = if (formKeySet) {
-                                stringResource(R.string.settings_grok_key_present)
-                            } else {
-                                stringResource(
-                                    if (formProvider == AiProvider.GROK) {
-                                        R.string.settings_grok_key_absent
-                                    } else {
-                                        R.string.settings_ai_key_absent_openai
-                                    },
-                                )
-                            },
-                            secret = true,
-                            enabled = !grokSubscription,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                            onValueChange = {
-                                setCurrentDraft(draft.copy(key = it))
-                                probeResult = null
-                            },
-                        )
-                        if (formKeySet) {
-                            TonalButton(
-                                text = stringResource(R.string.settings_grok_key_clear),
-                                enabled = !grokSubscription,
-                                fillMaxWidth = false,
-                                onClick = { showClearKey = true },
                             )
+                        } else {
+                            // API key mode (and OpenAI): subscription mode hides the API URL, the key and
+                            // its clear button (AIPV010-R05); the stored URL and key are left untouched.
+                            SettingsField(
+                                label = stringResource(R.string.grok_url),
+                                value = draft.url,
+                                supporting = if (normalizedGrokUrl != draft.url.trim()) {
+                                    stringResource(R.string.settings_grok_url_preview, normalizedGrokUrl)
+                                } else {
+                                    null
+                                },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
+                                onValueChange = {
+                                    setCurrentDraft(draft.copy(url = it))
+                                    probeResult = null
+                                },
+                            )
+                            SettingsField(
+                                label = stringResource(R.string.grok_key),
+                                value = draft.key,
+                                placeholder = stringResource(
+                                    if (formProvider == AiProvider.GROK) {
+                                        R.string.grok_key_placeholder
+                                    } else {
+                                        R.string.settings_ai_key_placeholder_openai
+                                    },
+                                ),
+                                supporting = if (formKeySet) {
+                                    stringResource(R.string.settings_grok_key_present)
+                                } else {
+                                    stringResource(
+                                        if (formProvider == AiProvider.GROK) {
+                                            R.string.settings_grok_key_absent
+                                        } else {
+                                            R.string.settings_ai_key_absent_openai
+                                        },
+                                    )
+                                },
+                                secret = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                                onValueChange = {
+                                    setCurrentDraft(draft.copy(key = it))
+                                    probeResult = null
+                                },
+                            )
+                            if (formKeySet) {
+                                TonalButton(
+                                    text = stringResource(R.string.settings_grok_key_clear),
+                                    fillMaxWidth = false,
+                                    onClick = { showClearKey = true },
+                                )
+                            }
                         }
 
                         Text(

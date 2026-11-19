@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -311,23 +312,53 @@ internal fun IdPhotoSheetPreview(
                     }
                 }
             }
+            // The chips sit on the photo grid, not on the white sheet margin: the grid's own edges
+            // (physical, like the sheet) plus the 10dp inset AspectCropper gives its frame chips.
+            val gridLeftDp = with(density) { ((layout.slots.minOfOrNull { it.left } ?: 0) * scale).toDp() }
+            val gridTopDp = with(density) { ((layout.slots.minOfOrNull { it.top } ?: 0) * scale).toDp() }
+            val gridRightDp = with(density) {
+                ((layout.sheetWidth - (layout.slots.maxOfOrNull { it.right } ?: layout.sheetWidth)) * scale).toDp()
+            }
+            val gridBottomDp = with(density) {
+                ((layout.sheetHeight - (layout.slots.maxOfOrNull { it.bottom } ?: layout.sheetHeight)) * scale).toDp()
+            }
             Box(
                 Modifier
                     .size(frameWDp, frameHDp)
                     .border(1.dp, if (enabled) SheetHairline else Amber.copy(alpha = 0.7f)),
             ) {
-                Text(
-                    overlay,
-                    color = Paper.copy(alpha = 0.9f),
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                        .background(Ink.copy(alpha = 0.72f), FrameChipShape)
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                )
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .absolutePadding(left = gridLeftDp, top = gridTopDp, right = gridRightDp, bottom = gridBottomDp),
+                ) {
+                    Text(
+                        overlay,
+                        color = Paper.copy(alpha = 0.9f),
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(10.dp)
+                            .background(Ink.copy(alpha = 0.72f), FrameChipShape)
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                    if (note != null) {
+                        Text(
+                            note,
+                            color = Amber,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(10.dp)
+                                .background(Ink.copy(alpha = 0.82f), FrameChipShape)
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
+                    }
+                }
                 if (decoding && cutout == null) {
                     AmberTrack(
                         ui = indeterminateUi(""),
@@ -347,20 +378,6 @@ internal fun IdPhotoSheetPreview(
                             .align(Alignment.Center)
                             .size(40.dp)
                             .semantics { contentDescription = busy },
-                    )
-                }
-                if (note != null) {
-                    Text(
-                        note,
-                        color = Amber,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(10.dp)
-                            .background(Ink.copy(alpha = 0.82f), FrameChipShape)
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
             }

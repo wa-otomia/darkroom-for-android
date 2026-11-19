@@ -142,7 +142,7 @@
     <string name="settings_ai_auth_api_key">API key</string>
     <string name="settings_ai_auth_subscription">Subscription (experimental)</string>
     <string name="settings_ai_openai_no_subscription">OpenAI does not support subscription sign-in. Use an API key.</string>
-    <string name="settings_xai_fixed_endpoint">Subscription mode always sends requests to %1$s. The API URL and API key below are not used.</string>
+    <string name="settings_xai_fixed_endpoint">Subscription mode always sends requests to %1$s. A custom API URL and API key are not used; a saved API key is kept for API key mode.</string>
     <string name="settings_xai_experimental_notice">Experimental: this may stop working at any time. An API key remains the regular way to use Grok.</string>
     <string name="settings_xai_responsibility">You are responsible for using a client ID you are authorized to use and for complying with xAI\'s terms. This app does not include or suggest any client ID. The app name shown on the authorization page is set by whoever registered that client ID.</string>
     <string name="settings_xai_billing_notice">xAI decides which subscription plans can be used and whether usage counts toward your subscription. Requests may be refused, and usage beyond the subscription allowance may be charged to your prepaid xAI credits.</string>
@@ -158,6 +158,9 @@
     <string name="settings_xai_verify_unlisted_host">This address is not on the app\'s list of xAI addresses, so it is not opened for you. Check the address carefully before opening it yourself.</string>
     <string name="settings_xai_only_if_you_started">Only approve the request if you started this sign-in yourself just now.</string>
     <string name="settings_xai_open_login_page">Open sign-in page</string>
+    <string name="settings_xai_save_hint">Model, resolution, quality and client ID take effect together when you save.</string>
+    <string name="settings_xai_notice_details">Details</string>
+    <string name="settings_xai_copy_address">Copy address</string>
     <string name="settings_xai_copy_code">Copy code</string>
     <string name="settings_xai_code_copied">Code copied</string>
     <string name="settings_xai_browser_unavailable">Couldn\'t open a browser. Open the address above yourself and enter the code.</string>

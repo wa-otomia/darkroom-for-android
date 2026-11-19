@@ -19,8 +19,8 @@
     <string name="gallery_desc">카메라는 JPG만 지원합니다. 수신한 사진은 여기에 표시됩니다. 설정에서 수신 후 자동 인쇄를 켜면 2:3으로 자른 뒤 자동으로 인쇄합니다. AI 편집은 선택 사항입니다.</string>
     <string name="chip_grok_ok">AI 준비됨</string>
     <string name="chip_grok_off">AI 미설정</string>
-    <string name="chip_grok_not_signed_in">구독 로그인 안 됨</string>
-    <string name="chip_grok_relogin">구독 다시 로그인 필요</string>
+    <string name="chip_grok_not_signed_in">AI 구독 로그인 안 됨</string>
+    <string name="chip_grok_relogin">AI 구독 다시 로그인 필요</string>
     <string name="chip_printer_ok">프린터 준비됨</string>
     <string name="chip_printer_off">프린터 미등록</string>
     <string name="chip_autoprint">수신 후 자동 인쇄</string>

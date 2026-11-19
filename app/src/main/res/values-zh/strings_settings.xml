@@ -134,11 +134,11 @@
     <string name="settings_ai_auth_api_key">API 密钥</string>
     <string name="settings_ai_auth_subscription">订阅登录（实验性）</string>
     <string name="settings_ai_openai_no_subscription">OpenAI 不支持订阅登录，请使用 API 密钥。</string>
-    <string name="settings_xai_fixed_endpoint">订阅模式固定向 %1$s 发送请求，不使用下方的接口地址与 API 密钥。</string>
+    <string name="settings_xai_fixed_endpoint">订阅模式固定向 %1$s 发送请求，不使用自定义接口地址与 API 密钥；已保存的 API 密钥会保留，供 API 密钥方式使用。</string>
     <string name="settings_xai_experimental_notice">实验性功能，可能随时失效。使用 Grok 的常规方式仍是 API 密钥。</string>
     <string name="settings_xai_responsibility">使用者须自行确保所填 client ID 已获授权使用，并自行遵守 xAI 的条款。本应用不内置、不提供任何 client ID。授权页显示的应用名称由该 client ID 的注册方决定。</string>
     <string name="settings_xai_billing_notice">哪些订阅层级可用、用量是否计入订阅额度由 xAI 决定。请求可能被拒绝，超出订阅用量的部分可能从 xAI 预付余额扣费。</string>
-    <string name="settings_xai_client_id">Client ID</string>
+    <string name="settings_xai_client_id">客户端 ID</string>
     <string name="settings_xai_client_id_required">请先填写 client ID 并保存 AI 设置，再开始登录。</string>
     <string name="settings_xai_client_id_locked">已登录时不能修改 client ID，请先登出。</string>
     <string name="settings_xai_client_id_locked_login">正在登录时不能修改 client ID，请先取消登录。</string>
@@ -150,6 +150,9 @@
     <string name="settings_xai_verify_unlisted_host">该地址不在本应用认可的 xAI 地址列表中，因此不会自动打开。请仔细核对地址后自行打开。</string>
     <string name="settings_xai_only_if_you_started">仅在本人刚刚发起此次登录时批准。</string>
     <string name="settings_xai_open_login_page">打开登录页</string>
+    <string name="settings_xai_save_hint">模型、分辨率、质量与客户端 ID 在保存时一并生效。</string>
+    <string name="settings_xai_notice_details">说明</string>
+    <string name="settings_xai_copy_address">复制地址</string>
     <string name="settings_xai_copy_code">复制代码</string>
     <string name="settings_xai_code_copied">已复制代码</string>
     <string name="settings_xai_browser_unavailable">无法打开浏览器。请自行打开上方地址并输入代码。</string>

@@ -134,11 +134,11 @@
     <string name="settings_ai_auth_api_key">API キー</string>
     <string name="settings_ai_auth_subscription">サブスクリプションでサインイン（試験運用）</string>
     <string name="settings_ai_openai_no_subscription">OpenAI はサブスクリプションでのサインインに対応していません。API キーを使用してください。</string>
-    <string name="settings_xai_fixed_endpoint">サブスクリプションモードでは常に %1$s にリクエストを送信します。下の API URL と API キーは使用されません。</string>
+    <string name="settings_xai_fixed_endpoint">サブスクリプションモードでは常に %1$s にリクエストを送信します。カスタムの API URL と API キーは使用されません。保存済みの API キーは API キー方式用にそのまま残ります。</string>
     <string name="settings_xai_experimental_notice">試験運用中の機能で、いつでも使えなくなる可能性があります。Grok の通常の利用方法は引き続き API キーです。</string>
     <string name="settings_xai_responsibility">入力する client ID の使用権限があることの確認と、xAI の規約の遵守は利用者の責任です。本アプリは client ID を同梱・提示しません。認可ページに表示されるアプリ名は、その client ID の登録者によって決まります。</string>
     <string name="settings_xai_billing_notice">利用できるサブスクリプションのプランや、利用量がサブスクリプションの枠に含まれるかどうかは xAI が決めます。リクエストが拒否されることがあり、サブスクリプションの利用枠を超えた分は xAI のプリペイド残高から差し引かれる場合があります。</string>
-    <string name="settings_xai_client_id">Client ID</string>
+    <string name="settings_xai_client_id">クライアント ID</string>
     <string name="settings_xai_client_id_required">サインインする前に client ID を入力し、AI の設定を保存してください。</string>
     <string name="settings_xai_client_id_locked">client ID を変更するには、先にサインアウトしてください。</string>
     <string name="settings_xai_client_id_locked_login">client ID を変更するには、先にサインインをキャンセルしてください。</string>
@@ -150,6 +150,9 @@
     <string name="settings_xai_verify_unlisted_host">このアドレスは本アプリが認識する xAI のアドレスではないため、自動では開きません。アドレスをよく確認してからご自身で開いてください。</string>
     <string name="settings_xai_only_if_you_started">このサインインを今ご自身で開始した場合にのみ承認してください。</string>
     <string name="settings_xai_open_login_page">サインインページを開く</string>
+    <string name="settings_xai_save_hint">モデル、解像度、品質、クライアント ID は保存時にまとめて適用されます。</string>
+    <string name="settings_xai_notice_details">詳細</string>
+    <string name="settings_xai_copy_address">アドレスをコピー</string>
     <string name="settings_xai_copy_code">コードをコピー</string>
     <string name="settings_xai_code_copied">コードをコピーしました</string>
     <string name="settings_xai_browser_unavailable">ブラウザを開けませんでした。上のアドレスをご自身で開き、コードを入力してください。</string>

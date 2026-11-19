@@ -13,8 +13,8 @@
     <string name="gallery_desc">Cameras send JPG only. New files appear here. Turn on print-on-receive in Settings to crop to 2:3 and print automatically. AI editing is optional.</string>
     <string name="chip_grok_ok">AI ready</string>
     <string name="chip_grok_off">AI not configured</string>
-    <string name="chip_grok_not_signed_in">Subscription not signed in</string>
-    <string name="chip_grok_relogin">Subscription sign-in expired</string>
+    <string name="chip_grok_not_signed_in">AI: subscription not signed in</string>
+    <string name="chip_grok_relogin">AI: sign in again</string>
     <string name="chip_printer_ok">Printer ready</string>
     <string name="chip_printer_off">Printer not bound</string>
     <string name="chip_autoprint">Print on receive</string>
