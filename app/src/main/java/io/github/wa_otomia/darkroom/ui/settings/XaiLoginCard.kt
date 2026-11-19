@@ -40,8 +40,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -103,6 +105,11 @@ internal fun rememberXaiUi(): XaiUiEntryPoint {
  *
  * The start button is the app's own primary button: no xAI or Grok mark, never styled as an
  * official "Sign in with" button. Side-effect free apart from the callbacks.
+ *
+ * TalkBack: each state swaps the button that was just tapped out of composition, and the flow
+ * is asynchronous (the user is in the browser while the code runs down), so every state's
+ * message is a polite live region: "Requesting…", the issued code (once, not the per-second
+ * countdown), the failed / expired / denied / cancelled / interrupted line and "Signed in".
  */
 @Composable
 internal fun XaiLoginCard(
@@ -134,7 +141,13 @@ internal fun XaiLoginCard(
         when {
             state is XaiLoginUiState.Starting -> {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.settings_xai_starting), color = Paper, fontSize = 14.sp, lineHeight = 20.sp)
+                    Text(
+                        stringResource(R.string.settings_xai_starting),
+                        color = Paper,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    )
                     AmberTrack(percent = 0, indeterminate = true, modifier = Modifier.fillMaxWidth(), height = 3.dp)
                 }
                 TonalButton(
@@ -153,6 +166,7 @@ internal fun XaiLoginCard(
                         stringResource(R.string.settings_xai_signed_in, accountLabel)
                     },
                     dot = Ok,
+                    modifier = Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
                 )
                 TonalButton(
                     text = stringResource(R.string.settings_xai_sign_out),
@@ -229,7 +243,8 @@ private fun AwaitingUser(
             verticalArrangement = Arrangement.spacedBy(4.dp),
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {
-            // Large mono, kept left-to-right in RTL languages (R03).
+            // Large mono, kept left-to-right in RTL languages (R03). Announced once when it arrives;
+            // the countdown below stays outside any live region so it is not re-read every second.
             SelectionContainer {
                 Text(
                     state.userCode,
@@ -238,7 +253,10 @@ private fun AwaitingUser(
                         fontFamily = MonoFont,
                         textDirection = TextDirection.Ltr,
                     ),
-                    modifier = Modifier.semantics { contentDescription = "$label: $spoken" },
+                    modifier = Modifier.semantics {
+                        contentDescription = "$label: $spoken"
+                        liveRegion = LiveRegionMode.Polite
+                    },
                 )
             }
             IconCircleButton(
@@ -303,12 +321,13 @@ private fun AwaitingUser(
 
 /**
  * A one-line status or caution inside the fold, without a box of its own: an 18dp icon and 14sp
- * text in [color] (Amber 8.10:1 or PaperDim 5.16:1 on Surface1), read as one TalkBack item.
+ * text in [color] (Amber 8.10:1 or PaperDim 5.16:1 on Surface1), read as one TalkBack item and
+ * announced politely when it appears or changes (it replaces the button the user just tapped).
  */
 @Composable
 private fun StatusLine(text: String, color: Color) {
     Row(
-        Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
+        Modifier.fillMaxWidth().semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
         verticalAlignment = Alignment.Top,
     ) {
         Icon(
