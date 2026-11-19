@@ -1,6 +1,7 @@
 package io.github.wa_otomia.darkroom.core
 
 const val SKIP_EDIT_NO_KEY = "edit:no_key"
+const val SKIP_EDIT_RELOGIN = "edit:relogin_required"
 const val SKIP_EDIT_NO_PRESET = "edit:no_preset"
 const val SKIP_WATERMARK_NO_CONFIG = "watermark:no_config"
 const val SKIP_WATERMARK_NO_PRINT = "watermark:no_print"
@@ -17,6 +18,8 @@ data class AutomationPlan(
  * Step-by-step ingest pipeline: ① AI edit → ② watermark → ③ print.
  * A disabled switch is omitted. An enabled switch whose conditions fail is
  * skipped with a reason string; later steps still run.
+ * [aiReloginRequired] picks [SKIP_EDIT_RELOGIN] instead of [SKIP_EDIT_NO_KEY] when the
+ * subscription credential was dropped after a rejected refresh (AUTG030-R02).
  */
 fun planAutomation(
     autoEdit: Boolean,
@@ -26,6 +29,7 @@ fun planAutomation(
     aiConfigured: Boolean,
     watermarkConfigured: Boolean,
     printerBound: Boolean,
+    aiReloginRequired: Boolean = false,
 ): AutomationPlan {
     val skipped = mutableListOf<String>()
 
@@ -34,7 +38,7 @@ fun planAutomation(
         false
     } else {
         if (!hasPreset) skipped += SKIP_EDIT_NO_PRESET
-        if (!aiConfigured) skipped += SKIP_EDIT_NO_KEY
+        if (!aiConfigured) skipped += if (aiReloginRequired) SKIP_EDIT_RELOGIN else SKIP_EDIT_NO_KEY
         hasPreset && aiConfigured
     }
 

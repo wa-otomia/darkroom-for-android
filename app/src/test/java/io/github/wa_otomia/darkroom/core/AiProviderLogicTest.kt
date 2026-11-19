@@ -109,6 +109,43 @@ class AiProviderLogicTest {
     }
 
     @Test
+    fun publicSubscriptionStateHidesKeyAndTokens() {
+        val settings = AiSettings(
+            AiProvider.GROK,
+            mapOf(
+                AiProvider.GROK to grokEnv.copy(apiKey = "xai-secretkey123"),
+                AiProvider.OPENAI to openaiEnv,
+            ),
+        )
+        val signedIn = toPublicAi(
+            settings,
+            grokAuth = SubscriptionSnapshot(AiAuthMode.SUBSCRIPTION, "test-client-id", true, false, "a@example.com"),
+        )
+        val grok = signedIn.byProvider.getValue(AiProvider.GROK)
+        assertEquals(AiAuthMode.SUBSCRIPTION, grok.authMode)
+        assertEquals(AiCredentialState.READY, grok.credential)
+        assertTrue(signedIn.credentialReady)
+        assertEquals("a@example.com", grok.accountLabel)
+        assertTrue(grok.keySet)
+        assertFalse(signedIn.toString().contains("xai-secretkey123"))
+        assertFalse(signedIn.toString().contains("sk-envkey"))
+        // OpenAI never gets the Grok subscription snapshot.
+        assertEquals(AiAuthMode.API_KEY, signedIn.byProvider.getValue(AiProvider.OPENAI).authMode)
+
+        val notSignedIn = toPublicAi(
+            settings,
+            grokAuth = SubscriptionSnapshot(AiAuthMode.SUBSCRIPTION, "test-client-id", false, true, null),
+        )
+        assertEquals(AiCredentialState.RELOGIN_REQUIRED, notSignedIn.credential)
+        assertFalse(notSignedIn.credentialReady)
+        assertTrue(notSignedIn.keySet)
+
+        val legacy = toPublicAi(settings)
+        assertEquals(AiCredentialState.READY, legacy.credential)
+        assertEquals(AiAuthMode.API_KEY, legacy.byProvider.getValue(AiProvider.GROK).authMode)
+    }
+
+    @Test
     fun normalizeBaseUrlBothProviders() {
         assertEquals(DEFAULT_XAI_BASE_URL, normalizeAiBaseUrl("", DEFAULT_XAI_BASE_URL))
         assertEquals(DEFAULT_XAI_BASE_URL, normalizeAiBaseUrl("  ", DEFAULT_XAI_BASE_URL))

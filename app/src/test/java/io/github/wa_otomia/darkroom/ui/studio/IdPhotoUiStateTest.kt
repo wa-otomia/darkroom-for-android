@@ -235,25 +235,25 @@ class IdPhotoUiStateTest {
     @Test
     fun canCutOutLocalNeedsNoKeyAndAnyJobBlocks() {
         // AI: needs a key.
-        assertTrue(idCanCutOut(local = false, keySet = true, busy = false))
-        assertFalse(idCanCutOut(local = false, keySet = false, busy = false))
+        assertTrue(idCanCutOut(local = false, aiReady = true, busy = false))
+        assertFalse(idCanCutOut(local = false, aiReady = false, busy = false))
         // On device: no key needed.
-        assertTrue(idCanCutOut(local = true, keySet = false, busy = false))
-        assertTrue(idCanCutOut(local = true, keySet = true, busy = false))
+        assertTrue(idCanCutOut(local = true, aiReady = false, busy = false))
+        assertTrue(idCanCutOut(local = true, aiReady = true, busy = false))
         // Any job on the photo (hidden ones included) blocks both modes.
         for (local in listOf(false, true)) {
             for (keySet in listOf(false, true)) {
-                assertFalse(idCanCutOut(local = local, keySet = keySet, busy = true))
+                assertFalse(idCanCutOut(local = local, aiReady = keySet, busy = true))
             }
         }
     }
 
     @Test
     fun needKeyHintOnlyForAiWithoutKey() {
-        assertTrue(idShowNeedKey(local = false, keySet = false))
-        assertFalse(idShowNeedKey(local = false, keySet = true))
-        assertFalse(idShowNeedKey(local = true, keySet = false))
-        assertFalse(idShowNeedKey(local = true, keySet = true))
+        assertTrue(idShowNeedKey(local = false, aiReady = false))
+        assertFalse(idShowNeedKey(local = false, aiReady = true))
+        assertFalse(idShowNeedKey(local = true, aiReady = false))
+        assertFalse(idShowNeedKey(local = true, aiReady = true))
     }
 
     @Test

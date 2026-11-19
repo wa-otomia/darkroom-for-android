@@ -70,6 +70,7 @@ import coil.size.Precision
 import coil.size.Scale
 import coil.size.Size
 import io.github.wa_otomia.darkroom.R
+import io.github.wa_otomia.darkroom.core.AiCredentialState
 import io.github.wa_otomia.darkroom.data.catalog.IdMaskFailure
 import io.github.wa_otomia.darkroom.core.ID_MASK_OFFSET_MAX_PX
 import io.github.wa_otomia.darkroom.core.ID_PHOTO_PRESETS
@@ -332,7 +333,7 @@ internal fun IdMaskJobRow(job: IdMaskJobUi, elsewhere: String?) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun IdPhotoProcessSection(
-    keySet: Boolean,
+    credential: AiCredentialState,
     local: Boolean,
     localSwitchEnabled: Boolean,
     hasMask: Boolean,
@@ -369,9 +370,17 @@ internal fun IdPhotoProcessSection(
                 enabled = localSwitchEnabled,
                 onCheckedChange = onLocalChange,
             )
-            if (idShowNeedKey(local = local, keySet = keySet)) {
+            // An on-device cut-out never needs a credential (EDID040-R10); an AI one needs an API key
+            // or a signed-in subscription (AIPV010-R04), and the hint names which is missing.
+            if (idShowNeedKey(local = local, aiReady = credential == AiCredentialState.READY)) {
                 NoticeCard(
-                    text = stringResource(R.string.grok_need_key),
+                    text = stringResource(
+                        when (credential) {
+                            AiCredentialState.NOT_SIGNED_IN -> R.string.studio_id_need_subscription_login
+                            AiCredentialState.RELOGIN_REQUIRED -> R.string.studio_id_need_relogin
+                            else -> R.string.grok_need_key
+                        },
+                    ),
                     modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
                     actions = {
                         TonalButton(

@@ -1,6 +1,9 @@
 package io.github.wa_otomia.darkroom.data.printer
 
 import android.content.Context
+import io.github.wa_otomia.darkroom.core.AiCredentialState
+import io.github.wa_otomia.darkroom.core.aiNotReadyMessage
+import io.github.wa_otomia.darkroom.core.sanitizeAiSecrets
 import io.github.wa_otomia.darkroom.core.Framing
 import io.github.wa_otomia.darkroom.core.ID_MASK_MSG_MISSING
 import io.github.wa_otomia.darkroom.core.OrientedSize
@@ -429,7 +432,7 @@ class PrintQueue @Inject constructor(
 
     suspend fun applyPreset(photoId: String, source: String, presetId: String): String {
         val preset = settings.readPresets().presets.find { it.id == presetId } ?: error("预设不存在")
-        if (!settings.aiConfigured()) error("未配置 AI 钥匙。去设置页填入 API key 后再修图。")
+        settings.aiCredentialState().takeIf { it != AiCredentialState.READY }?.let { error(aiNotReadyMessage(it, "修图")) }
         val file = catalog.sourceFile(photoId, source)
         val jpeg = grok.edit(file.readBytes(), preset.prompt, photoId, "edit")
         return catalog.saveEdit(
@@ -446,7 +449,7 @@ class PrintQueue @Inject constructor(
         if (presetId.isNotEmpty()) settings.setLastPreset(presetId)
         val presetPrompt = store.presets.find { it.id == presetId }?.prompt.orEmpty()
         val combined = combineGeneratePrompt(presetPrompt, prompt)
-        if (!settings.aiConfigured()) error("未配置 AI 钥匙。去设置页填入 API key 后再生成。")
+        settings.aiCredentialState().takeIf { it != AiCredentialState.READY }?.let { error(aiNotReadyMessage(it, "生成")) }
         val file = catalog.sourceFile(photoId, source)
         val jpeg = grok.edit(file.readBytes(), combined, photoId, "generate")
         return catalog.saveGenerated(photoId, jpeg, combined)
@@ -457,7 +460,7 @@ class PrintQueue @Inject constructor(
         val preset = store.presets.find { it.id == presetId }
         val presetPrompt = preset?.prompt.orEmpty()
         val combined = combineGeneratePrompt(presetPrompt, prompt)
-        if (!settings.aiConfigured()) error("未配置 AI 钥匙。去设置页填入 API key 后再修图。")
+        settings.aiCredentialState().takeIf { it != AiCredentialState.READY }?.let { error(aiNotReadyMessage(it, "修图")) }
         val file = catalog.sourceFile(photoId, source)
         val jpeg = grok.edit(file.readBytes(), combined, photoId, "edit")
         return catalog.saveEdit(
@@ -526,7 +529,7 @@ class PrintQueue @Inject constructor(
             if (usedPreset) {
                 tracker.startPhase("editing")
                 emit(photoId, "editing")
-                if (!settings.aiConfigured()) error("未配置 AI 钥匙。去设置页填入 API key 后再修图。")
+                settings.aiCredentialState().takeIf { it != AiCredentialState.READY }?.let { error(aiNotReadyMessage(it, "修图")) }
                 val store = settings.readPresets()
                 val preset = store.presets.find { it.id == presetId }
                 val presetPrompt = preset?.prompt.orEmpty()
@@ -697,7 +700,7 @@ class PrintQueue @Inject constructor(
             throw e
         } catch (e: Exception) {
             val uncertain = printer?.jobCreationAttempted == true && printer?.remoteJobSettled != true
-            val message = e.message ?: e.toString()
+            val message = sanitizeAiSecrets(e.message ?: e.toString())
             if (uncertain) _pauseReason.value = message
             catalog.recordPrint(
                 photoId,
@@ -802,7 +805,7 @@ class PrintQueue @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            val message = e.message ?: e.toString()
+            val message = sanitizeAiSecrets(e.message ?: e.toString())
             val outcome = mapPrintWorkerFailure(
                 cancellation = false,
                 cancelRequested = false, // Intent does not prove that the printer canceled a remote job.

@@ -14,6 +14,9 @@ import io.github.wa_otomia.darkroom.core.idMaskVerdictMessage
 import io.github.wa_otomia.darkroom.core.resolvePhotoSource
 import io.github.wa_otomia.darkroom.core.sanitizeAiSecrets
 import io.github.wa_otomia.darkroom.core.validateLocalMaskLuma
+import io.github.wa_otomia.darkroom.core.AiCredentialState
+import io.github.wa_otomia.darkroom.core.aiNotReadyMessage
+import io.github.wa_otomia.darkroom.core.idMaskNotReadyMessage
 import io.github.wa_otomia.darkroom.data.catalog.CatalogRepository
 import io.github.wa_otomia.darkroom.data.ai.AiImageClient
 import io.github.wa_otomia.darkroom.data.imaging.ImagePipeline
@@ -127,8 +130,8 @@ class AiJobs @Inject constructor(
     /**
      * Starts a person-matte job for one version (EDID040, AIJB010-R04). Returns the job id, or null
      * when any AI job row for [photoId] exists (hidden or still in its finished/failed tail).
-     * Without [local], throws [IllegalStateException] with [ID_MASK_MSG_NEED_KEY] when no AI key is
-     * configured.
+     * Without [local], throws [IllegalStateException] with [ID_MASK_MSG_NEED_KEY] (or the
+     * subscription variant from [idMaskNotReadyMessage]) when the AI credential is not ready.
      *
      * [local] (EDID040-R10/R11) is frozen here: the job segments on this device with
      * [LocalSelfieSegmenter], needs no key, sends no provider request and uploads nothing,
@@ -139,8 +142,11 @@ class AiJobs @Inject constructor(
      * result.
      */
     fun enqueueMask(photoId: String, source: String, local: Boolean = false): String? {
-        // D8 gate: no key means no job and no request. The AI job re-checks at execution time.
-        if (!local && !settings.aiConfigured()) error(ID_MASK_MSG_NEED_KEY)
+        // D8 gate: no ready credential means no job and no request. The AI job re-checks at
+        // execution time. A local cut-out never needs a credential (EDID040-R10/R11).
+        if (!local) {
+            settings.aiCredentialState().takeIf { it != AiCredentialState.READY }?.let { error(idMaskNotReadyMessage(it)) }
+        }
         val versionKey = resolvePhotoSource(source)
         val id = UUID.randomUUID().toString()
         val row = AiJob(
@@ -184,7 +190,9 @@ class AiJobs @Inject constructor(
             try {
                 // EDID040-R09: a new attempt drops the version's last failure record.
                 withContext(Dispatchers.IO) { runCatching { catalog.clearIdMaskFailure(photoId, versionKey) } }
-                if (!local && !settings.aiConfigured()) error(ID_MASK_MSG_NEED_KEY)
+                if (!local) {
+                    settings.aiCredentialState().takeIf { it != AiCredentialState.READY }?.let { error(idMaskNotReadyMessage(it)) }
+                }
                 val raw = withContext(Dispatchers.IO) {
                     val file = catalog.sourceFile(photoId, versionKey)
                     if (!file.isFile) error(ID_MASK_MSG_VERSION_GONE)
@@ -354,7 +362,9 @@ class AiJobs @Inject constructor(
                 val preset = store.presets.find { it.id == presetId }
                 val presetPrompt = preset?.prompt.orEmpty()
                 val combined = combineGeneratePrompt(presetPrompt, prompt)
-                if (!settings.aiConfigured()) error("未配置 AI 钥匙。去设置页填入 API key 后再${if (kind == AiKind.Generate) "生成" else "修图"}。")
+                settings.aiCredentialState().takeIf { it != AiCredentialState.READY }?.let {
+                    error(aiNotReadyMessage(it, if (kind == AiKind.Generate) "生成" else "修图"))
+                }
                 val file = catalog.sourceFile(photoId, resolvePhotoSource(source))
                 val raw = file.readBytes()
                 val upload = if (appliedFraming != null) {
@@ -410,7 +420,7 @@ class AiJobs @Inject constructor(
                 _jobs.update { list -> list.filter { it.id != id } }
                 _events.tryEmit(StudioJobEvent.Failed(photoId, kind.action, ""))
             } catch (e: Exception) {
-                val message = e.message ?: e.toString()
+                val message = sanitizeAiSecrets(e.message ?: e.toString())
                 tracker.fail(message)
                 publish(id, tracker)
                 _events.tryEmit(StudioJobEvent.Failed(photoId, kind.action, message))

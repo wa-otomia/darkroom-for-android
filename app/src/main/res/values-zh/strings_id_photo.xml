@@ -95,4 +95,8 @@
     <string name="id_error_mask_background_kept">抠图失败：返回图保留了原背景，不是蒙版。</string>
     <string name="id_error_mask_shaded">抠图失败：返回图是带明暗的灰度图，不是蒙版。</string>
     <string name="id_error_mask_local_failed">本地抠图失败。请重试，或关闭“本地抠图”改用 AI 抠图。</string>
+
+    <!-- ID photo cut-out gate: xAI subscription -->
+    <string name="studio_id_need_subscription_login">抠图需要登录 xAI 订阅，请在设置中登录。</string>
+    <string name="studio_id_need_relogin">xAI 订阅登录已失效，请在设置中重新登录后再抠图。</string>
 </resources>

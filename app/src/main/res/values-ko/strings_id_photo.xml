@@ -95,4 +95,8 @@
     <string name="id_error_mask_background_kept">오려내기 실패: 결과에 원래 배경이 남아 있어 마스크가 아닙니다.</string>
     <string name="id_error_mask_shaded">오려내기 실패: 결과가 음영이 있는 흑백 이미지라 마스크가 아닙니다.</string>
     <string name="id_error_mask_local_failed">기기에서 오려내지 못했습니다. 다시 시도하거나 \'기기에서 오려내기\'를 끄고 AI를 사용하세요.</string>
+
+    <!-- ID photo cut-out gate: xAI subscription -->
+    <string name="studio_id_need_subscription_login">오려내기에는 xAI 구독 로그인이 필요합니다. 설정에서 로그인하세요.</string>
+    <string name="studio_id_need_relogin">xAI 구독 로그인이 만료되었습니다. 오려내려면 설정에서 다시 로그인하세요.</string>
 </resources>
