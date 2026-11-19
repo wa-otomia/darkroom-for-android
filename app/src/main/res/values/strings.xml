@@ -13,6 +13,8 @@
     <string name="gallery_desc">Cameras send JPG only. New files appear here. Turn on print-on-receive in Settings to crop to 2:3 and print automatically. AI editing is optional.</string>
     <string name="chip_grok_ok">AI ready</string>
     <string name="chip_grok_off">AI not configured</string>
+    <string name="chip_grok_not_signed_in">AI: subscription not signed in</string>
+    <string name="chip_grok_relogin">AI: sign in again</string>
     <string name="chip_printer_ok">Printer ready</string>
     <string name="chip_printer_off">Printer not bound</string>
     <string name="chip_autoprint">Print on receive</string>
@@ -294,4 +296,14 @@
     <string name="settings_keep_alive_hint">Keeps the app running in the background so FTP and auto-print keep working.</string>
     <string name="keep_alive_channel">Keep-alive</string>
     <string name="keep_alive_notification">Keeping Darkroom running</string>
+
+    <!-- AI readiness: xAI subscription not signed in / sign-in expired, and their job errors -->
+    <string name="ai_need_subscription_login">The xAI subscription is not signed in. Sign in under AI image processing in Settings.</string>
+    <string name="ai_need_relogin">The xAI subscription sign-in has expired. Sign in again in Settings.</string>
+    <string name="error_xai_not_signed_in">The xAI subscription is not signed in. Sign in in Settings, then try again.</string>
+    <string name="error_xai_relogin">The xAI subscription sign-in has expired. Sign in again in Settings.</string>
+    <string name="error_xai_rejected">xAI rejected the subscription credential. Try again later, or sign in again.</string>
+    <string name="error_xai_refresh_network">Couldn\'t renew the xAI subscription credential: the network or the service is unavailable.</string>
+    <string name="error_xai_forbidden">xAI refused the subscription request (403): the plan does not support it, or the account or client ID is not authorized for API access. You can use an API key instead.</string>
+    <string name="error_xai_quota">The xAI subscription usage is used up or limited (429).</string>
 </resources>

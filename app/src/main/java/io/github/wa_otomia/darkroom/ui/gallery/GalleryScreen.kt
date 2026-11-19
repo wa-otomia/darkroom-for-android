@@ -107,6 +107,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.wa_otomia.darkroom.R
+import io.github.wa_otomia.darkroom.core.AiCredentialState
 import io.github.wa_otomia.darkroom.core.EditJobOverlay
 import io.github.wa_otomia.darkroom.core.GalleryItem
 import io.github.wa_otomia.darkroom.core.OverlayKind
@@ -209,7 +210,7 @@ fun GalleryScreen(
     photos: List<PhotoMeta>,
     transfers: List<IncomingTransfer>,
     aiJobs: List<AiJob>,
-    grokReady: Boolean,
+    grokCredential: AiCredentialState,
     printerReady: Boolean,
     autoEdit: Boolean,
     autoWatermark: Boolean,
@@ -587,7 +588,7 @@ fun GalleryScreen(
                         GalleryHeader(
                             count = items.size,
                             empty = items.isEmpty(),
-                            grokReady = grokReady,
+                            grokCredential = grokCredential,
                             printerReady = printerReady,
                             autoEdit = autoEdit,
                             autoWatermark = autoWatermark,
@@ -714,7 +715,7 @@ fun GalleryScreen(
 private fun GalleryHeader(
     count: Int,
     empty: Boolean,
-    grokReady: Boolean,
+    grokCredential: AiCredentialState,
     printerReady: Boolean,
     autoEdit: Boolean,
     autoWatermark: Boolean,
@@ -735,7 +736,16 @@ private fun GalleryHeader(
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            StatusChip(grokReady, stringResource(R.string.chip_grok_ok), stringResource(R.string.chip_grok_off)) { onSettings("grok") }
+            val grokOffText = when (grokCredential) {
+                AiCredentialState.NOT_SIGNED_IN -> R.string.chip_grok_not_signed_in
+                AiCredentialState.RELOGIN_REQUIRED -> R.string.chip_grok_relogin
+                else -> R.string.chip_grok_off
+            }
+            StatusChip(
+                grokCredential == AiCredentialState.READY,
+                stringResource(R.string.chip_grok_ok),
+                stringResource(grokOffText),
+            ) { onSettings("grok") }
             StatusChip(printerReady, stringResource(R.string.chip_printer_ok), stringResource(R.string.chip_printer_off)) { onSettings("printer") }
             val autoOn = autoEdit || autoWatermark || autoPrint
             val autoParts = buildList {

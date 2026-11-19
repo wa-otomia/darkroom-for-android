@@ -97,4 +97,8 @@
     <string name="id_error_mask_background_kept">Cut-out failed: the reply kept the original background, so it is not a mask.</string>
     <string name="id_error_mask_shaded">Cut-out failed: the reply was a shaded greyscale image, not a mask.</string>
     <string name="id_error_mask_local_failed">On-device cut-out failed. Try again, or turn off “Cut out on this device” to use AI.</string>
+
+    <!-- ID photo cut-out gate: xAI subscription -->
+    <string name="studio_id_need_subscription_login">Cut-out needs the xAI subscription sign-in. Sign in in Settings.</string>
+    <string name="studio_id_need_relogin">The xAI subscription sign-in has expired. Sign in again in Settings to cut out.</string>
 </resources>

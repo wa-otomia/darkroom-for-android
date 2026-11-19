@@ -19,6 +19,8 @@
     <string name="gallery_desc">相机仅支持 JPG 格式，照片接收后会显示在这里。在设置中开启「收图后自动打印」，即可自动裁切为 2:3 并打印。AI 修图为可选项。</string>
     <string name="chip_grok_ok">AI 已就绪</string>
     <string name="chip_grok_off">AI 未配置</string>
+    <string name="chip_grok_not_signed_in">AI 订阅未登录</string>
+    <string name="chip_grok_relogin">AI 订阅需重新登录</string>
     <string name="chip_printer_ok">打印机已就绪</string>
     <string name="chip_printer_off">打印机未绑定</string>
     <string name="chip_autoprint">收图后自动打印</string>
@@ -298,4 +300,14 @@
     <string name="settings_keep_alive_hint">保持应用在后台运行，以便 FTP 与自动打印持续工作。</string>
     <string name="keep_alive_channel">保活</string>
     <string name="keep_alive_notification">保持 Darkroom 运行中</string>
+
+    <!-- AI readiness: xAI subscription not signed in / sign-in expired, and their job errors -->
+    <string name="ai_need_subscription_login">xAI 订阅未登录。请在设置的「AI 图片处理」中登录。</string>
+    <string name="ai_need_relogin">xAI 订阅登录已失效，请在设置中重新登录。</string>
+    <string name="error_xai_not_signed_in">xAI 订阅未登录。请在设置中登录后再试。</string>
+    <string name="error_xai_relogin">xAI 订阅登录已失效，请在设置中重新登录。</string>
+    <string name="error_xai_rejected">xAI 拒绝了订阅凭据，请稍后重试或重新登录。</string>
+    <string name="error_xai_refresh_network">无法更新 xAI 订阅凭据：网络不可用或服务暂时不可用。</string>
+    <string name="error_xai_forbidden">xAI 拒绝了订阅请求（403）：订阅层级不支持，或该账号或 client ID 未获 API 访问授权，可改用 API 密钥。</string>
+    <string name="error_xai_quota">xAI 订阅用量已用尽或受限（429）。</string>
 </resources>

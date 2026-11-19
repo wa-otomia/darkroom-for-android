@@ -97,6 +97,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.wa_otomia.darkroom.R
+import io.github.wa_otomia.darkroom.core.AiCredentialState
 import io.github.wa_otomia.darkroom.core.AppliedFraming
 import io.github.wa_otomia.darkroom.core.DEFAULT_ID_PHOTO_PRESET_ID
 import io.github.wa_otomia.darkroom.core.Framing
@@ -461,9 +462,9 @@ fun StudioScreen(
     val cropLocked = aiBlocking
     val printerReady = appSettings.printerMac.isNotBlank()
     val hasInstructions = presetId.isNotEmpty() || prompt.isNotBlank()
-    val canGenerate = !aiBusy && grokPub.keySet && hasInstructions
+    val canGenerate = !aiBusy && grokPub.credentialReady && hasInstructions
     val canPrintDirect = printerReady && !alreadyQueued
-    val canPrintWithPreset = printerReady && grokPub.keySet && hasInstructions && !alreadyQueued
+    val canPrintWithPreset = printerReady && grokPub.credentialReady && hasInstructions && !alreadyQueued
     val queuedIds = printJobs.filter { jobFieldKey(it.state) == "queued" }.map { it.id }
     val queueIndex = myPrint?.let { queuedIds.indexOf(it.id) }?.let { if (it >= 0) it + 1 else 0 } ?: 0
     LaunchedEffect(myPrint?.id) { printStripCollapsed = false }
@@ -1132,7 +1133,7 @@ fun StudioScreen(
 
             if (idActive) {
                 IdPhotoProcessSection(
-                    keySet = grokPub.keySet,
+                    credential = grokPub.credential,
                     local = idLocalCutout,
                     localSwitchEnabled = idLocalSwitchEnabled(busy = aiBusy, compositing = idCompositing),
                     hasMask = idHasMask,
@@ -1141,7 +1142,7 @@ fun StudioScreen(
                     featherInward = idFeatherInward,
                     maskOffset = idMaskOffsetChoice,
                     compositing = idCompositing,
-                    canCutOut = idCanCutOut(local = idLocalCutout, keySet = grokPub.keySet, busy = aiBusy),
+                    canCutOut = idCanCutOut(local = idLocalCutout, aiReady = grokPub.credentialReady, busy = aiBusy),
                     maskJob = maskJobUi,
                     maskJobElsewhere = maskJobElsewhereLabel,
                     maskError = maskErrorHere,
@@ -1164,10 +1165,15 @@ fun StudioScreen(
                 }
                 Column {
                     SectionLabel(stringResource(R.string.grok_title))
-                    if (!grokPub.keySet) {
+                    if (!grokPub.credentialReady) {
                         // Same notice as the ID-mode process section (IdPhotoProcessSection).
+                        val needText = when (grokPub.credential) {
+                            AiCredentialState.NOT_SIGNED_IN -> R.string.ai_need_subscription_login
+                            AiCredentialState.RELOGIN_REQUIRED -> R.string.ai_need_relogin
+                            else -> R.string.grok_need_key
+                        }
                         NoticeCard(
-                            text = stringResource(R.string.grok_need_key),
+                            text = stringResource(needText),
                             modifier = Modifier.padding(bottom = 8.dp),
                             actions = {
                                 TonalButton(

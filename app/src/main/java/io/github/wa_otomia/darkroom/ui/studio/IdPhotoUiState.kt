@@ -188,13 +188,17 @@ internal fun idCutOutLabel(hasMask: Boolean, local: Boolean): IdCutOutLabel = wh
 }
 
 /**
- * Whether the cut-out can start (EDID040-R02/R10): an on-device cut-out needs no provider key; an
- * AI one needs [keySet]. Any job on this photo ([busy], hidden ones included) blocks both.
+ * Whether the cut-out can start (EDID040-R02/R10): an on-device cut-out needs no provider
+ * credential; an AI one needs [aiReady] (API key set, or the subscription signed in: AIPV010-R04).
+ * Any job on this photo ([busy], hidden ones included) blocks both.
  */
-internal fun idCanCutOut(local: Boolean, keySet: Boolean, busy: Boolean): Boolean = (local || keySet) && !busy
+internal fun idCanCutOut(local: Boolean, aiReady: Boolean, busy: Boolean): Boolean = (local || aiReady) && !busy
 
-/** The "set an API key" hint and Settings entry show only for an AI cut-out without a key. */
-internal fun idShowNeedKey(local: Boolean, keySet: Boolean): Boolean = !local && !keySet
+/**
+ * The credential hint ("set an API key" / "sign in" / "sign in again") and Settings entry show only
+ * for an AI cut-out whose credential is not ready.
+ */
+internal fun idShowNeedKey(local: Boolean, aiReady: Boolean): Boolean = !local && !aiReady
 
 /**
  * The on-device switch is disabled while this photo has any job or the preview composite is

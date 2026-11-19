@@ -47,12 +47,20 @@ data class AiSettings(
         get() = byProvider[active] ?: defaultProviderSettings(active)
 }
 
+/**
+ * Public view of one provider. [keySet] only says the API key is non-empty (for the key field);
+ * [credential] is the AI readiness gate (AIPV010-R04). Holds no API key and no token.
+ */
 data class PublicProviderSettings(
     val keySet: Boolean,
     val baseUrl: String,
     val model: String,
     val resolution: String,
     val quality: String,
+    val authMode: AiAuthMode = AiAuthMode.API_KEY,
+    val credential: AiCredentialState = if (keySet) AiCredentialState.READY else AiCredentialState.NO_KEY,
+    val accountLabel: String? = null,
+    val clientId: String = "",
 )
 
 data class PublicAiSettings(
@@ -65,6 +73,8 @@ data class PublicAiSettings(
     val model: String get() = byProvider[active]?.model.orEmpty()
     val resolution: String get() = byProvider[active]?.resolution.orEmpty()
     val quality: String get() = byProvider[active]?.quality.orEmpty()
+    val credential: AiCredentialState get() = byProvider[active]?.credential ?: AiCredentialState.NO_KEY
+    val credentialReady: Boolean get() = credential == AiCredentialState.READY
 }
 
 typealias GrokSettings = ProviderSettings
@@ -183,21 +193,42 @@ fun mergeProviderSettings(
 fun mergeGrokSettings(stored: GrokSettings?, env: GrokSettings): GrokSettings =
     mergeProviderSettings(AiProvider.GROK, stored, env)
 
-fun toPublicProvider(settings: ProviderSettings) = PublicProviderSettings(
-    keySet = settings.apiKey.isNotBlank(),
-    baseUrl = settings.baseUrl,
-    model = settings.model,
-    resolution = settings.resolution,
-    quality = settings.quality,
-)
+/** [auth] describes Grok's subscription state; pass it only for Grok. */
+fun toPublicProvider(settings: ProviderSettings, auth: SubscriptionSnapshot? = null): PublicProviderSettings {
+    val keySet = settings.apiKey.isNotBlank()
+    val base = PublicProviderSettings(
+        keySet = keySet,
+        baseUrl = settings.baseUrl,
+        model = settings.model,
+        resolution = settings.resolution,
+        quality = settings.quality,
+    )
+    if (auth == null) return base
+    return base.copy(
+        authMode = auth.mode,
+        credential = credentialState(
+            AiProvider.GROK,
+            auth.mode,
+            settings.apiKey,
+            auth.hasCredential,
+            auth.reloginRequired,
+        ),
+        accountLabel = auth.accountLabel.takeIf { auth.hasCredential },
+        clientId = auth.clientId,
+    )
+}
 
 fun toPublicAi(
     settings: AiSettings,
     cachedModels: Map<AiProvider, List<String>> = emptyMap(),
+    grokAuth: SubscriptionSnapshot? = null,
 ) = PublicAiSettings(
     active = settings.active,
     byProvider = AiProvider.entries.associateWith { provider ->
-        toPublicProvider(settings.byProvider[provider] ?: defaultProviderSettings(provider))
+        toPublicProvider(
+            settings.byProvider[provider] ?: defaultProviderSettings(provider),
+            grokAuth.takeIf { provider == AiProvider.GROK },
+        )
     },
     cachedModels = cachedModels,
 )
@@ -266,6 +297,14 @@ fun sanitizeAiSecrets(text: String): String {
         .replace(Regex("((?:api[_-]?key|authorization)\\s*[:=]\\s*)\\S+", RegexOption.IGNORE_CASE), "$1********")
         .replace(Regex("\\bxai-[A-Za-z0-9_-]{8,}\\b"), "xai-********")
         .replace(Regex("\\bsk-[A-Za-z0-9_-]{8,}\\b"), "sk-********")
+        .replace(Regex("\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]*"), "eyJ********")
+        .replace(
+            Regex(
+                "(\"?(?:access_token|refresh_token|id_token|device_code|user_code)\"?\\s*[:=]\\s*\"?)[^\"&\\s,}]+",
+                RegexOption.IGNORE_CASE,
+            ),
+            "$1********",
+        )
 }
 
 fun formatByteProgress(

@@ -95,4 +95,8 @@
     <string name="id_error_mask_background_kept">切り抜きに失敗しました：返された画像に元の背景が残っており、マスクではありません。</string>
     <string name="id_error_mask_shaded">切り抜きに失敗しました：返された画像は陰影のあるグレースケール画像で、マスクではありません。</string>
     <string name="id_error_mask_local_failed">端末内での切り抜きに失敗しました。もう一度試すか、「端末内で切り抜く」をオフにして AI を使ってください。</string>
+
+    <!-- ID photo cut-out gate: xAI subscription -->
+    <string name="studio_id_need_subscription_login">切り抜きには xAI サブスクリプションへのサインインが必要です。設定でサインインしてください。</string>
+    <string name="studio_id_need_relogin">xAI サブスクリプションのサインインが無効になりました。切り抜くには設定でもう一度サインインしてください。</string>
 </resources>

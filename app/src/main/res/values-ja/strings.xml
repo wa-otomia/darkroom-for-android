@@ -19,6 +19,8 @@
     <string name="gallery_desc">カメラは JPG のみ対応です。受信した写真はここに表示されます。設定で「受信後に自動印刷」をオンにすると、2:3 にトリミングして自動的に印刷します。AI による編集は任意です。</string>
     <string name="chip_grok_ok">AI 準備完了</string>
     <string name="chip_grok_off">AI 未設定</string>
+    <string name="chip_grok_not_signed_in">AI サブスクリプション未サインイン</string>
+    <string name="chip_grok_relogin">AI 再サインインが必要</string>
     <string name="chip_printer_ok">プリンター準備完了</string>
     <string name="chip_printer_off">プリンター未登録</string>
     <string name="chip_autoprint">受信後に自動印刷</string>
@@ -298,4 +300,14 @@
     <string name="settings_keep_alive_hint">FTP と自動印刷が継続できるよう、アプリをバックグラウンドで維持します。</string>
     <string name="keep_alive_channel">常駐</string>
     <string name="keep_alive_notification">Darkroom を実行中に保ちます</string>
+
+    <!-- AI readiness: xAI subscription not signed in / sign-in expired, and their job errors -->
+    <string name="ai_need_subscription_login">xAI サブスクリプションにサインインしていません。設定の「AI 画像処理」でサインインしてください。</string>
+    <string name="ai_need_relogin">xAI サブスクリプションのサインインが無効になりました。設定でもう一度サインインしてください。</string>
+    <string name="error_xai_not_signed_in">xAI サブスクリプションにサインインしていません。設定でサインインしてから再試行してください。</string>
+    <string name="error_xai_relogin">xAI サブスクリプションのサインインが無効になりました。設定でもう一度サインインしてください。</string>
+    <string name="error_xai_rejected">xAI がサブスクリプションの認証情報を拒否しました。しばらくしてから再試行するか、もう一度サインインしてください。</string>
+    <string name="error_xai_refresh_network">xAI サブスクリプションの認証情報を更新できませんでした。ネットワークまたはサービスが利用できません。</string>
+    <string name="error_xai_forbidden">xAI がサブスクリプションのリクエストを拒否しました（403）。プランが対応していないか、アカウントまたは client ID に API アクセスが認可されていません。代わりに API キーを使用できます。</string>
+    <string name="error_xai_quota">xAI サブスクリプションの利用量が上限に達したか、制限されています（429）。</string>
 </resources>
